@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HCCL Auction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-logo" id="brandLogo">HCCL</div>
+      <div class="brand-text">
+        <h1 id="seasonTitle">HCCL Season 06</h1>
+        <p class="brand-sub">Champions League · Live Auction</p>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="auction">🔨 Live Auction</button>
+      <button class="tab" data-tab="players">👥 Players</button>
+      <button class="tab" data-tab="purse">💰 Teams &amp; Purse</button>
+      <button class="tab" data-tab="squads">🏆 Squads</button>
+      <button class="tab" data-tab="setup">⚙️ Setup</button>
+    </nav>
+  </header>
+
+  <main class="app-main">
+
+    <!-- ===================== LIVE AUCTION ===================== -->
+    <section class="view active" id="view-auction">
+      <div id="auctionEmpty" class="empty-state hidden">
+        <h2>No players to auction yet</h2>
+        <p>Go to the <strong>⚙️ Setup</strong> tab to add teams and players, or load the sample data to try it out.</p>
+        <button class="btn btn-yellow" data-goto="setup">Open Setup</button>
+      </div>
+
+      <div id="auctionStage" class="auction-stage">
+        <!-- LEFT: Player card -->
+        <div class="player-card">
+          <div class="player-photo-wrap">
+            <div class="player-photo" id="playerPhoto"></div>
+            <div class="player-status-chip" id="playerCounter">Player 1 / 1</div>
+          </div>
+          <div class="player-info">
+            <div class="player-role" id="playerRole"></div>
+            <h2 class="player-name" id="playerName">—</h2>
+            <div class="base-price-box">
+              <span class="label">BASE PRICE</span>
+              <span class="value" id="playerBase">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Bidding panel -->
+        <div class="bid-panel">
+          <div class="current-bid-box">
+            <div class="cb-left">
+              <span class="label">CURRENT BID</span>
+              <span class="cb-amount" id="currentBidAmount">—</span>
+            </div>
+            <div class="cb-right">
+              <span class="label">LEADING</span>
+              <span class="cb-leader" id="currentLeader">No bids yet</span>
+            </div>
+          </div>
+
+          <div class="teams-bid-grid" id="teamsBidGrid"></div>
+
+          <div class="auctioneer-bar">
+            <button class="btn btn-sold" id="btnSold">SOLD</button>
+            <button class="btn btn-dark" id="btnUnsold">Unsold</button>
+            <button class="btn btn-dark" id="btnUndo" title="Revert the last sold/unsold action">↩ Undo</button>
+            <button class="btn btn-dark" id="btnReset" title="Clear the current bids for this player">⟳ Reset Bid</button>
+          </div>
+
+          <div class="bidlog" id="bidLog"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PLAYERS ===================== -->
+    <section class="view" id="view-players">
+      <div class="view-head">
+        <h2>Players</h2>
+        <div class="view-head-tools">
+          <input type="search" id="playerSearch" placeholder="Search players…" />
+          <select id="playerFilter">
+            <option value="all">All</option>
+            <option value="available">Available</option>
+            <option value="sold">Sold</option>
+            <option value="unsold">Unsold</option>
+            <option value="retained">Retained</option>
+          </select>
+        </div>
+      </div>
+      <div class="players-grid" id="playersGrid"></div>
+    </section>
+
+    <!-- ===================== TEAMS & PURSE ===================== -->
+    <section class="view" id="view-purse">
+      <div class="view-head"><h2>Teams &amp; Remaining Purse</h2></div>
+      <div class="purse-grid" id="purseGrid"></div>
+    </section>
+
+    <!-- ===================== SQUADS ===================== -->
+    <section class="view" id="view-squads">
+      <div class="view-head"><h2>Squads</h2></div>
+      <div class="squads-grid" id="squadsGrid"></div>
+    </section>
+
+    <!-- ===================== SETUP ===================== -->
+    <section class="view" id="view-setup">
+      <div class="view-head"><h2>Setup &amp; Management</h2></div>
+
+      <div class="setup-grid">
+
+        <!-- League settings -->
+        <div class="card">
+          <h3>League Settings</h3>
+          <label>Season name
+            <input type="text" id="setSeasonName" placeholder="HCCL" />
+          </label>
+          <label>Season number
+            <input type="number" id="setSeasonNumber" min="1" placeholder="6" />
+          </label>
+          <label>Currency label
+            <input type="text" id="setCurrency" placeholder="Cr" />
+          </label>
+          <label>Default purse (per team)
+            <input type="number" id="setPurse" min="0" step="any" placeholder="100" />
+          </label>
+          <label>Bid increment
+            <input type="number" id="setIncrement" min="0" step="any" placeholder="1" />
+          </label>
+          <label>League logo
+            <input type="file" id="setLogoFile" accept="image/*" />
+          </label>
+          <button class="btn btn-yellow" id="btnSaveSettings">Save Settings</button>
+        </div>
+
+        <!-- Add / edit team -->
+        <div class="card">
+          <h3 id="teamFormTitle">Add Team</h3>
+          <input type="hidden" id="teamEditId" />
+          <label>Team name
+            <input type="text" id="teamName" placeholder="e.g. Royal Strikers" />
+          </label>
+          <label>Purse (leave blank for default)
+            <input type="number" id="teamPurse" min="0" step="any" placeholder="100" />
+          </label>
+          <label>Team logo
+            <input type="file" id="teamLogoFile" accept="image/*" />
+          </label>
+          <div class="form-row">
+            <button class="btn btn-red" id="btnSaveTeam">Add Team</button>
+            <button class="btn btn-dark hidden" id="btnCancelTeam">Cancel</button>
+          </div>
+          <div class="mini-list" id="teamMiniList"></div>
+        </div>
+
+        <!-- Add / edit player -->
+        <div class="card">
+          <h3 id="playerFormTitle">Add Player</h3>
+          <input type="hidden" id="playerEditId" />
+          <label>Player name
+            <input type="text" id="pName" placeholder="e.g. Kasun Perera" />
+          </label>
+          <label>Role / category (optional)
+            <input type="text" id="pRole" placeholder="e.g. All-rounder" />
+          </label>
+          <label>Base price
+            <input type="number" id="pBase" min="0" step="any" placeholder="1" />
+          </label>
+          <label>Player photo
+            <input type="file" id="pPhotoFile" accept="image/*" />
+          </label>
+          <div class="form-row">
+            <button class="btn btn-red" id="btnSavePlayer">Add Player</button>
+            <button class="btn btn-dark hidden" id="btnCancelPlayer">Cancel</button>
+          </div>
+          <p class="hint">Tip: players are auctioned top-to-bottom in this order. Use ▲ ▼ to reorder.</p>
+          <div class="mini-list" id="playerMiniList"></div>
+        </div>
+
+        <!-- Retain / pre-assign players -->
+        <div class="card">
+          <h3 id="retainFormTitle">Retain / Pre-assign Player</h3>
+          <input type="hidden" id="retainEditId" />
+          <p class="hint">Players a team keeps from last season. They go straight into the squad (not the auction). Price is optional — it's just for record and is <strong>not</strong> deducted from the new-season purse.</p>
+          <label>Team
+            <select id="retainTeam"></select>
+          </label>
+          <label>Player name
+            <input type="text" id="rName" placeholder="e.g. Kasun Perera" />
+          </label>
+          <label>Role / category (optional)
+            <input type="text" id="rRole" placeholder="e.g. Captain" />
+          </label>
+          <label>Retention price (optional)
+            <input type="number" id="rPrice" min="0" step="any" placeholder="optional" />
+          </label>
+          <label>Player photo
+            <input type="file" id="rPhotoFile" accept="image/*" />
+          </label>
+          <div class="form-row">
+            <button class="btn btn-red" id="btnSaveRetain">Add Retained Player</button>
+            <button class="btn btn-dark hidden" id="btnCancelRetain">Cancel</button>
+          </div>
+          <div class="mini-list" id="retainMiniList"></div>
+        </div>
+
+        <!-- Data management -->
+        <div class="card">
+          <h3>Data &amp; Backup</h3>
+          <p class="hint">Your data is saved in this browser. Export regularly to keep a safe backup of the auction.</p>
+          <div class="form-row">
+            <button class="btn btn-yellow" id="btnExport">⬇ Export backup</button>
+            <label class="btn btn-dark file-btn">⬆ Import backup
+              <input type="file" id="importFile" accept="application/json" hidden />
+            </label>
+          </div>
+          <hr />
+          <div class="form-row">
+            <button class="btn btn-dark" id="btnLoadSample">Load sample data</button>
+            <button class="btn btn-dark" id="btnReauction">Re-open unsold players</button>
+          </div>
+          <hr />
+          <p class="hint danger-hint">Danger zone</p>
+          <div class="form-row">
+            <button class="btn btn-danger" id="btnResetAuction">Reset auction results</button>
+            <button class="btn btn-danger" id="btnResetAll">Erase everything</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================== RESULT OVERLAY ===================== -->
+  <div class="overlay hidden" id="overlay">
+    <div class="overlay-card" id="overlayCard">
+      <div class="overlay-logo" id="overlayLogo"></div>
+      <div class="overlay-title" id="overlayTitle">SOLD</div>
+      <div class="overlay-text" id="overlayText"></div>
+      <div class="overlay-actions" id="overlayActions">
+        <button class="btn btn-yellow" id="btnNextPlayer">Next Player ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

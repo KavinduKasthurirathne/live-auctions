@@ -1,0 +1,359 @@
+/* ===================== THEME ===================== */
+:root {
+  --black: #0a0a0b;
+  --panel: #161618;
+  --panel-2: #1f1f22;
+  --panel-3: #2a2a2e;
+  --border: #34343a;
+  --red: #e10600;
+  --red-dark: #b00500;
+  --yellow: #ffcc00;
+  --gold: #f5b301;
+  --text: #f6f6f7;
+  --muted: #9b9ba3;
+  --green: #22c55e;
+  --radius: 16px;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background:
+    radial-gradient(900px 600px at 100% -10%, rgba(225, 6, 0, 0.18), transparent 60%),
+    radial-gradient(800px 500px at -10% 110%, rgba(255, 204, 0, 0.10), transparent 55%),
+    var(--black);
+  color: var(--text);
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hidden { display: none !important; }
+
+/* ===================== HEADER ===================== */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(12, 12, 14, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px clamp(14px, 3vw, 34px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand { display: flex; align-items: center; gap: 14px; }
+
+.brand-logo {
+  width: 56px; height: 56px;
+  border-radius: 14px;
+  display: grid; place-items: center;
+  font-family: "Anton", sans-serif;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--red), var(--gold));
+  background-size: cover; background-position: center;
+  box-shadow: var(--shadow);
+  flex: none;
+  overflow: hidden;
+}
+
+.brand-text h1 {
+  font-family: "Anton", sans-serif;
+  font-size: clamp(20px, 2.4vw, 30px);
+  letter-spacing: 1px;
+  line-height: 1;
+  background: linear-gradient(90deg, #fff, var(--yellow));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.brand-sub { color: var(--muted); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 10px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.tab:hover { color: var(--text); border-color: #4a4a52; }
+.tab.active {
+  color: #1a1300;
+  background: linear-gradient(135deg, var(--yellow), var(--gold));
+  border-color: transparent;
+}
+
+/* ===================== LAYOUT ===================== */
+.app-main { padding: clamp(14px, 3vw, 30px); max-width: 1400px; margin: 0 auto; }
+.view { display: none; animation: fade 0.25s ease; }
+.view.active { display: block; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.view-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+.view-head h2 { font-family: "Anton", sans-serif; font-size: 26px; letter-spacing: 1px; }
+.view-head-tools { display: flex; gap: 10px; flex-wrap: wrap; }
+
+input, select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+input:focus, select:focus { border-color: var(--gold); }
+input[type="file"] { padding: 8px; font-size: 13px; }
+
+/* ===================== BUTTONS ===================== */
+.btn {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease;
+  color: #fff;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-yellow { background: linear-gradient(135deg, var(--yellow), var(--gold)); color: #1a1300; }
+.btn-red { background: linear-gradient(135deg, var(--red), var(--red-dark)); }
+.btn-dark { background: var(--panel-3); border: 1px solid var(--border); }
+.btn-dark:hover:not(:disabled) { background: #34343a; }
+.btn-danger { background: transparent; border: 1px solid var(--red); color: var(--red); }
+.btn-danger:hover { background: rgba(225, 6, 0, 0.12); }
+.btn-yellow:hover:not(:disabled), .btn-red:hover:not(:disabled) { filter: brightness(1.08); }
+.file-btn { display: inline-flex; align-items: center; cursor: pointer; }
+
+/* ===================== EMPTY STATE ===================== */
+.empty-state {
+  text-align: center;
+  padding: 70px 20px;
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.empty-state h2 { font-family: "Anton", sans-serif; font-size: 26px; margin-bottom: 10px; }
+.empty-state p { color: var(--muted); margin-bottom: 18px; }
+
+/* ===================== AUCTION STAGE ===================== */
+.auction-stage { display: grid; grid-template-columns: minmax(320px, 5fr) 7fr; gap: 22px; align-items: start; }
+
+.player-card {
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.player-card::before {
+  content: ""; position: absolute; inset: 0;
+  border-radius: 22px; padding: 2px;
+  background: linear-gradient(135deg, var(--red), var(--gold));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+.player-photo-wrap { position: relative; }
+.player-photo {
+  width: 100%; aspect-ratio: 4 / 5;
+  border-radius: 16px;
+  background: #0d0d0f center/cover no-repeat;
+  display: grid; place-items: center;
+  font-family: "Anton", sans-serif; font-size: 84px; color: #2f2f35;
+  border: 1px solid var(--border);
+}
+.player-status-chip {
+  position: absolute; top: 12px; left: 12px;
+  background: rgba(0,0,0,0.65); color: var(--yellow);
+  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  backdrop-filter: blur(6px);
+}
+.player-info { padding: 16px 6px 6px; text-align: center; }
+.player-role { color: var(--yellow); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; font-size: 12px; min-height: 14px; }
+.player-name { font-family: "Anton", sans-serif; font-size: clamp(26px, 3vw, 40px); letter-spacing: 1px; margin: 6px 0 14px; }
+.base-price-box {
+  display: inline-flex; flex-direction: column; gap: 2px;
+  background: var(--black); border: 1px solid var(--border);
+  padding: 10px 26px; border-radius: 14px;
+}
+.base-price-box .label { color: var(--muted); font-size: 11px; letter-spacing: 2px; }
+.base-price-box .value { font-family: "Anton", sans-serif; font-size: 26px; color: var(--yellow); }
+
+/* BID PANEL */
+.bid-panel { display: flex; flex-direction: column; gap: 16px; }
+.current-bid-box {
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  background: linear-gradient(135deg, rgba(225,6,0,0.18), rgba(255,204,0,0.10));
+  border: 1px solid var(--border);
+  border-radius: 18px; padding: 18px 22px;
+}
+.current-bid-box .label { color: var(--muted); font-size: 11px; letter-spacing: 2px; display: block; }
+.cb-amount { font-family: "Anton", sans-serif; font-size: clamp(34px, 5vw, 60px); line-height: 1; color: #fff; text-shadow: 0 0 22px rgba(255,204,0,0.35); }
+.cb-right { text-align: right; }
+.cb-leader { font-size: clamp(18px, 2.4vw, 26px); font-weight: 800; color: var(--yellow); }
+
+.teams-bid-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.team-bid-btn {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  display: flex; gap: 10px; align-items: center;
+  transition: all 0.12s ease;
+  position: relative;
+  min-width: 0; overflow: hidden;
+}
+.team-bid-btn:hover:not(:disabled) { border-color: var(--gold); transform: translateY(-2px); }
+.team-bid-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.team-bid-btn.leading { border-color: var(--green); background: rgba(34,197,94,0.12); }
+.tb-logo {
+  width: 40px; height: 40px; border-radius: 10px; flex: none;
+  background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat;
+  display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff;
+}
+.tb-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; padding-right: 10px; }
+.tb-name { display: block; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-purse { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-key { position: absolute; top: 6px; right: 8px; font-size: 10px; color: var(--muted); }
+
+/* AUCTIONEER BAR */
+.auctioneer-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-sold {
+  flex: 1; min-width: 180px;
+  background: linear-gradient(135deg, var(--red), var(--red-dark));
+  font-family: "Anton", sans-serif; font-size: 22px; letter-spacing: 2px;
+  padding: 16px;
+}
+.btn-sold.stage-1 { background: linear-gradient(135deg, var(--yellow), var(--gold)); color: #1a1300; animation: pulse 0.8s infinite; }
+.btn-sold.stage-2 { background: linear-gradient(135deg, #ff9a00, #ff6a00); animation: pulse 0.6s infinite; }
+.btn-sold.stage-3 { background: linear-gradient(135deg, var(--red), #ff2a00); animation: pulse 0.4s infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.0); } 50% { box-shadow: 0 0 0 6px rgba(255,255,255,0.18); } }
+
+.bidlog {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 12px 16px; max-height: 160px; overflow-y: auto;
+  font-size: 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.bidlog:empty::after { content: "Bid history will appear here…"; color: var(--muted); font-size: 13px; }
+.bidlog-row { color: var(--muted); }
+.bidlog-row b { color: var(--text); }
+.bidlog-row .amt { color: var(--yellow); font-weight: 700; }
+
+/* ===================== PLAYERS GRID ===================== */
+.players-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.pcard {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.pcard-photo { aspect-ratio: 1/1; background: #0d0d0f center/cover no-repeat; display: grid; place-items: center; font-family: "Anton", sans-serif; font-size: 46px; color: #2f2f35; }
+.pcard-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.pcard-name { font-weight: 700; font-size: 16px; }
+.pcard-role { color: var(--muted); font-size: 12px; }
+.pcard-base { color: var(--yellow); font-weight: 700; font-size: 14px; margin-top: auto; }
+.pcard-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+.badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 1px; }
+.badge.available { background: rgba(255,204,0,0.15); color: var(--yellow); }
+.badge.sold { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge.unsold { background: rgba(225,6,0,0.15); color: #ff6b6b; }
+.badge.retained { background: rgba(255,154,60,0.16); color: #ff9a3c; }
+.pcard-sold { font-size: 12px; color: var(--muted); }
+.pcard-sold b { color: var(--text); }
+.btn-mini { font-size: 12px; padding: 6px 12px; border-radius: 8px; }
+
+/* ===================== PURSE GRID ===================== */
+.purse-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.purse-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+.purse-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.team-logo { width: 48px; height: 48px; border-radius: 12px; flex: none; background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat; display: grid; place-items: center; font-weight: 800; color: #fff; }
+.team-logo.lg { width: 60px; height: 60px; font-size: 20px; }
+.purse-name { font-weight: 800; font-size: 18px; }
+.purse-count { color: var(--muted); font-size: 13px; }
+.purse-amounts { display: flex; justify-content: space-between; margin: 10px 0 8px; font-size: 13px; }
+.purse-amounts .muted { color: var(--muted); }
+.purse-remaining { font-family: "Anton", sans-serif; font-size: 24px; color: var(--yellow); }
+.bar { height: 10px; background: var(--panel-3); border-radius: 999px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), var(--gold)); }
+
+/* ===================== SQUADS ===================== */
+.squads-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.squad-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+.squad-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.squad-meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.squad-players { display: flex; flex-direction: column; gap: 8px; }
+.squad-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+.squad-row .mini-photo { width: 34px; height: 34px; border-radius: 8px; background: #0d0d0f center/cover no-repeat; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #555; flex: none; }
+.squad-row .sr-name { font-weight: 600; font-size: 14px; flex: 1; }
+.squad-row .sr-price { color: var(--yellow); font-weight: 700; font-size: 14px; }
+.ret-tag { font-size: 9px; font-weight: 800; letter-spacing: 1px; color: #ff9a3c; border: 1px solid #ff9a3c; border-radius: 5px; padding: 1px 5px; flex: none; }
+.squad-empty { color: var(--muted); font-size: 13px; font-style: italic; }
+
+/* ===================== SETUP ===================== */
+.setup-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; align-items: start; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.card h3 { font-size: 18px; }
+.card label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.card label input, .card label select { color: var(--text); }
+.form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.hint { color: var(--muted); font-size: 12px; }
+.danger-hint { color: var(--red); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.card hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+.mini-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.mini-row { display: flex; align-items: center; gap: 8px; background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+.mini-row .ml-logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; color: #fff; }
+.mini-row .ml-name { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-row .ml-sub { color: var(--muted); font-size: 12px; }
+.icon-btn { background: var(--panel-3); border: 1px solid var(--border); color: var(--text); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 13px; display: grid; place-items: center; }
+.icon-btn:hover { border-color: var(--gold); }
+.icon-btn.del:hover { border-color: var(--red); color: var(--red); }
+
+/* ===================== OVERLAY ===================== */
+.overlay { position: fixed; inset: 0; z-index: 100; background: rgba(5,5,6,0.88); backdrop-filter: blur(6px); display: grid; place-items: center; animation: fade 0.25s ease; padding: 20px; }
+.overlay-card { text-align: center; max-width: 640px; width: 100%; padding: 40px; border-radius: 24px; background: linear-gradient(160deg, var(--panel-2), var(--panel)); border: 1px solid var(--border); box-shadow: var(--shadow); animation: pop 0.35s cubic-bezier(.2,1.3,.4,1); }
+@keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.overlay-logo { width: 110px; height: 110px; border-radius: 24px; margin: 0 auto 18px; background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat; display: grid; place-items: center; font-family: "Anton", sans-serif; font-size: 36px; color: #fff; }
+.overlay-title { font-family: "Anton", sans-serif; font-size: clamp(44px, 8vw, 80px); letter-spacing: 3px; line-height: 1; }
+.overlay-title.sold { color: var(--green); text-shadow: 0 0 30px rgba(34,197,94,0.4); }
+.overlay-title.unsold { color: var(--red); }
+.overlay-title.done { background: linear-gradient(90deg, var(--yellow), var(--red)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.overlay-text { font-size: clamp(18px, 3vw, 26px); margin: 16px 0 26px; line-height: 1.5; }
+.overlay-text b { color: var(--yellow); }
+.overlay-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* ===================== TOAST ===================== */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--panel-3); border: 1px solid var(--border); color: var(--text); padding: 12px 20px; border-radius: 12px; z-index: 200; box-shadow: var(--shadow); font-weight: 600; animation: fade 0.2s ease; }
+.toast.good { border-color: var(--green); }
+.toast.bad { border-color: var(--red); }
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 900px) {
+  .auction-stage { grid-template-columns: 1fr; }
+  .tabs { width: 100%; justify-content: center; }
+}
+@media (max-width: 560px) {
+  .tab { padding: 8px 12px; font-size: 13px; }
+  .btn { padding: 11px 14px; font-size: 14px; }
+}
