@@ -328,10 +328,13 @@
     const card = document.createElement("div");
     // Lay out at the origin (NOT off-screen via a huge negative offset - the
     // node's own position is copied onto html-to-image's clone, so left:-99999px
-    // pushes the content outside the captured SVG => an all-black image). We tuck
-    // it behind the app with z-index:-1 instead. Do NOT use opacity/visibility to
-    // hide it - those get cloned too and would blank the capture.
-    card.style.cssText = "position:fixed;left:0;top:0;z-index:-1;pointer-events:none;" +
+    // pushes the content outside the captured SVG => an all-black image). Use
+    // position:absolute (NOT fixed): a fixed node taller than the viewport gets
+    // clipped to the screen height, cutting off the lower rows. Absolute lets the
+    // node take its full content height so the entire table is captured. We tuck
+    // it behind the app with z-index:-1; do NOT use opacity/visibility to hide it
+    // - those get cloned too and would blank the capture.
+    card.style.cssText = "position:absolute;left:0;top:0;z-index:-1;pointer-events:none;" +
       "width:1080px;box-sizing:border-box;padding:52px 48px;" +
       "background:#0a0a0b;color:#f6f6f7;font-family:'Inter',system-ui,sans-serif;";
     card.innerHTML = `
@@ -372,7 +375,7 @@
     document.body.appendChild(node);
     try {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      const opts = { pixelRatio: 2, backgroundColor: "#0a0a0b", cacheBust: true, width: 1080, height: node.offsetHeight };
+      const opts = { pixelRatio: 2, backgroundColor: "#0a0a0b", cacheBust: true, width: 1080, height: node.scrollHeight };
       // First render is unreliable (fonts/styles not embedded yet) and often
       // comes back blank - run it as a throwaway, then capture for real.
       await lib.toPng(node, opts);
