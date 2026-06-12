@@ -1,0 +1,64 @@
+/* ===================== FANTASY ===================== */
+.fan-subnav { display: flex; gap: 8px; flex-wrap: wrap; }
+.fan-tab {
+  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+  padding: 9px 14px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 700;
+  font-family: inherit; transition: all 0.15s ease;
+}
+.fan-tab:hover { color: var(--text); border-color: #4a4a52; }
+.fan-tab.active { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+
+#view-fantasy .card { margin-bottom: 16px; }
+#view-fantasy .card h3 { font-size: 17px; }
+
+/* teams playing toggles */
+.fan-team-toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+.fan-chip {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600;
+}
+.fan-chip.on { border-color: var(--gold); background: rgba(255, 204, 0, 0.12); color: var(--yellow); }
+.fan-chip input { accent-color: var(--gold); }
+
+/* player pool picker */
+.fan-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin: 6px 0; }
+.fan-pool-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.fan-pool-team-name { font-weight: 800; font-size: 13px; color: var(--yellow); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.fan-pick { display: flex; align-items: center; gap: 8px; padding: 5px 2px; font-size: 14px; cursor: pointer; }
+.fan-pick input { accent-color: var(--red); width: 16px; height: 16px; flex: none; }
+.fan-pick input:disabled { opacity: 0.4; }
+.fan-count { font-weight: 700; color: var(--muted); margin: 8px 0; }
+.fan-count.full { color: var(--green); }
+
+/* entries list */
+.fan-entries { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.fan-entry { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.fan-entry-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.fan-entry-head b { font-size: 15px; }
+.fan-pts { color: var(--yellow); font-weight: 800; }
+.fan-entry-actions { margin-left: auto; display: flex; gap: 6px; }
+.fan-entry-players { display: flex; flex-wrap: wrap; gap: 6px; }
+.fan-pchip { display: inline-flex; align-items: center; gap: 5px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+.fan-pchip .cap, .fan-pchip .vc { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 5px; }
+.fan-pchip .cap { background: var(--red); color: #fff; }
+.fan-pchip .vc { background: var(--gold); color: #1a1300; }
+.pchip-pts { color: var(--yellow); font-weight: 700; }
+
+/* results entry */
+.fan-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin: 6px 0 14px; }
+.fan-results-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.fan-res-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.frr-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-res-row input { width: 62px; flex: none; padding: 7px 8px; }
+.frr-pts { width: 44px; flex: none; text-align: right; color: var(--yellow); font-weight: 800; font-size: 14px; }
+.frr-sub { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
+
+/* leaderboards */
+.fan-board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.fan-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.fan-table th { text-align: left; color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.fan-table td { padding: 9px 8px; border-bottom: 1px solid var(--panel-2); vertical-align: middle; }
+.fan-table td.num, .fan-table th.num { text-align: right; }
+.fan-table td.strong { color: var(--yellow); font-weight: 800; font-size: 15px; }
+.fan-table tr:first-child td { font-weight: 700; }

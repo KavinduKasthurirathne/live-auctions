@@ -24,7 +24,7 @@ function defaultState() {
     teams: [],   // { id, name, logo, purse }
     players: [], // { id, name, role, basePrice, photo, status, soldTo, soldPrice }
     auction: { currentPlayerId: null, currentBid: 0, currentBidderId: null, soldStage: 0, bidLog: [], lastResult: null },
-    lastAction: null, // { type, playerId } — for Undo
+    lastAction: null, // { type, playerId }for Undo
   };
 }
 
@@ -56,7 +56,7 @@ function load() {
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
-  catch (e) { toast("Storage full — export a backup and use smaller images", "bad"); }
+  catch (e) { toast("Storage fullexport a backup and use smaller images", "bad"); }
 }
 
 /* ---------- utilities ---------- */
@@ -73,7 +73,7 @@ function initials(str) {
 }
 
 function money(n) {
-  if (n === null || n === undefined || isNaN(n)) return "—";
+  if (n === null || n === undefined || isNaN(n)) return "-";
   const num = Number(n);
   const s = Number.isInteger(num) ? String(num) : String(parseFloat(num.toFixed(2)));
   return `${s} ${state.settings.currency}`;
@@ -271,7 +271,7 @@ function renderTeamButtons() {
 function renderSoldButton() {
   const btn = $("#btnSold");
   const a = state.auction;
-  const labels = { 0: "SOLD", 1: "GOING ONCE!", 2: "GOING TWICE!", 3: "GOING THRICE — SELL!" };
+  const labels = { 0: "SOLD", 1: "GOING ONCE!", 2: "GOING TWICE!", 3: "GOING THRICESELL!" };
   btn.className = "btn btn-sold" + (a.soldStage ? ` stage-${a.soldStage}` : "");
   btn.textContent = labels[a.soldStage];
   btn.disabled = a.currentBidderId == null;
@@ -325,7 +325,7 @@ function placeBid(teamId) {
 }
 
 function advanceSold() {  const a = state.auction;
-  if (a.currentBidderId == null) { toast("No bids yet — use Unsold instead", "bad"); return; }
+  if (a.currentBidderId == null) { toast("No bids yetuse Unsold instead", "bad"); return; }
   if (a.soldStage < 3) { a.soldStage++; save(); renderSoldButton(); }
   else { finalizeSold(); }
 }
@@ -394,7 +394,7 @@ function auctionNow(playerId) {
   const p = getPlayer(playerId);
   if (!p) return;
   if (p.status === "unsold") p.status = "available";
-  if (p.status !== "available") { toast("Already sold — use Undo first", "bad"); return; }
+  if (p.status !== "available") { toast("Already solduse Undo first", "bad"); return; }
   state.auction.currentPlayerId = playerId;
   state.auction.lastResult = null;
   resetBidState();
@@ -448,7 +448,7 @@ function renderPlayers() {
     let foot;
     if (p.status === "available")    foot = `<button class="btn btn-yellow btn-mini" data-auction="${p.id}">Auction now</button>`;
     else if (p.status === "unsold")  foot = `<button class="btn btn-dark btn-mini" data-auction="${p.id}">Re-auction</button>`;
-    else foot = `<span class="pcard-sold">${team ? esc(team.name) : "—"} · <b>${money(p.soldPrice)}</b></span>`;
+    else foot = `<span class="pcard-sold">${team ? esc(team.name) : "-"} · <b>${money(p.soldPrice)}</b></span>`;
 
     const card = document.createElement("div");
     card.className = "pcard";
@@ -596,7 +596,7 @@ function renderSetup() {
     row.innerHTML = `
       ${logoHTML("ml-logo", p.photo, p.name)}
       <span class="ml-name">${esc(p.name)}</span>
-      <span class="ml-sub">${team ? esc(team.name) : "—"}${p.soldPrice ? " · " + money(p.soldPrice) : ""}</span>
+      <span class="ml-sub">${team ? esc(team.name) : "-"}${p.soldPrice ? " · " + money(p.soldPrice) : ""}</span>
       <button class="icon-btn" data-edit-retain="${p.id}" title="Edit">✎</button>
       <button class="icon-btn del" data-del-retain="${p.id}" title="Remove">✕</button>`;
     rl.appendChild(row);
@@ -746,7 +746,7 @@ async function saveRetain() {
   if (!team) { toast("Add a team first, then retain players", "bad"); return; }
   const name = $("#rName").value.trim();
   if (!name) { toast("Enter a player name", "bad"); return; }
-  // Price is optional & informational — retained players carry over from last
+  // Price is optional & informationalretained players carry over from last
   // season, so they are NOT deducted from this season's purse.
   const raw = $("#rPrice").value.trim();
   const price = raw === "" ? null : parseFloat(raw);
@@ -878,7 +878,7 @@ function resetAuction() {
   toast("Auction reset", "good");
 }
 function resetAll() {
-  if (!confirm("Erase EVERYTHING — teams, players and settings?")) return;
+  if (!confirm("Erase EVERYTHINGteams, players and settings?")) return;
   if (!confirm("Are you absolutely sure? This cannot be undone.")) return;
   state = defaultState();
   save();

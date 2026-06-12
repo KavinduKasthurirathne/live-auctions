@@ -1,0 +1,592 @@
+/* ============================================================
+   HCCL Fantasy League  (self-contained - does not touch the auction)
+   Stored separately in localStorage under "hccl_fantasy_v1".
+   Reads the auction key only for the optional "Import" button.
+   ============================================================ */
+(function () {
+  "use strict";
+
+  const FKEY = "hccl_fantasy_v1";
+  const AKEY = "hccl_auction_v1";
+
+  /* ---------------- state ---------------- */
+  function defaultFantasy() {
+    return { teams: [], players: [], contestants: [], days: [] };
+  }
+  function normalizeF(s) {
+    s = s || {};
+    s.teams = Array.isArray(s.teams) ? s.teams : [];
+    s.players = Array.isArray(s.players) ? s.players : [];
+    s.contestants = Array.isArray(s.contestants) ? s.contestants : [];
+    s.days = (Array.isArray(s.days) ? s.days : []).map(d => ({
+      id: d.id, date: d.date || "", label: d.label || "",
+      teamIds: Array.isArray(d.teamIds) ? d.teamIds : [],
+      performance: d.performance || {},
+      entries: (Array.isArray(d.entries) ? d.entries : []).map(e => ({
+        id: e.id, contestantId: e.contestantId,
+        playerIds: Array.isArray(e.playerIds) ? e.playerIds : [],
+        captainId: e.captainId || null, viceCaptainId: e.viceCaptainId || null,
+      })),
+      hasResults: !!d.hasResults,
+    }));
+    return s;
+  }
+  function loadF() {
+    try { const r = localStorage.getItem(FKEY); if (r) return normalizeF(JSON.parse(r)); } catch (e) {}
+    return defaultFantasy();
+  }
+  function saveF() {
+    try { localStorage.setItem(FKEY, JSON.stringify(F)); } catch (e) { ftoast("Storage full - export a backup", "bad"); }
+  }
+
+  let F = loadF();
+  const UI = { sub: "matchday", dayId: null, editEntryId: null, editTeamId: null, editPlayerId: null };
+
+  /* ---------------- helpers ---------------- */
+  const fid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const fanEl = () => document.getElementById("view-fantasy");
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  const fTeam = id => F.teams.find(t => t.id === id);
+  const fPlayer = id => F.players.find(p => p.id === id);
+  const fContestant = id => F.contestants.find(c => c.id === id);
+  const fDay = id => F.days.find(d => d.id === id);
+  const pname = id => { const p = fPlayer(id); return p ? p.name : ""; };
+  const teamName = id => { const t = fTeam(id); return t ? t.name : "-"; };
+  function fmtPts(n) { return String(Math.round((Number(n) || 0) * 100) / 100); }
+  function today() { return new Date().toISOString().slice(0, 10); }
+  function dayLabel(d) {
+    if (!d) return "";
+    const dt = new Date(d.date + "T00:00:00");
+    const s = isNaN(dt.getTime()) ? (d.date || "Day") : dt.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+    return s + (d.label ? " · " + d.label : "");
+  }
+  function medal(i) { return i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : String(i + 1); }
+
+  let ftoastTimer;
+  function ftoast(msg, kind = "") {
+    const t = document.getElementById("toast"); if (!t) return;
+    t.textContent = msg; t.className = "toast " + kind;
+    clearTimeout(ftoastTimer); ftoastTimer = setTimeout(() => t.classList.add("hidden"), 2400);
+  }
+
+  /* ---------------- scoring ---------------- */
+  function dayPool(day) { return F.players.filter(p => day.teamIds.includes(p.teamId)); }
+  function playerDayPoints(day, playerId) {
+    const perf = day.performance && day.performance[playerId];
+    if (!perf) return 0;
+    return (Number(perf.runs) || 0) + (Number(perf.wickets) || 0) * 10;
+  }
+  function entryPoints(day, entry) {
+    return entry.playerIds.reduce((sum, pid) => {
+      let pts = playerDayPoints(day, pid);
+      if (pid === entry.captainId) pts *= 2;
+      else if (pid === entry.viceCaptainId) pts *= 1.5;
+      return sum + pts;
+    }, 0);
+  }
+  function dayStandings(day) {
+    return day.entries
+      .map(e => ({ entry: e, contestant: fContestant(e.contestantId), points: entryPoints(day, e) }))
+      .sort((a, b) => b.points - a.points);
+  }
+  function contestantStats() {
+    return F.contestants.map(c => {
+      let total = 0, n = 0;
+      F.days.forEach(d => {
+        if (!d.hasResults) return;
+        const e = d.entries.find(x => x.contestantId === c.id);
+        if (e) { total += entryPoints(d, e); n++; }
+      });
+      return { contestant: c, total, days: n, avg: n ? total / n : 0 };
+    }).sort((a, b) => b.avg - a.avg || b.total - a.total);
+  }
+  function playerStats() {
+    return F.players.map(p => {
+      let total = 0, n = 0;
+      F.days.forEach(d => {
+        if (!d.hasResults || !d.teamIds.includes(p.teamId)) return;
+        total += playerDayPoints(d, p.id); n++;
+      });
+      return { player: p, total, days: n, avg: n ? total / n : 0 };
+    }).sort((a, b) => b.avg - a.avg || b.total - a.total);
+  }
+  function currentDay() {
+    if (UI.dayId) { const d = fDay(UI.dayId); if (d) return d; }
+    const d = F.days[0]; UI.dayId = d ? d.id : null; return d || null;
+  }
+
+  /* ============================================================
+     RENDER
+     ============================================================ */
+  function renderFantasy() {
+    const v = fanEl(); if (!v) return;
+    v.innerHTML = `
+      <div class="view-head">
+        <h2>Fantasy League</h2>
+        <div class="fan-subnav">
+          ${subBtn("matchday", "📅 Match Day")}
+          ${subBtn("leaderboard", "🏆 Leaderboards")}
+          ${subBtn("manage", "⚙️ Manage")}
+        </div>
+      </div>
+      <div id="fan-body"></div>`;
+    renderFanBody();
+  }
+  function subBtn(key, label) {
+    return `<button class="fan-tab ${UI.sub === key ? "active" : ""}" data-fan-sub="${key}">${label}</button>`;
+  }
+  function renderFanBody() {
+    const body = document.getElementById("fan-body"); if (!body) return;
+    if (UI.sub === "leaderboard") body.innerHTML = renderLeaderboards();
+    else if (UI.sub === "manage") body.innerHTML = renderManage();
+    else body.innerHTML = renderMatchDay();
+    if (UI.sub === "matchday") refreshEntryPickUI();
+  }
+
+  /* ---------- match day ---------- */
+  function renderMatchDay() {
+    if (!F.teams.length) {
+      return `<div class="card"><h3>Get started</h3>
+        <p class="hint">Add your tournament teams &amp; players first - open <b>⚙️ Manage</b>, or import them from the auction.</p>
+        <div class="form-row"><button class="btn btn-yellow" data-fan-sub="manage">Open Manage</button></div></div>`;
+    }
+    const days = F.days;
+    let html = `<div class="card">
+      <div class="form-row" style="align-items:flex-end">
+        <label style="flex:1 1 180px">Match day
+          <select id="fanDaySelect">${days.length ? days.map(d => `<option value="${d.id}" ${d.id === UI.dayId ? "selected" : ""}>${esc(dayLabel(d))}</option>`).join("") : `<option value="">No days yet</option>`}</select>
+        </label>
+        <label>New day<input type="date" id="fanNewDate" value="${today()}"/></label>
+        <button class="btn btn-yellow" data-new-day>+ New day</button>
+      </div></div>`;
+
+    const day = currentDay();
+    if (!day) return html + `<p class="hint">Create a match day to begin.</p>`;
+
+    html += `<div class="card">
+      <h3>Teams playing - ${esc(dayLabel(day))}</h3>
+      <p class="hint">Tick the teams in action today; their players form the selectable pool.</p>
+      <div class="fan-team-toggles">
+        ${F.teams.map(t => `<label class="fan-chip ${day.teamIds.includes(t.id) ? "on" : ""}"><input type="checkbox" data-toggle-team="${t.id}" ${day.teamIds.includes(t.id) ? "checked" : ""}/>${esc(t.name)}</label>`).join("")}
+      </div>
+      <div class="form-row" style="margin-top:10px"><button class="btn btn-danger" data-del-day="${day.id}">Delete this day</button></div>
+    </div>`;
+
+    html += renderEntrySection(day);
+    html += renderResultsSection(day);
+    html += renderDayStandings(day);
+    return html;
+  }
+
+  function renderEntrySection(day) {
+    const pool = dayPool(day);
+    let html = `<div class="card"><h3>Fantasy Entries</h3>`;
+    if (!pool.length) return html + `<p class="hint">Select the teams playing today to build the player pool.</p></div>`;
+
+    const edit = UI.editEntryId ? day.entries.find(e => e.id === UI.editEntryId) : null;
+    const picked = new Set(edit ? edit.playerIds : []);
+
+    html += `<label>Contestant name
+        <input id="fanContestant" list="fanCList" placeholder="e.g. Yasitha" value="${edit && fContestant(edit.contestantId) ? esc(fContestant(edit.contestantId).name) : ""}"/>
+      </label>
+      <datalist id="fanCList">${F.contestants.map(c => `<option value="${esc(c.name)}"></option>`).join("")}</datalist>
+      <div class="fan-pool">`;
+    day.teamIds.forEach(tid => {
+      const ps = F.players.filter(p => p.teamId === tid);
+      if (!ps.length) return;
+      html += `<div class="fan-pool-team"><div class="fan-pool-team-name">${esc(teamName(tid))}</div>`;
+      ps.forEach(p => {
+        html += `<label class="fan-pick"><input type="checkbox" data-pick="${p.id}" ${picked.has(p.id) ? "checked" : ""}/>${esc(p.name)}</label>`;
+      });
+      html += `</div>`;
+    });
+    html += `</div>
+      <div id="fanPickCount" class="fan-count">0/6 selected</div>
+      <div class="form-row">
+        <label>Captain (2×)<select id="fanC"></select></label>
+        <label>Vice-Captain (1.5×)<select id="fanVC"></select></label>
+      </div>
+      <div class="form-row">
+        <button class="btn btn-red" data-add-entry>${edit ? "Update team" : "Add team"}</button>
+        ${edit ? `<button class="btn btn-dark" data-cancel-entry>Cancel</button>` : ""}
+      </div>`;
+
+    if (day.entries.length) {
+      html += `<div class="fan-entries">`;
+      day.entries.forEach(e => {
+        const pts = entryPoints(day, e);
+        html += `<div class="fan-entry">
+          <div class="fan-entry-head"><b>${esc(fContestant(e.contestantId) ? fContestant(e.contestantId).name : "?")}</b>
+            ${day.hasResults ? `<span class="fan-pts">${fmtPts(pts)} pts</span>` : `<span class="hint">pending results</span>`}
+            <span class="fan-entry-actions"><button class="icon-btn" data-edit-entry="${e.id}" title="Edit">✎</button><button class="icon-btn del" data-del-entry="${e.id}" title="Delete">✕</button></span>
+          </div>
+          <div class="fan-entry-players">${e.playerIds.map(pid => playerChip(pid, e, day)).join("")}</div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    return html + `</div>`;
+  }
+  function playerChip(pid, e, day) {
+    const tag = pid === e.captainId ? `<span class="cap">C</span>` : pid === e.viceCaptainId ? `<span class="vc">VC</span>` : "";
+    let pts = "";
+    if (day && day.hasResults) {
+      let val = playerDayPoints(day, pid);
+      if (pid === e.captainId) val *= 2;
+      else if (pid === e.viceCaptainId) val *= 1.5;
+      pts = `<span class="pchip-pts">${fmtPts(val)}</span>`;
+    }
+    return `<span class="fan-pchip">${esc(pname(pid))}${tag}${pts}</span>`;
+  }
+
+  function renderResultsSection(day) {
+    const pool = dayPool(day);
+    let html = `<div class="card"><h3>Match results ${day.hasResults ? `<span class="badge sold">saved</span>` : ""}</h3>`;
+    if (!pool.length) return html + `<p class="hint">Select the teams playing to enter results.</p></div>`;
+    html += `<p class="hint">Enter each player's runs &amp; wickets. Points = runs + wickets × 10.</p><div class="fan-results">`;
+    day.teamIds.forEach(tid => {
+      const ps = F.players.filter(p => p.teamId === tid);
+      if (!ps.length) return;
+      html += `<div class="fan-results-team"><div class="fan-pool-team-name">${esc(teamName(tid))}</div>`;
+      ps.forEach(p => {
+        const perf = (day.performance && day.performance[p.id]) || {};
+        html += `<div class="fan-res-row">
+          <span class="frr-name">${esc(p.name)}</span>
+          <input type="number" min="0" inputmode="numeric" data-runs="${p.id}" value="${perf.runs != null ? perf.runs : ""}" placeholder="runs"/>
+          <input type="number" min="0" inputmode="numeric" data-wkts="${p.id}" value="${perf.wickets != null ? perf.wickets : ""}" placeholder="wkts"/>
+          <span class="frr-pts">${fmtPts(playerDayPoints(day, p.id))}</span>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    html += `</div><div class="form-row"><button class="btn btn-yellow" data-save-results>Save results &amp; calculate</button></div></div>`;
+    return html;
+  }
+
+  function renderDayStandings(day) {
+    if (!day.entries.length) return "";
+    let html = `<div class="card"><h3>Day standings - ${esc(dayLabel(day))}</h3>`;
+    if (!day.hasResults) return html + `<p class="hint">Save match results to see points.</p></div>`;
+    html += `<table class="fan-table"><thead><tr><th>#</th><th>Contestant</th><th class="num">Points</th></tr></thead><tbody>`;
+    dayStandings(day).forEach((row, i) => {
+      html += `<tr><td>${medal(i)}</td><td>${esc(row.contestant ? row.contestant.name : "?")}</td><td class="num strong">${fmtPts(row.points)}</td></tr>`;
+    });
+    return html + `</tbody></table></div>`;
+  }
+
+  /* ---------- leaderboards ---------- */
+  function renderLeaderboards() {
+    const cs = contestantStats(), ps = playerStats();
+    return `<div class="fan-board-grid">
+      <div class="card"><h3>🏆 Contestants (by average)</h3>
+        ${boardTable(cs.map(s => ({ name: s.contestant.name, avg: s.avg, days: s.days, total: s.total })), "Contestant", "contestant")}</div>
+      <div class="card"><h3>⭐ Player of the Season (by average)</h3>
+        ${boardTable(ps.map(s => ({ name: s.player.name, sub: teamName(s.player.teamId), avg: s.avg, days: s.days, total: s.total })), "Player", "player")}</div>
+    </div>`;
+  }
+  function boardTable(rows, label, kind) {
+    if (!rows.length) return `<p class="hint">No results yet. Add entries and save match results.</p>`;
+    const head = kind === "player"
+      ? `<th class="num" title="Matches played">Matches</th><th class="num" title="Total points">Total</th><th class="num" title="Average points">Avg</th>`
+      : `<th class="num" title="Total points">Total</th><th class="num" title="Average points">Avg</th>`;
+    const cells = r => kind === "player"
+      ? `<td class="num">${r.days}</td><td class="num">${fmtPts(r.total)}</td><td class="num strong">${fmtPts(r.avg)}</td>`
+      : `<td class="num">${fmtPts(r.total)}</td><td class="num strong">${fmtPts(r.avg)}</td>`;
+    return `<table class="fan-table">
+      <thead><tr><th>#</th><th>${label}</th>${head}</tr></thead>
+      <tbody>${rows.map((r, i) => `<tr>
+        <td>${medal(i)}</td>
+        <td>${esc(r.name)}${r.sub ? `<span class="frr-sub">${esc(r.sub)}</span>` : ""}</td>
+        ${cells(r)}</tr>`).join("")}</tbody></table>`;
+  }
+
+  /* ---------- manage ---------- */
+  function renderManage() {
+    const teamOpts = F.teams.map(t => `<option value="${t.id}" ${UI.editPlayerId && fPlayer(UI.editPlayerId) && fPlayer(UI.editPlayerId).teamId === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("");
+    return `<div class="fan-board-grid">
+      <div class="card"><h3 id="fanTeamTitle">${UI.editTeamId ? "Edit Team" : "Add Team"}</h3>
+        <label>Team name<input id="fanTeamName" value="${UI.editTeamId && fTeam(UI.editTeamId) ? esc(fTeam(UI.editTeamId).name) : ""}" placeholder="e.g. Wizard Titans"/></label>
+        <div class="form-row"><button class="btn btn-red" data-save-team>${UI.editTeamId ? "Save" : "Add team"}</button>${UI.editTeamId ? `<button class="btn btn-dark" data-cancel-team>Cancel</button>` : ""}</div>
+        <div class="mini-list">${F.teams.length ? F.teams.map(t => `<div class="mini-row"><span class="ml-name">${esc(t.name)}</span><span class="ml-sub">${F.players.filter(p => p.teamId === t.id).length} players</span><button class="icon-btn" data-edit-team="${t.id}">✎</button><button class="icon-btn del" data-del-team="${t.id}">✕</button></div>`).join("") : `<p class="hint">No teams yet.</p>`}</div>
+      </div>
+
+      <div class="card"><h3 id="fanPlayerTitle">${UI.editPlayerId ? "Edit Player" : "Add Player"}</h3>
+        <label>Player name<input id="fanPlayerName" value="${UI.editPlayerId && fPlayer(UI.editPlayerId) ? esc(fPlayer(UI.editPlayerId).name) : ""}" placeholder="e.g. Yasitha"/></label>
+        <label>Team<select id="fanPlayerTeam">${teamOpts || `<option value="">Add a team first</option>`}</select></label>
+        <div class="form-row"><button class="btn btn-red" data-save-player>${UI.editPlayerId ? "Save" : "Add player"}</button>${UI.editPlayerId ? `<button class="btn btn-dark" data-cancel-player>Cancel</button>` : ""}</div>
+        <p class="hint">${F.players.length} players in the pool.</p>
+        <div class="mini-list">${F.players.length ? F.players.map(p => `<div class="mini-row"><span class="ml-name">${esc(p.name)}</span><span class="ml-sub">${esc(teamName(p.teamId))}</span><button class="icon-btn" data-edit-player="${p.id}">✎</button><button class="icon-btn del" data-del-player="${p.id}">✕</button></div>`).join("") : `<p class="hint">No players. Add teams first, or import from the auction.</p>`}</div>
+      </div>
+
+      <div class="card"><h3>Contestants</h3>
+        <p class="hint">These are added automatically when you enter a fantasy team on a match day.</p>
+        <div class="mini-list">${F.contestants.length ? F.contestants.map(c => `<div class="mini-row"><span class="ml-name">${esc(c.name)}</span><button class="icon-btn del" data-del-contestant="${c.id}">✕</button></div>`).join("") : `<p class="hint">No contestants yet.</p>`}</div>
+      </div>
+
+      <div class="card"><h3>Data &amp; Backup</h3>
+        <p class="hint">Pull tournament teams &amp; players straight from your auction squads (sold + retained).</p>
+        <div class="form-row"><button class="btn btn-yellow" data-import-auction>⬇ Import from auction</button></div>
+        <hr/>
+        <div class="form-row"><button class="btn btn-dark" data-export>Export fantasy backup</button>
+          <label class="btn btn-dark file-btn">Import backup<input type="file" id="fanImportFile" accept="application/json" hidden/></label></div>
+        <hr/>
+        <div class="form-row"><button class="btn btn-danger" data-reset>Erase fantasy data</button></div>
+      </div>
+    </div>`;
+  }
+
+  /* live update of the Captain/Vice-Captain selects + pick count */
+  function refreshEntryPickUI() {
+    const root = fanEl(); if (!root) return;
+    const checks = [...root.querySelectorAll("[data-pick]")]; if (!checks.length) return;
+    const picked = checks.filter(c => c.checked).map(c => c.getAttribute("data-pick"));
+    checks.forEach(c => { c.disabled = !c.checked && picked.length >= 6; });
+    const count = root.querySelector("#fanPickCount");
+    if (count) { count.textContent = `${picked.length}/6 selected`; count.classList.toggle("full", picked.length === 6); }
+    const cSel = root.querySelector("#fanC"), vSel = root.querySelector("#fanVC");
+    if (!cSel || !vSel) return;
+    const day = currentDay();
+    const edit = UI.editEntryId && day ? day.entries.find(e => e.id === UI.editEntryId) : null;
+    const cWant = cSel.value || (edit ? edit.captainId : "");
+    const vWant = vSel.value || (edit ? edit.viceCaptainId : "");
+    const opts = picked.map(pid => `<option value="${pid}">${esc(pname(pid))}</option>`).join("");
+    cSel.innerHTML = `<option value="">- Captain -</option>` + opts;
+    vSel.innerHTML = `<option value="">- Vice-Captain -</option>` + opts;
+    if (picked.includes(cWant)) cSel.value = cWant;
+    if (picked.includes(vWant)) vSel.value = vWant;
+  }
+
+  /* ============================================================
+     ACTIONS
+     ============================================================ */
+  function newDay() {
+    const el = fanEl().querySelector("#fanNewDate");
+    const date = (el && el.value) || today();
+    const d = { id: fid("d"), date, label: "", teamIds: [], performance: {}, entries: [], hasResults: false };
+    F.days.unshift(d);
+    UI.dayId = d.id; UI.editEntryId = null;
+    saveF(); renderFanBody(); ftoast("Match day created", "good");
+  }
+  function delDay(id) {
+    const d = fDay(id); if (!d) return;
+    if (!confirm("Delete this match day and all its entries & results?")) return;
+    F.days = F.days.filter(x => x.id !== id);
+    if (UI.dayId === id) UI.dayId = F.days[0] ? F.days[0].id : null;
+    saveF(); renderFanBody();
+  }
+  function toggleTeam(teamId) {
+    const day = currentDay(); if (!day) return;
+    const i = day.teamIds.indexOf(teamId);
+    if (i >= 0) day.teamIds.splice(i, 1); else day.teamIds.push(teamId);
+    saveF(); renderFanBody();
+  }
+  function saveEntry() {
+    const day = currentDay(); if (!day) return;
+    const root = fanEl();
+    const name = (root.querySelector("#fanContestant").value || "").trim();
+    if (!name) { ftoast("Enter the contestant's name", "bad"); return; }
+    const picked = [...root.querySelectorAll("[data-pick]:checked")].map(c => c.getAttribute("data-pick"));
+    if (picked.length !== 6) { ftoast("Pick exactly 6 players", "bad"); return; }
+    const cId = root.querySelector("#fanC").value, vId = root.querySelector("#fanVC").value;
+    if (!cId || !vId) { ftoast("Choose a Captain and Vice-Captain", "bad"); return; }
+    if (cId === vId) { ftoast("Captain and Vice-Captain must be different", "bad"); return; }
+    if (!picked.includes(cId) || !picked.includes(vId)) { ftoast("C / VC must be among your 6", "bad"); return; }
+
+    let c = F.contestants.find(x => x.name.toLowerCase() === name.toLowerCase());
+    if (!c) { c = { id: fid("c"), name }; F.contestants.push(c); }
+    const dup = day.entries.find(e => e.contestantId === c.id && e.id !== UI.editEntryId);
+    if (dup) { ftoast(`${name} already has a team today - edit it instead`, "bad"); return; }
+
+    if (UI.editEntryId) {
+      const e = day.entries.find(x => x.id === UI.editEntryId);
+      if (e) { e.contestantId = c.id; e.playerIds = picked; e.captainId = cId; e.viceCaptainId = vId; }
+      UI.editEntryId = null;
+    } else {
+      day.entries.push({ id: fid("e"), contestantId: c.id, playerIds: picked, captainId: cId, viceCaptainId: vId });
+    }
+    saveF(); renderFanBody(); ftoast("Fantasy team saved", "good");
+  }
+  function delEntry(id) {
+    const day = currentDay(); if (!day) return;
+    day.entries = day.entries.filter(e => e.id !== id);
+    if (UI.editEntryId === id) UI.editEntryId = null;
+    saveF(); renderFanBody();
+  }
+  function saveResults() {
+    const day = currentDay(); if (!day) return;
+    const root = fanEl();
+    const perf = {};
+    dayPool(day).forEach(p => {
+      const r = root.querySelector(`[data-runs="${p.id}"]`);
+      const w = root.querySelector(`[data-wkts="${p.id}"]`);
+      perf[p.id] = { runs: Number(r && r.value) || 0, wickets: Number(w && w.value) || 0 };
+    });
+    day.performance = perf; day.hasResults = true;
+    saveF(); renderFanBody(); ftoast("Results saved - points calculated", "good");
+  }
+  function updateRowPts(input) {
+    const row = input.closest(".fan-res-row"); if (!row) return;
+    const r = Number(row.querySelector("[data-runs]").value) || 0;
+    const w = Number(row.querySelector("[data-wkts]").value) || 0;
+    const pts = row.querySelector(".frr-pts"); if (pts) pts.textContent = fmtPts(r + w * 10);
+  }
+
+  function saveTeam() {
+    const el = fanEl().querySelector("#fanTeamName");
+    const name = (el.value || "").trim();
+    if (!name) { ftoast("Enter a team name", "bad"); return; }
+    if (UI.editTeamId) { const t = fTeam(UI.editTeamId); if (t) t.name = name; UI.editTeamId = null; }
+    else F.teams.push({ id: fid("t"), name });
+    saveF(); renderFanBody(); ftoast("Team saved", "good");
+  }
+  function delTeam(id) {
+    const t = fTeam(id); if (!t) return;
+    if (!confirm(`Delete team "${t.name}" and its players?`)) return;
+    const pids = new Set(F.players.filter(p => p.teamId === id).map(p => p.id));
+    F.players = F.players.filter(p => p.teamId !== id);
+    F.teams = F.teams.filter(x => x.id !== id);
+    F.days.forEach(d => {
+      d.teamIds = d.teamIds.filter(x => x !== id);
+      pids.forEach(pid => delete d.performance[pid]);
+      d.entries.forEach(e => {
+        e.playerIds = e.playerIds.filter(x => !pids.has(x));
+        if (pids.has(e.captainId)) e.captainId = null;
+        if (pids.has(e.viceCaptainId)) e.viceCaptainId = null;
+      });
+    });
+    if (UI.editTeamId === id) UI.editTeamId = null;
+    saveF(); renderFanBody();
+  }
+  function savePlayer() {
+    const root = fanEl();
+    const name = (root.querySelector("#fanPlayerName").value || "").trim();
+    const teamSel = root.querySelector("#fanPlayerTeam");
+    const teamId = teamSel ? teamSel.value : "";
+    if (!name) { ftoast("Enter a player name", "bad"); return; }
+    if (!teamId) { ftoast("Add a team first", "bad"); return; }
+    if (UI.editPlayerId) { const p = fPlayer(UI.editPlayerId); if (p) { p.name = name; p.teamId = teamId; } UI.editPlayerId = null; }
+    else F.players.push({ id: fid("p"), name, teamId });
+    saveF(); renderFanBody(); ftoast("Player saved", "good");
+  }
+  function delPlayer(id) {
+    const p = fPlayer(id); if (!p) return;
+    if (!confirm(`Delete player "${p.name}"?`)) return;
+    F.players = F.players.filter(x => x.id !== id);
+    F.days.forEach(d => {
+      delete d.performance[id];
+      d.entries.forEach(e => {
+        e.playerIds = e.playerIds.filter(x => x !== id);
+        if (e.captainId === id) e.captainId = null;
+        if (e.viceCaptainId === id) e.viceCaptainId = null;
+      });
+    });
+    if (UI.editPlayerId === id) UI.editPlayerId = null;
+    saveF(); renderFanBody();
+  }
+  function delContestant(id) {
+    const c = fContestant(id); if (!c) return;
+    if (!confirm(`Delete contestant "${c.name}" and all their entries?`)) return;
+    F.contestants = F.contestants.filter(x => x.id !== id);
+    F.days.forEach(d => { d.entries = d.entries.filter(e => e.contestantId !== id); });
+    saveF(); renderFanBody();
+  }
+
+  function importFromAuction() {
+    let a; try { a = JSON.parse(localStorage.getItem(AKEY) || "null"); } catch (e) {}
+    if (!a || !Array.isArray(a.teams)) { ftoast("No auction data found in this browser", "bad"); return; }
+    const sold = (a.players || []).filter(p => p.status === "sold" && p.soldTo);
+    if (!sold.length) { ftoast("No players are sold/retained in the auction yet", "bad"); return; }
+    if ((F.teams.length || F.players.length) && !confirm("Replace the fantasy teams & players with your current auction squads?")) return;
+    F.teams = a.teams.map(t => ({ id: "ft_" + t.id, name: t.name }));
+    const ids = new Set(F.teams.map(t => t.id));
+    F.players = sold.map(p => ({ id: "fp_" + p.id, name: p.name, teamId: "ft_" + p.soldTo })).filter(p => ids.has(p.teamId));
+    saveF(); renderFanBody(); ftoast(`Imported ${F.teams.length} teams and ${F.players.length} players`, "good");
+  }
+  function exportF() {
+    const blob = new Blob([JSON.stringify(F, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = "hccl-fantasy-backup.json"; link.click();
+    URL.revokeObjectURL(url); ftoast("Backup downloaded", "good");
+  }
+  function importF(e) {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        if (!Array.isArray(data.days) && !Array.isArray(data.players)) throw new Error("bad");
+        F = normalizeF(data); saveF(); renderFantasy(); ftoast("Backup imported", "good");
+      } catch (err) { ftoast("Invalid fantasy backup file", "bad"); }
+      e.target.value = "";
+    };
+    r.readAsText(f);
+  }
+  function resetF() {
+    if (!confirm("Erase ALL fantasy data (teams, players, days, entries)? This cannot be undone.")) return;
+    F = defaultFantasy(); UI.sub = "manage"; UI.dayId = null;
+    saveF(); renderFantasy(); ftoast("Fantasy data erased", "good");
+  }
+
+  /* ============================================================
+     EVENTS (delegated on the persistent #view-fantasy container)
+     ============================================================ */
+  function onClick(e) {
+    const t = e.target;
+    const sub = t.closest("[data-fan-sub]");
+    if (sub) { UI.sub = sub.getAttribute("data-fan-sub"); UI.editEntryId = UI.editTeamId = UI.editPlayerId = null; renderFanBody(); return; }
+    if (t.closest("[data-new-day]")) return newDay();
+    let m;
+    if ((m = t.closest("[data-del-day]"))) return delDay(m.getAttribute("data-del-day"));
+    if (t.closest("[data-add-entry]")) return saveEntry();
+    if (t.closest("[data-cancel-entry]")) { UI.editEntryId = null; renderFanBody(); return; }
+    if ((m = t.closest("[data-edit-entry]"))) { UI.editEntryId = m.getAttribute("data-edit-entry"); renderFanBody(); return; }
+    if ((m = t.closest("[data-del-entry]"))) return delEntry(m.getAttribute("data-del-entry"));
+    if (t.closest("[data-save-results]")) return saveResults();
+    if (t.closest("[data-save-team]")) return saveTeam();
+    if (t.closest("[data-cancel-team]")) { UI.editTeamId = null; renderFanBody(); return; }
+    if ((m = t.closest("[data-edit-team]"))) { UI.editTeamId = m.getAttribute("data-edit-team"); renderFanBody(); return; }
+    if ((m = t.closest("[data-del-team]"))) return delTeam(m.getAttribute("data-del-team"));
+    if (t.closest("[data-save-player]")) return savePlayer();
+    if (t.closest("[data-cancel-player]")) { UI.editPlayerId = null; renderFanBody(); return; }
+    if ((m = t.closest("[data-edit-player]"))) { UI.editPlayerId = m.getAttribute("data-edit-player"); renderFanBody(); return; }
+    if ((m = t.closest("[data-del-player]"))) return delPlayer(m.getAttribute("data-del-player"));
+    if ((m = t.closest("[data-del-contestant]"))) return delContestant(m.getAttribute("data-del-contestant"));
+    if (t.closest("[data-import-auction]")) return importFromAuction();
+    if (t.closest("[data-export]")) return exportF();
+    if (t.closest("[data-reset]")) return resetF();
+  }
+  function onChange(e) {
+    const t = e.target;
+    if (t.id === "fanDaySelect") { UI.dayId = t.value; UI.editEntryId = null; renderFanBody(); return; }
+    if (t.id === "fanImportFile") return importF(e);
+    if (t.closest("[data-toggle-team]")) return toggleTeam(t.closest("[data-toggle-team]").getAttribute("data-toggle-team"));
+    if (t.hasAttribute("data-pick")) return refreshEntryPickUI();
+    if (t.hasAttribute("data-runs") || t.hasAttribute("data-wkts")) return updateRowPts(t);
+  }
+
+  /* ---------------- init ---------------- */
+  function init() {
+    const root = fanEl(); if (!root) return;
+    root.addEventListener("click", onClick);
+    root.addEventListener("change", onChange);
+    root.addEventListener("input", e => {
+      if (e.target.hasAttribute && (e.target.hasAttribute("data-runs") || e.target.hasAttribute("data-wkts"))) updateRowPts(e.target);
+    });
+    const tabs = document.getElementById("tabs");
+    if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="fantasy"]')) renderFantasy(); });
+    renderFantasy();
+  }
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+    else init();
+  }
+
+  // Node-only test hook (inert in the browser - `module` is undefined there)
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = { _load: d => { F = normalizeF(d); }, dayPool, playerDayPoints, entryPoints, contestantStats, playerStats };
+  }
+})();
