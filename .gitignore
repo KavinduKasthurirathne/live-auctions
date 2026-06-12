@@ -1,4 +1,19 @@
-.firebase/
-firebase-debug.log
+# Firebase credentials - KEEP OUT OF GIT
+firebase-config.js
+
+# Node (if you add it later)
+node_modules/
+npm-debug.log*
+
+# Environment files
 .env
-.vscode/
+.env.local
+.env*.local
+
+# OS clutter
+.DS_Store
+Thumbs.db
+
+# Build output (if applicable)
+dist/
+build/

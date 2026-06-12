@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// HCCL — Firestore Security Rules
+// Deploy: Firebase console -> Firestore Database -> Rules -> paste -> Publish.
+// Roles: admin (all), moderator (edit/delete app data), viewer (read-only).
+// The owner email is the bootstrap admin (works even before its user doc exists).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner() {
+      return signedIn() && request.auth.token.email == 'kavindu.kasthu@gmail.com';
+    }
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isAdmin() {
+      return isOwner() || (signedIn() && hasUserDoc() && myRole() == 'admin');
+    }
+    function canEdit() {
+      return isAdmin() || (signedIn() && hasUserDoc() && myRole() == 'moderator');
+    }
+
+    // User profiles + roles
+    match /users/{uid} {
+      allow read: if signedIn();
+      // A user may create only their OWN profile, and only as 'viewer'
+      // (the owner email may bootstrap itself as 'admin').
+      allow create: if signedIn() && request.auth.uid == uid
+                    && (isOwner() || request.resource.data.role == 'viewer');
+      // Only admins can change/remove roles.
+      allow update, delete: if isAdmin();
+    }
+
+    // Shared app data (auction + fantasy) — used by later phases.
+    match /app/{document=**} {
+      allow read: if signedIn();
+      allow write: if canEdit();
+    }
+  }
+}
