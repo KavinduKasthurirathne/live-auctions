@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HCCL Auction</title>
+  <title>Hand Cricket League</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -29,6 +29,7 @@
       <button class="tab" data-tab="setup">⚙️ Setup</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
     </nav>
+    <div class="auth-box" id="authBox"></div>
   </header>
 
   <main class="app-main">
@@ -262,9 +263,13 @@
   <!-- Toast -->
   <div class="toast hidden" id="toast"></div>
 
+  <!-- Firebase config must load before the modules that read it -->
+  <script src="firebase-config.js"></script>
   <script src="app.js"></script>
   <!-- DOM-to-PNG for the leaderboard share cards (exposes window.htmlToImage) -->
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js"></script>
   <script src="fantasy.js"></script>
+  <!-- Auth + roles (Google sign-in); exposes window.HCCL -->
+  <script type="module" src="firebase-init.js"></script>
 </body>
 </html>

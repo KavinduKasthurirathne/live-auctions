@@ -315,6 +315,8 @@
   }
   function buildShareCard(kind, stats) {
     const isPlayer = kind === "player";
+    const seasonEl = document.getElementById("seasonTitle");
+    const seasonTitle = (seasonEl && seasonEl.textContent.trim()) || "HCCL";
     // Players board: top 10 only. Contestants board: everyone.
     const ranked = isPlayer ? stats.slice(0, 10) : stats;
     const rows = ranked.map((s, i) => isPlayer
@@ -339,7 +341,7 @@
       "background:#0a0a0b;color:#f6f6f7;font-family:'Inter',system-ui,sans-serif;";
     card.innerHTML = `
       <div style="text-align:center;">
-        <div style="font-family:'Anton',sans-serif;font-size:56px;letter-spacing:1px;line-height:1;color:#ffcc00;">HCCL Season 06 - Fantasy</div>
+        <div style="font-family:'Anton',sans-serif;font-size:56px;letter-spacing:1px;line-height:1;color:#ffcc00;">${esc(seasonTitle)} - Fantasy</div>
         <div style="font-size:23px;letter-spacing:4px;text-transform:uppercase;color:#f6f6f7;margin-top:14px;">${esc(subTitle)}</div>
         <div style="font-size:16px;color:#9b9ba3;margin-top:10px;">${esc(dateStr)}</div>
       </div>
