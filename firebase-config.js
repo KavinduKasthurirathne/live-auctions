@@ -1,5 +1,5 @@
 /* ============================================================
-   Firebase web config for the existing "hc-live-auctions" project.
+   Firebase web config for the existing "hand-cricket-league" project.
    These are PUBLIC client keys (safe to ship) — real security is
    enforced by Firestore Security Rules + Authorized domains.
    ============================================================ */
