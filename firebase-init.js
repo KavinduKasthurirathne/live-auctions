@@ -7,7 +7,8 @@
    ============================================================ */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp,
@@ -75,11 +76,19 @@ try {
     window.HCCL.configured = true;
     window.HCCL.db = db;
     window.HCCL.fs = { doc, getDoc, setDoc, onSnapshot, serverTimestamp };
+    // Popup first (nicer UX); if the browser blocks it, fall back to a
+    // full-page redirect, which popup blockers can't stop.
+    const POPUP_FALLBACK = new Set(["auth/popup-blocked", "auth/popup-closed-by-user", "auth/cancelled-popup-request", "auth/operation-not-supported-in-this-environment"]);
     window.HCCL.signIn = () =>
-      signInWithPopup(auth, provider).catch(e => { console.error(e); alert("Sign-in failed: " + (e && e.message || e)); });
+      signInWithPopup(auth, provider).catch(e => {
+        if (e && POPUP_FALLBACK.has(e.code)) return signInWithRedirect(auth, provider);
+        console.error(e); alert("Sign-in failed: " + (e && e.message || e));
+      });
     window.HCCL.signOut = () => signOut(auth).catch(e => console.error(e));
 
     setPersistence(auth, browserLocalPersistence).catch(() => {});
+    // Complete a redirect-based sign-in if we're returning from one.
+    getRedirectResult(auth).catch(e => { console.error(e); alert("Sign-in failed: " + (e && e.message || e)); });
     renderAuthBox(); // "Connecting…" until the first auth event
 
     onAuthStateChanged(auth, async (user) => {
