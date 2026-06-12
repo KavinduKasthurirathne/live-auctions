@@ -315,7 +315,9 @@
   }
   function buildShareCard(kind, stats) {
     const isPlayer = kind === "player";
-    const rows = stats.slice(0, 10).map((s, i) => isPlayer
+    // Players board: top 10 only. Contestants board: everyone.
+    const ranked = isPlayer ? stats.slice(0, 10) : stats;
+    const rows = ranked.map((s, i) => isPlayer
       ? { i, name: s.player.name, sub: teamName(s.player.teamId), total: s.total, days: s.days, avg: s.avg }
       : { i, name: s.contestant.name, sub: "", total: s.total, days: s.days, avg: s.avg });
     const subTitle = isPlayer ? "Fantasy Player of the Season" : "Fantasy Leaderboard";
