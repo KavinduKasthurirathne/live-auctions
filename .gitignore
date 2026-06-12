@@ -1,5 +1,6 @@
-# Firebase credentials - KEEP OUT OF GIT
-firebase-config.js
+# Note: firebase-config.js holds PUBLIC web client keys (safe to ship).
+# It must be committed so the static deploy (Vercel) can read it.
+# Real security is enforced by Firestore rules + Authorized domains.
 
 # Node (if you add it later)
 node_modules/
