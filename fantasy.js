@@ -281,9 +281,9 @@
   function renderLeaderboards() {
     const cs = contestantStats(), ps = playerStats();
     return `<div class="fan-board-grid">
-      <div class="card"><h3>🏆 Contestants (by average)</h3>
+      <div class="card"><div class="fan-card-head"><h3>🏆 Contestants (by average)</h3><button class="btn btn-dark fan-share-btn" data-share-board="contestant" title="Download as image">📷 Share</button></div>
         ${boardTable(cs.map(s => ({ name: s.contestant.name, avg: s.avg, days: s.days, total: s.total })), "Contestant", "contestant")}</div>
-      <div class="card"><h3>⭐ Player of the Season (by average)</h3>
+      <div class="card"><div class="fan-card-head"><h3>⭐ Player of the Season (by average)</h3><button class="btn btn-dark fan-share-btn" data-share-board="player" title="Download as image">📷 Share</button></div>
         ${boardTable(ps.map(s => ({ name: s.player.name, sub: teamName(s.player.teamId), avg: s.avg, days: s.days, total: s.total })), "Player", "player")}</div>
     </div>`;
   }
@@ -301,6 +301,89 @@
         <td>${medal(i)}</td>
         <td>${esc(r.name)}${r.sub ? `<span class="frr-sub">${esc(r.sub)}</span>` : ""}</td>
         ${cells(r)}</tr>`).join("")}</tbody></table>`;
+  }
+
+  /* ---------- share leaderboard as image ---------- */
+  function shareRankBadge(i) {
+    const base = "width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Anton',sans-serif;font-size:24px;flex:none;";
+    const grad = i === 0 ? "linear-gradient(135deg,#ffe066,#f5b301)"
+      : i === 1 ? "linear-gradient(135deg,#dcdce4,#9a9aa4)"
+      : i === 2 ? "linear-gradient(135deg,#e0975a,#a05a1e)" : "";
+    return grad
+      ? `<div style="${base}color:#1a1300;background:${grad};">${i + 1}</div>`
+      : `<div style="${base}color:#9b9ba3;background:#2a2a2e;">${i + 1}</div>`;
+  }
+  function buildShareCard(kind, stats) {
+    const isPlayer = kind === "player";
+    const rows = stats.slice(0, 10).map((s, i) => isPlayer
+      ? { i, name: s.player.name, sub: teamName(s.player.teamId), total: s.total, days: s.days, avg: s.avg }
+      : { i, name: s.contestant.name, sub: "", total: s.total, days: s.days, avg: s.avg });
+    const subTitle = isPlayer ? "Fantasy Player of the Season" : "Fantasy Leaderboard";
+    const dateStr = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
+    const statCell = (val, hi) =>
+      `<div style="width:120px;text-align:right;font-size:${hi ? 30 : 24}px;font-weight:${hi ? 800 : 600};color:${hi ? "#ffcc00" : "#f6f6f7"};">${val}</div>`;
+    const headCell = label => `<div style="width:120px;text-align:right;">${label}</div>`;
+    const card = document.createElement("div");
+    // Lay out at the origin (NOT off-screen via a huge negative offset - the
+    // node's own position is copied onto html-to-image's clone, so left:-99999px
+    // pushes the content outside the captured SVG => an all-black image). We tuck
+    // it behind the app with z-index:-1 instead. Do NOT use opacity/visibility to
+    // hide it - those get cloned too and would blank the capture.
+    card.style.cssText = "position:fixed;left:0;top:0;z-index:-1;pointer-events:none;" +
+      "width:1080px;box-sizing:border-box;padding:52px 48px;" +
+      "background:#0a0a0b;color:#f6f6f7;font-family:'Inter',system-ui,sans-serif;";
+    card.innerHTML = `
+      <div style="text-align:center;">
+        <div style="font-family:'Anton',sans-serif;font-size:56px;letter-spacing:1px;line-height:1;color:#ffcc00;">HCCL Season 06 - Fantasy</div>
+        <div style="font-size:23px;letter-spacing:4px;text-transform:uppercase;color:#f6f6f7;margin-top:14px;">${esc(subTitle)}</div>
+        <div style="font-size:16px;color:#9b9ba3;margin-top:10px;">${esc(dateStr)}</div>
+      </div>
+      <div style="height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#e10600,#f5b301,transparent);margin:26px 0 30px;"></div>
+      <div style="max-width:840px;margin:0 auto;">
+        <div style="display:flex;align-items:center;padding:0 24px 14px;color:#9b9ba3;font-size:14px;letter-spacing:2px;text-transform:uppercase;">
+          <div style="width:56px;">#</div>
+          <div style="flex:1;">${isPlayer ? "Player" : "Contestant"}</div>
+          ${isPlayer ? headCell("Matches") : ""}${headCell("Total")}${headCell("Avg")}
+        </div>
+        ${rows.map(r => `
+          <div style="display:flex;align-items:center;background:#161618;border:1px solid #34343a;border-radius:16px;padding:16px 24px;margin-bottom:10px;">
+            <div style="width:56px;">${shareRankBadge(r.i)}</div>
+            <div style="flex:1;min-width:0;padding-right:16px;">
+              <div style="font-size:27px;font-weight:700;line-height:1.15;">${esc(r.name)}</div>
+              ${r.sub ? `<div style="font-size:16px;color:#9b9ba3;margin-top:3px;">${esc(r.sub)}</div>` : ""}
+            </div>
+            ${isPlayer ? statCell(fmtPts(r.days)) : ""}${statCell(fmtPts(r.total))}${statCell(fmtPts(r.avg), true)}
+          </div>`).join("")}
+      </div>
+      <div style="margin-top:30px;text-align:center;color:#5a5a62;font-size:15px;letter-spacing:3px;text-transform:uppercase;">
+        HC Champions League
+      </div>`;
+    return card;
+  }
+  async function shareBoard(kind) {
+    const lib = window.htmlToImage;
+    if (!lib || typeof lib.toPng !== "function") { ftoast("Image library still loading - try again", "bad"); return; }
+    const stats = kind === "player" ? playerStats() : contestantStats();
+    if (!stats.length) { ftoast("No results to share yet", "bad"); return; }
+    ftoast("Building image...", "");
+    const node = buildShareCard(kind, stats);
+    document.body.appendChild(node);
+    try {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      const opts = { pixelRatio: 2, backgroundColor: "#0a0a0b", cacheBust: true, width: 1080, height: node.offsetHeight };
+      // First render is unreliable (fonts/styles not embedded yet) and often
+      // comes back blank - run it as a throwaway, then capture for real.
+      await lib.toPng(node, opts);
+      const dataUrl = await lib.toPng(node, opts);
+      const link = document.createElement("a");
+      link.download = kind === "player" ? "hccl-player-of-season-leaderboard.png" : "hccl-contestants-leaderboard.png";
+      link.href = dataUrl; link.click();
+      ftoast("Leaderboard image downloaded", "good");
+    } catch (err) {
+      ftoast("Could not generate image", "bad");
+    } finally {
+      node.remove();
+    }
   }
 
   /* ---------- manage ---------- */
@@ -555,6 +638,7 @@
     if ((m = t.closest("[data-edit-player]"))) { UI.editPlayerId = m.getAttribute("data-edit-player"); renderFanBody(); return; }
     if ((m = t.closest("[data-del-player]"))) return delPlayer(m.getAttribute("data-del-player"));
     if ((m = t.closest("[data-del-contestant]"))) return delContestant(m.getAttribute("data-del-contestant"));
+    if ((m = t.closest("[data-share-board]"))) return shareBoard(m.getAttribute("data-share-board"));
     if (t.closest("[data-import-auction]")) return importFromAuction();
     if (t.closest("[data-export]")) return exportF();
     if (t.closest("[data-reset]")) return resetF();
