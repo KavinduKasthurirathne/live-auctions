@@ -5,7 +5,10 @@
    ============================================================ */
 window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyB1SOeZq09MSXAF_DZFOey1zutywb2TSJY",
-  authDomain: "hand-cricket-league-ed0d8.firebaseapp.com",
+  // Our own domain, NOT <project>.firebaseapp.com: the /__/auth/* proxy in
+  // vercel.json serves the auth handler first-party, so sign-in survives
+  // browsers that block third-party storage (Chrome 115+, Safari 16.1+).
+  authDomain: "live-auctions-hazel.vercel.app",
   projectId: "hand-cricket-league-ed0d8",
   storageBucket: "hand-cricket-league-ed0d8.firebasestorage.app",
   messagingSenderId: "635499766885",
