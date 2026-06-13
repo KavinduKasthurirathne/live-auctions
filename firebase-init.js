@@ -11,7 +11,7 @@ import {
   signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp,
+  initializeFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp,
   collection, getDocs,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -166,7 +166,11 @@ try {
   } else {
     const app = initializeApp(cfg);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    // Auto-detect long-polling: falls back from the streaming WebChannel to
+    // plain XHR long-polling on restrictive networks/proxies. (Does NOT defeat
+    // a deliberate ad-block rule on firestore.googleapis.com — that needs the
+    // user to whitelist the site.)
+    const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
     const provider = new GoogleAuthProvider();
 
     window.HCCL.configured = true;
