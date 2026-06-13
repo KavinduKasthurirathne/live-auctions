@@ -150,6 +150,17 @@ async function openMembers() {
 
 /* ---------- sign-in wall: nobody sees the app until authenticated ---------- */
 let authGateEl = null;
+// Mirror the header's #brandLogo (league logo image, or initials fallback) so the
+// gate shows the ongoing league's badge. app.js fills #brandLogo before this runs.
+function gateLogoHtml() {
+  const brand = document.getElementById("brandLogo");
+  const bg = brand && brand.style && brand.style.backgroundImage;
+  if (bg && bg !== "none" && bg !== "") {
+    return `<div class="auth-gate-logo" style="background-image:${bg};background-size:cover;background-position:center"></div>`;
+  }
+  const txt = (brand && brand.textContent && brand.textContent.trim()) || "HCCL";
+  return `<div class="auth-gate-logo">${esc(txt)}</div>`;
+}
 function renderAuthGate() {
   const H = window.HCCL;
   // Lock the whole app whenever Firebase is configured and we don't yet have a
@@ -166,11 +177,11 @@ function renderAuthGate() {
   const seasonEl = document.getElementById("seasonTitle");
   const season = (seasonEl && seasonEl.textContent.trim()) || "HCCL";
   authGateEl.innerHTML = !H.ready
-    ? `<div class="auth-gate-card"><div class="auth-gate-logo">HCCL</div><h2>${esc(season)}</h2><p class="auth-gate-sub">Connecting…</p></div>`
+    ? `<div class="auth-gate-card">${gateLogoHtml()}<h2>${esc(season)}</h2><p class="auth-gate-sub">Connecting…</p></div>`
     : `<div class="auth-gate-card">
-        <div class="auth-gate-logo">HCCL</div>
+        ${gateLogoHtml()}
         <h2>${esc(season)}</h2>
-        <p class="auth-gate-sub">Sign in to view and manage the league.</p>
+        <p class="auth-gate-sub">Live Auction & Fantasy Platform</p>
         <button class="auth-btn" id="authGateBtn">Sign in with Google</button>
        </div>`;
   const b = document.getElementById("authGateBtn"); if (b) b.onclick = () => H.signIn();

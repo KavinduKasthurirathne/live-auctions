@@ -269,6 +269,14 @@ function setPhoto(el, img, fallback) {
   else { el.style.backgroundImage = ""; el.textContent = fallback; }
 }
 
+/* Point the browser-tab icon at the league logo (data URL). No-op if no logo. */
+function setFavicon(href) {
+  if (!href) return;
+  let link = document.querySelector('link[rel="icon"]');
+  if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+  link.href = href;
+}
+
 let toastTimer;
 function toast(msg, kind = "") {
   const t = $("#toast");
@@ -302,8 +310,9 @@ function renderHeader() {
   const { seasonName, seasonNumber, leagueLogo } = state.settings;
   const num = String(seasonNumber).padStart(2, "0");
   $("#seasonTitle").textContent = `${seasonName} Season ${num}`;
-  document.title = `${seasonName} S${num} · Auction`;
+  document.title = `${seasonName} Season ${num}`;
   setPhoto($("#brandLogo"), leagueLogo, initials(seasonName));
+  setFavicon(leagueLogo);
 }
 
 /* ---------- LIVE AUCTION ---------- */
