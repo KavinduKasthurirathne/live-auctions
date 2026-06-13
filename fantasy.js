@@ -225,7 +225,7 @@
         if (e) { total += entryPoints(d, e); n++; }
       });
       return { contestant: c, total, days: n, avg: n ? total / n : 0 };
-    }).sort((a, b) => b.avg - a.avg || b.total - a.total);
+    }).sort((a, b) => b.total - a.total || b.avg - a.avg);
   }
   function playerStats() {
     return F.players.map(p => {
@@ -235,7 +235,7 @@
         total += playerDayPoints(d, p.id); n++;
       });
       return { player: p, total, days: n, avg: n ? total / n : 0 };
-    }).sort((a, b) => b.avg - a.avg || b.total - a.total);
+    }).sort((a, b) => b.total - a.total || b.avg - a.avg);
   }
   function currentDay() {
     if (UI.dayId) { const d = fDay(UI.dayId); if (d) return d; }
@@ -414,20 +414,20 @@
   function renderLeaderboards() {
     const cs = contestantStats(), ps = playerStats();
     return `<div class="fan-board-grid">
-      <div class="card"><div class="fan-card-head"><h3>🏆 Contestants (by average)</h3><button class="btn btn-dark fan-share-btn" data-share-board="contestant" title="Download as image">📷 Share</button></div>
+      <div class="card"><div class="fan-card-head"><h3>🏆 Contestants (by total)</h3><button class="btn btn-dark fan-share-btn" data-share-board="contestant" title="Download as image">📷 Share</button></div>
         ${boardTable(cs.map(s => ({ name: s.contestant.name, avg: s.avg, days: s.days, total: s.total })), "Contestant", "contestant")}</div>
-      <div class="card"><div class="fan-card-head"><h3>⭐ Player of the Season (by average)</h3><button class="btn btn-dark fan-share-btn" data-share-board="player" title="Download as image">📷 Share</button></div>
+      <div class="card"><div class="fan-card-head"><h3>⭐ Player of the Season (by total)</h3><button class="btn btn-dark fan-share-btn" data-share-board="player" title="Download as image">📷 Share</button></div>
         ${boardTable(ps.map(s => ({ name: s.player.name, sub: teamName(s.player.teamId), avg: s.avg, days: s.days, total: s.total })), "Player", "player")}</div>
     </div>`;
   }
   function boardTable(rows, label, kind) {
     if (!rows.length) return `<p class="hint">No results yet. Add entries and save match results.</p>`;
     const head = kind === "player"
-      ? `<th class="num" title="Matches played">Matches</th><th class="num" title="Total points">Total</th><th class="num" title="Average points">Avg</th>`
-      : `<th class="num" title="Total points">Total</th><th class="num" title="Average points">Avg</th>`;
+      ? `<th class="num" title="Matches played">Matches</th><th class="num" title="Total points">Total</th>`
+      : `<th class="num" title="Total points">Total</th>`;
     const cells = r => kind === "player"
-      ? `<td class="num">${r.days}</td><td class="num">${fmtPts(r.total)}</td><td class="num strong">${fmtPts(r.avg)}</td>`
-      : `<td class="num">${fmtPts(r.total)}</td><td class="num strong">${fmtPts(r.avg)}</td>`;
+      ? `<td class="num">${r.days}</td><td class="num strong">${fmtPts(r.total)}</td>`
+      : `<td class="num strong">${fmtPts(r.total)}</td>`;
     return `<table class="fan-table">
       <thead><tr><th>#</th><th>${label}</th>${head}</tr></thead>
       <tbody>${rows.map((r, i) => `<tr>
@@ -494,7 +494,7 @@
         <div style="display:flex;align-items:center;padding:0 24px 14px;color:#9b9ba3;font-size:14px;letter-spacing:2px;text-transform:uppercase;">
           <div style="width:56px;">#</div>
           <div style="flex:1;">${isPlayer ? "Player" : "Contestant"}</div>
-          ${isPlayer ? headCell("Matches") : ""}${headCell("Total")}${headCell("Avg")}
+          ${isPlayer ? headCell("Matches") : ""}${headCell("Total")}
         </div>
         ${rows.map(r => `
           <div style="display:flex;align-items:center;background:#161618;border:1px solid #34343a;border-radius:16px;padding:16px 24px;margin-bottom:10px;">
@@ -503,7 +503,7 @@
               <div style="font-size:27px;font-weight:700;line-height:1.15;">${esc(r.name)}</div>
               ${r.sub ? `<div style="font-size:16px;color:#9b9ba3;margin-top:3px;">${esc(r.sub)}</div>` : ""}
             </div>
-            ${isPlayer ? statCell(fmtPts(r.days)) : ""}${statCell(fmtPts(r.total))}${statCell(fmtPts(r.avg), true)}
+            ${isPlayer ? statCell(fmtPts(r.days)) : ""}${statCell(fmtPts(r.total), true)}
           </div>`).join("")}`;
     return buildShareShell(subTitle, shareDateStr(), body);
   }
