@@ -822,14 +822,17 @@
     root.addEventListener("focusout", () => { if (pendingRender) { pendingRender = false; renderFantasy(); } });
     const tabs = document.getElementById("tabs");
     if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="fantasy"]')) renderFantasy(); });
-    // Real-time data: if Firebase is configured, mirror Firestore into F. Otherwise
-    // stay on localStorage (offline / no-account mode), exactly as before.
-    if (window.HCCL && window.HCCL.configured && fsDb() && fsApi()) {
-      usingFirestore = true;
-      startFantasySync();
+    // Real-time data: mirror Firestore into F, but only once SIGNED IN (reads
+    // require auth). Without Firebase we stay on localStorage as before.
+    if (window.HCCL && typeof window.HCCL.onChange === "function") {
+      window.HCCL.onChange(H => {
+        if (H.configured && H.user && !usingFirestore && !fsFellBack && fsDb() && fsApi()) {
+          usingFirestore = true;
+          startFantasySync();
+        }
+        renderFantasy(); // re-render so gating + live data apply
+      });
     }
-    // Re-render when sign-in / role changes so gating applies live.
-    if (window.HCCL && typeof window.HCCL.onChange === "function") window.HCCL.onChange(() => renderFantasy());
     renderFantasy();
   }
   if (typeof document !== "undefined") {

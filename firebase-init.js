@@ -148,6 +148,34 @@ async function openMembers() {
   }
 }
 
+/* ---------- sign-in wall: nobody sees the app until authenticated ---------- */
+let authGateEl = null;
+function renderAuthGate() {
+  const H = window.HCCL;
+  // Lock the whole app whenever Firebase is configured and we don't yet have a
+  // signed-in user (connecting, or signed out). Offline mode (no config) is open.
+  const locked = !!H.configured && !(H.ready && H.user);
+  document.body.classList.toggle("app-locked", locked);
+  if (!locked) { if (authGateEl) authGateEl.classList.add("hidden"); return; }
+  if (!authGateEl) {
+    authGateEl = document.createElement("div");
+    authGateEl.className = "auth-gate";
+    document.body.appendChild(authGateEl);
+  }
+  authGateEl.classList.remove("hidden");
+  const seasonEl = document.getElementById("seasonTitle");
+  const season = (seasonEl && seasonEl.textContent.trim()) || "HCCL";
+  authGateEl.innerHTML = !H.ready
+    ? `<div class="auth-gate-card"><div class="auth-gate-logo">HCCL</div><h2>${esc(season)}</h2><p class="auth-gate-sub">Connecting…</p></div>`
+    : `<div class="auth-gate-card">
+        <div class="auth-gate-logo">HCCL</div>
+        <h2>${esc(season)}</h2>
+        <p class="auth-gate-sub">Sign in to view and manage the league.</p>
+        <button class="auth-btn" id="authGateBtn">Sign in with Google</button>
+       </div>`;
+  const b = document.getElementById("authGateBtn"); if (b) b.onclick = () => H.signIn();
+}
+
 function applyRoleAttr() {
   const H = window.HCCL;
   document.body.dataset.role = H.role;
@@ -162,7 +190,7 @@ try {
   const configured = cfg && cfg.apiKey && !String(cfg.apiKey).startsWith("PASTE") && cfg.projectId;
   if (!configured) {
     applyRoleAttr(); // offline mode: enable editing (no auth gate)
-    renderAuthBox();
+    renderAuthBox(); renderAuthGate();
   } else {
     const app = initializeApp(cfg);
     const auth = getAuth(app);
@@ -197,7 +225,7 @@ try {
     setPersistence(auth, browserLocalPersistence).catch(() => {});
     // Complete a redirect-based sign-in if we're returning from one.
     getRedirectResult(auth).catch(e => { console.error(e); alert("Sign-in failed: " + (e && e.message || e)); });
-    renderAuthBox(); // "Connecting…" until the first auth event
+    renderAuthBox(); renderAuthGate(); // "Connecting…" wall until the first auth event
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -237,11 +265,16 @@ try {
       }
       window.HCCL.ready = true;
       applyRoleAttr();
-      renderAuthBox();
+      renderAuthBox(); renderAuthGate();
       emit();
     });
   }
 } catch (e) {
   console.error("Firebase init failed:", e);
-  renderAuthBox();
+  // Fail safe: never trap the user behind a permanent "Connecting…" wall.
+  // If Firebase couldn't initialise, drop to open/offline mode (localStorage).
+  window.HCCL.configured = false;
+  window.HCCL.ready = true;
+  applyRoleAttr();
+  renderAuthBox(); renderAuthGate();
 }

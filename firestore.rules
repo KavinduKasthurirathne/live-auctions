@@ -42,16 +42,15 @@ service cloud.firestore {
     }
 
     // Shared fantasy data (Phase C): fantasy/league/{teams|players|contestants|days}/{id}.
-    // Public read so spectators/viewers (even signed-out) see live leaderboards;
-    // only editors (admin/moderator) may write.
+    // Must be signed in to read (no anonymous viewing); only editors write.
     match /fantasy/{document=**} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if canEdit();
     }
 
-    // Shared auction data (Phase D, reserved).
+    // Shared auction data (Phase D): auction/league/{teams|players}/{id} + state docs.
     match /auction/{document=**} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if canEdit();
     }
   }

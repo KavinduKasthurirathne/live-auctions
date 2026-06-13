@@ -55,8 +55,156 @@ function load() {
   catch (e) { return null; }
 }
 function save() {
+  // Cloud mode: Firestore is the source of truth; don't touch the local backup
+  // (KEY) so a one-time "upload to cloud" can still recover this device's data.
+  if (auUsingFirestore) { if (auCanEdit()) auctionSyncDiff(); return; }
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
-  catch (e) { toast("Storage fullexport a backup and use smaller images", "bad"); }
+  catch (e) { toast("Storage full — export a backup and use smaller images", "bad"); }
+}
+
+/* ============================================================
+   FIRESTORE REAL-TIME SYNC (Phase D)
+   When Firebase is configured AND signed in, auction data lives in Firestore:
+     auction/league/teams/{id}, auction/league/players/{id},
+     auction/league/state/settings, auction/league/state/live.
+   onSnapshot mirrors it into `state`; local edits (save) push a minimal diff.
+   With no Firebase (or if unreachable) we stay on localStorage, as before.
+   ============================================================ */
+const AU_COLLS = ["teams", "players"];
+let auUsingFirestore = false;
+let auFsReady = false;
+const auFsLoaded = new Set();
+const auMirror = { teams: [], players: [], settings: null, live: null };
+const auUnsubs = [];
+let auPendingRender = false;
+let auSyncing = false, auSyncAgain = false;
+let auFellBack = false;
+
+function auCanEdit() { const H = window.HCCL; return !H || !H.configured || H.canEdit(); }
+const auApi = () => window.HCCL && window.HCCL.fs;
+const auDb  = () => window.HCCL && window.HCCL.db;
+const auCollRef  = coll     => auApi().collection(auDb(), "auction", "league", coll);
+const auItemRef  = (coll, id) => auApi().doc(auDb(), "auction", "league", coll, id);
+const auStateRef = name     => auApi().doc(auDb(), "auction", "league", "state", name);
+function auStrip(o) { const c = Object.assign({}, o); delete c.id; return c; }
+function auClone(x) { return JSON.parse(JSON.stringify(x)); }
+
+function auNormTeam(id, d) {
+  return { id, name: d.name || "", logo: d.logo || "",
+    purse: (d.purse === undefined ? null : d.purse), order: d.order || 0 };
+}
+function auNormPlayer(id, d) {
+  return { id, name: d.name || "", role: d.role || "", basePrice: d.basePrice || 0,
+    photo: d.photo || "", status: d.status || "available",
+    soldTo: d.soldTo == null ? null : d.soldTo, soldPrice: d.soldPrice == null ? null : d.soldPrice,
+    retained: !!d.retained, order: d.order || 0 };
+}
+const auDropOrder = x => { const c = { ...x }; delete c.order; return c; };
+
+function startAuctionSync() {
+  const api = auApi();
+  auUnsubs.push(api.onSnapshot(auCollRef("teams"),
+    snap => { const items = snap.docs.map(s => auNormTeam(s.id, s.data())).sort((a, b) => a.order - b.order);
+      auMirror.teams = auClone(items); state.teams = items.map(auDropOrder); auLoaded("teams"); }, auErr));
+  auUnsubs.push(api.onSnapshot(auCollRef("players"),
+    snap => { const items = snap.docs.map(s => auNormPlayer(s.id, s.data())).sort((a, b) => a.order - b.order);
+      auMirror.players = auClone(items); state.players = items.map(auDropOrder); auLoaded("players"); }, auErr));
+  auUnsubs.push(api.onSnapshot(auStateRef("settings"),
+    snap => { if (snap.exists()) { auMirror.settings = auClone(snap.data()); state.settings = { ...defaultState().settings, ...snap.data() }; }
+      else auMirror.settings = null; auLoaded("settings"); }, auErr));
+  auUnsubs.push(api.onSnapshot(auStateRef("live"),
+    snap => { if (snap.exists()) { const d = snap.data(); auMirror.live = auClone(d);
+        state.auction = { ...defaultState().auction, ...(d.auction || {}) };
+        if (!Array.isArray(state.auction.bidLog)) state.auction.bidLog = [];
+        state.lastAction = d.lastAction || null; }
+      else auMirror.live = null; auLoaded("live"); }, auErr));
+  setTimeout(() => auFallback("Live sync unavailable — this device only"), 6000);
+}
+function auLoaded(which) {
+  auFsLoaded.add(which);
+  if (!auFsReady && auFsLoaded.size === 4) auFsReady = true;
+  auRemote();
+}
+function auErr(err) {
+  console.error("auction snapshot error:", err);
+  const code = err && err.code;
+  auFallback(code === "permission-denied" ? "Cloud blocked: publish the latest Firestore rules"
+    : code === "not-found" ? "Firestore database not created yet"
+    : "Live sync unavailable — this device only");
+}
+function auFallback(msg) {
+  if (auFellBack || auFsReady) return;
+  auFellBack = true;
+  auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+  auUsingFirestore = false;
+  state = normalize(load());
+  toast(msg, "bad");
+  fillSettingsInputs(); renderAll(); updateCloudUploadBtn();
+}
+function auRemote() {
+  updateCloudUploadBtn();
+  const ae = document.activeElement;
+  if (ae && ["INPUT", "SELECT", "TEXTAREA"].includes(ae.tagName)) { auPendingRender = true; return; }
+  ensureCurrentPlayer();
+  fillSettingsInputs(); renderAll();
+}
+
+async function auctionSyncDiff() {
+  if (!auFsReady) return;                 // never push until we have the server baseline
+  if (auSyncing) { auSyncAgain = true; return; }
+  auSyncing = true;
+  try {
+    const api = auApi();
+    const ops = [];
+    AU_COLLS.forEach(coll => {
+      const cur = state[coll].map((item, i) => ({ ...item, order: i })); // positional order
+      const prev = auMirror[coll] || [];
+      const prevMap = new Map(prev.map(x => [x.id, x]));
+      const curIds = new Set(cur.map(x => x.id));
+      cur.forEach(item => {
+        const before = prevMap.get(item.id);
+        if (!before || JSON.stringify(auStrip(before)) !== JSON.stringify(auStrip(item)))
+          ops.push({ t: "set", ref: auItemRef(coll, item.id), data: auStrip(item) });
+      });
+      prev.forEach(item => { if (!curIds.has(item.id)) ops.push({ t: "del", ref: auItemRef(coll, item.id) }); });
+    });
+    if (JSON.stringify(state.settings) !== JSON.stringify(auMirror.settings))
+      ops.push({ t: "set", ref: auStateRef("settings"), data: auClone(state.settings) });
+    const live = { auction: state.auction, lastAction: state.lastAction || null };
+    if (JSON.stringify(live) !== JSON.stringify(auMirror.live))
+      ops.push({ t: "set", ref: auStateRef("live"), data: auClone(live) });
+    for (let i = 0; i < ops.length; i += 50) {   // small chunks: player photos make docs heavy
+      const batch = api.writeBatch(auDb());
+      ops.slice(i, i + 50).forEach(op => op.t === "set" ? batch.set(op.ref, op.data) : batch.delete(op.ref));
+      await batch.commit();
+    }
+    auMirror.teams = auClone(state.teams.map((t, i) => ({ ...t, order: i })));
+    auMirror.players = auClone(state.players.map((p, i) => ({ ...p, order: i })));
+    auMirror.settings = auClone(state.settings);
+    auMirror.live = auClone(live);
+  } catch (e) {
+    console.error("auction sync failed:", e);
+    toast("Couldn't save to the cloud", "bad");
+  } finally {
+    auSyncing = false;
+    if (auSyncAgain) { auSyncAgain = false; auctionSyncDiff(); }
+  }
+}
+
+function updateCloudUploadBtn() {
+  const row = $("#cloudUploadRow"); if (row) row.classList.toggle("hidden", !auUsingFirestore);
+}
+function uploadAuctionToCloud() {
+  if (!auUsingFirestore || !auCanEdit()) { toast("Cloud editing isn't available", "bad"); return; }
+  const local = normalize(load());
+  if (!local.teams.length && !local.players.length) { toast("No saved auction data on this device", "bad"); return; }
+  if (!confirm(`Add this device's ${local.teams.length} teams and ${local.players.length} players to the shared cloud auction?`)) return;
+  const haveT = new Set(state.teams.map(t => t.id));
+  local.teams.forEach(t => { if (!haveT.has(t.id)) state.teams.push(t); });
+  const haveP = new Set(state.players.map(p => p.id));
+  local.players.forEach(p => { if (!haveP.has(p.id)) state.players.push(p); });
+  if (!auMirror.settings) state.settings = { ...state.settings, ...local.settings };
+  save(); fillSettingsInputs(); renderAll(); toast("Uploading auction to the cloud…", "good");
 }
 
 /* ---------- utilities ---------- */
@@ -932,6 +1080,17 @@ function wireEvents() {
   $("#btnReauction").onclick = reauctionUnsold;
   $("#btnResetAuction").onclick = resetAuction;
   $("#btnResetAll").onclick = resetAll;
+  const cloudBtn = $("#btnCloudUpload"); if (cloudBtn) cloudBtn.onclick = uploadAuctionToCloud;
+
+  // When an editor finishes typing, flush any remote update we held back.
+  document.addEventListener("focusout", () => {
+    if (!auPendingRender) return;
+    setTimeout(() => {
+      const ae = document.activeElement;
+      if (ae && ["INPUT", "SELECT", "TEXTAREA"].includes(ae.tagName)) return; // still editing
+      auPendingRender = false; ensureCurrentPlayer(); fillSettingsInputs(); renderAll();
+    }, 0);
+  });
 
   // players search / filter
   $("#playerSearch").oninput = renderPlayers;
@@ -1005,5 +1164,15 @@ function init() {
   ensureCurrentPlayer();
   save();
   renderAll();
+  // Real-time auction (Phase D): start syncing once SIGNED IN (reads require auth).
+  if (window.HCCL && typeof window.HCCL.onChange === "function") {
+    window.HCCL.onChange(H => {
+      if (H.configured && H.user && !auUsingFirestore && !auFellBack && auDb() && auApi()) {
+        auUsingFirestore = true;
+        startAuctionSync();
+      }
+      renderAll(); updateCloudUploadBtn(); // re-render so gating applies live
+    });
+  }
 }
 init();

@@ -394,6 +394,27 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .member-role-select { width: auto; flex: none; padding: 6px 8px; font-size: 13px; }
 .members-hint { color: var(--muted); font-size: 12px; margin-top: 12px; }
 
+/* ===================== SIGN-IN WALL ===================== */
+.app-locked { overflow: hidden; }
+.auth-gate {
+  position: fixed; inset: 0; z-index: 2000;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(225, 6, 0, 0.18), transparent 60%),
+    var(--black);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.auth-gate.hidden { display: none; }
+.auth-gate-card { text-align: center; max-width: 360px; }
+.auth-gate-logo {
+  width: 88px; height: 88px; margin: 0 auto 20px; border-radius: 22px;
+  background: linear-gradient(135deg, var(--red), var(--gold));
+  display: flex; align-items: center; justify-content: center;
+  font-family: "Anton", sans-serif; font-size: 30px; color: #1a1300; box-shadow: var(--shadow);
+}
+.auth-gate-card h2 { font-size: 26px; margin-bottom: 8px; }
+.auth-gate-sub { color: var(--muted); margin-bottom: 22px; }
+.auth-gate .auth-btn { font-size: 15px; padding: 12px 22px; }
+
 /* ===================== ROLE GATING ===================== */
 /* Viewers (and signed-out users, when Firebase is configured) get a read-only
    app: no control buttons, no setup/management pages. firebase-init.js toggles
