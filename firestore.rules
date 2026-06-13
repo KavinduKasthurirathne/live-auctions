@@ -41,9 +41,17 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // Shared app data (auction + fantasy) — used by later phases.
-    match /app/{document=**} {
-      allow read: if signedIn();
+    // Shared fantasy data (Phase C): fantasy/league/{teams|players|contestants|days}/{id}.
+    // Public read so spectators/viewers (even signed-out) see live leaderboards;
+    // only editors (admin/moderator) may write.
+    match /fantasy/{document=**} {
+      allow read: if true;
+      allow write: if canEdit();
+    }
+
+    // Shared auction data (Phase D, reserved).
+    match /auction/{document=**} {
+      allow read: if true;
       allow write: if canEdit();
     }
   }

@@ -36,11 +36,128 @@
     return defaultFantasy();
   }
   function saveF() {
+    // In cloud mode Firestore is the source of truth; leave the local backup
+    // (FKEY) untouched so a one-time "upload to cloud" can still recover it.
+    if (usingFirestore) { if (canEditApp()) syncDiff(); return; }
     try { localStorage.setItem(FKEY, JSON.stringify(F)); } catch (e) { ftoast("Storage full - export a backup", "bad"); }
   }
 
   let F = loadF();
   const UI = { sub: "matchday", dayId: null, editEntryId: null, editTeamId: null, editPlayerId: null };
+
+  /* ============================================================
+     FIRESTORE REAL-TIME SYNC (Phase C)
+     When Firebase is configured, fantasy data lives in Firestore under
+     fantasy/league/{teams,players,contestants,days}/{id}. onSnapshot mirrors
+     it into F; local edits (saveF) are pushed as a minimal diff. With no
+     Firebase (or if it can't be reached) we stay on localStorage as before.
+     ============================================================ */
+  const FS_COLLS = ["teams", "players", "contestants", "days"];
+  let usingFirestore = false;
+  let fsReady = false;                 // true once every collection has loaded at least once
+  const fsLoaded = new Set();
+  const fsMirror = { teams: [], players: [], contestants: [], days: [] }; // last known server state
+  const fsUnsubs = [];
+  let pendingRender = false;           // defer re-render while an editor is typing
+  let fsSyncing = false, fsSyncAgain = false;
+
+  const fsDb = () => window.HCCL && window.HCCL.db;
+  const fsApi = () => window.HCCL && window.HCCL.fs;
+  function fsRef(coll, id) { return fsApi().doc(fsDb(), "fantasy", "league", coll, id); }
+  function stripId(o) { const c = Object.assign({}, o); delete c.id; return c; }
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+
+  function normItem(coll, id, d) {
+    if (coll === "days") {
+      return {
+        id, date: d.date || "", label: d.label || "",
+        teamIds: Array.isArray(d.teamIds) ? d.teamIds : [],
+        performance: d.performance || {},
+        entries: (Array.isArray(d.entries) ? d.entries : []).map(e => ({
+          id: e.id, contestantId: e.contestantId,
+          playerIds: Array.isArray(e.playerIds) ? e.playerIds : [],
+          captainId: e.captainId || null, viceCaptainId: e.viceCaptainId || null,
+        })),
+        hasResults: !!d.hasResults,
+      };
+    }
+    if (coll === "players") return { id, name: d.name || "", teamId: d.teamId || "" };
+    return { id, name: d.name || "" }; // teams, contestants
+  }
+
+  function startFantasySync() {
+    const api = fsApi(), db = fsDb();
+    FS_COLLS.forEach(coll => {
+      const unsub = api.onSnapshot(api.collection(db, "fantasy", "league", coll),
+        snap => {
+          const items = snap.docs.map(docSnap => normItem(coll, docSnap.id, docSnap.data()));
+          fsMirror[coll] = clone(items);
+          F[coll] = items;
+          fsLoaded.add(coll);
+          if (!fsReady && fsLoaded.size === FS_COLLS.length) fsReady = true;
+          onRemoteChange();
+        },
+        err => { console.error("fantasy snapshot error:", coll, err); }
+      );
+      fsUnsubs.push(unsub);
+    });
+    // If Firestore can't be reached (blocked/offline), don't hang on "Loading…":
+    // drop to local-only mode after a short grace period.
+    setTimeout(() => {
+      if (usingFirestore && !fsReady) {
+        console.warn("Firestore unreachable — falling back to local-only mode");
+        fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+        usingFirestore = false;
+        F = loadF();
+        ftoast("Live sync unavailable — this device only", "bad");
+        renderFantasy();
+      }
+    }, 6000);
+  }
+
+  function onRemoteChange() {
+    // Don't wipe an editor's in-progress typing; defer the re-render until blur.
+    const ae = document.activeElement, root = fanEl();
+    if (ae && root && root.contains(ae) && ["INPUT", "SELECT", "TEXTAREA"].includes(ae.tagName)) {
+      pendingRender = true; return;
+    }
+    renderFantasy();
+  }
+
+  async function syncDiff() {
+    if (!fsReady) return;            // never push until we have the server baseline
+    if (fsSyncing) { fsSyncAgain = true; return; }
+    fsSyncing = true;
+    try {
+      const api = fsApi(), db = fsDb();
+      const ops = [];
+      FS_COLLS.forEach(coll => {
+        const cur = F[coll] || [], prev = fsMirror[coll] || [];
+        const prevMap = new Map(prev.map(x => [x.id, x]));
+        const curIds = new Set(cur.map(x => x.id));
+        cur.forEach(item => {
+          const before = prevMap.get(item.id);
+          if (!before || JSON.stringify(stripId(before)) !== JSON.stringify(stripId(item)))
+            ops.push({ t: "set", ref: fsRef(coll, item.id), data: stripId(item) });
+        });
+        prev.forEach(item => { if (!curIds.has(item.id)) ops.push({ t: "del", ref: fsRef(coll, item.id) }); });
+      });
+      for (let i = 0; i < ops.length; i += 450) {        // Firestore batch limit is 500
+        const batch = api.writeBatch(db);
+        ops.slice(i, i + 450).forEach(op => op.t === "set" ? batch.set(op.ref, op.data) : batch.delete(op.ref));
+        await batch.commit();
+      }
+      FS_COLLS.forEach(coll => { fsMirror[coll] = clone(F[coll] || []); }); // advance baseline
+    } catch (e) {
+      console.error("fantasy sync failed:", e);
+      ftoast("Couldn't save to the cloud", "bad");
+      FS_COLLS.forEach(coll => { F[coll] = clone(fsMirror[coll] || []); }); // revert to server state
+      renderFantasy();
+    } finally {
+      fsSyncing = false;
+      if (fsSyncAgain) { fsSyncAgain = false; syncDiff(); }
+    }
+  }
 
   /* ---------------- helpers ---------------- */
   const fid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -145,6 +262,7 @@
   }
   function renderFanBody() {
     const body = document.getElementById("fan-body"); if (!body) return;
+    if (usingFirestore && !fsReady) { body.innerHTML = `<div class="card"><p class="hint">Loading league data…</p></div>`; return; }
     // Viewers only get the read-only Leaderboards (Match Day & Manage are editing surfaces).
     if (!canEditApp() && UI.sub !== "leaderboard") UI.sub = "leaderboard";
     if (UI.sub === "leaderboard") body.innerHTML = renderLeaderboards();
@@ -430,6 +548,9 @@
         <div class="form-row"><button class="btn btn-dark" data-export>Export fantasy backup</button>
           <label class="btn btn-dark file-btn">Import backup<input type="file" id="fanImportFile" accept="application/json" hidden/></label></div>
         <hr/>
+        ${usingFirestore ? `<p class="hint">Live cloud sync is on — everyone sees the same data. Copy this device's saved data into the shared cloud (one-time).</p>
+        <div class="form-row"><button class="btn btn-yellow" data-cloud-upload>☁ Upload local data to cloud</button></div>
+        <hr/>` : ""}
         <div class="form-row"><button class="btn btn-danger" data-reset>Erase fantasy data</button></div>
       </div>
     </div>`;
@@ -602,6 +723,20 @@
     F.players = sold.map(p => ({ id: "fp_" + p.id, name: p.name, teamId: "ft_" + p.soldTo })).filter(p => ids.has(p.teamId));
     saveF(); renderFanBody(); ftoast(`Imported ${F.teams.length} teams and ${F.players.length} players`, "good");
   }
+  // One-time migration: copy this device's localStorage fantasy data into the
+  // shared cloud. Additive (won't delete cloud entries that aren't local).
+  function uploadLocalToCloud() {
+    if (!usingFirestore || !canEditApp()) { ftoast("Cloud editing isn't available", "bad"); return; }
+    const local = loadF();
+    const n = local.teams.length + local.players.length + local.days.length + local.contestants.length;
+    if (!n) { ftoast("No saved data on this device to upload", "bad"); return; }
+    if (!confirm(`Add this device's ${local.teams.length} teams, ${local.players.length} players and ${local.days.length} match days to the shared cloud?`)) return;
+    FS_COLLS.forEach(coll => {
+      const have = new Set(F[coll].map(x => x.id));
+      local[coll].forEach(it => { if (!have.has(it.id)) F[coll].push(it); });
+    });
+    saveF(); renderFantasy(); ftoast("Uploading to the cloud…", "good");
+  }
   function exportF() {
     const blob = new Blob([JSON.stringify(F, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -655,6 +790,7 @@
     if ((m = t.closest("[data-share-board]"))) return shareBoard(m.getAttribute("data-share-board"));
     if (t.closest("[data-import-auction]")) return importFromAuction();
     if (t.closest("[data-export]")) return exportF();
+    if (t.closest("[data-cloud-upload]")) return uploadLocalToCloud();
     if (t.closest("[data-reset]")) return resetF();
   }
   function onChange(e) {
@@ -674,8 +810,16 @@
     root.addEventListener("input", e => {
       if (e.target.hasAttribute && (e.target.hasAttribute("data-runs") || e.target.hasAttribute("data-wkts"))) updateRowPts(e.target);
     });
+    // Flush a re-render that was deferred while the editor was typing.
+    root.addEventListener("focusout", () => { if (pendingRender) { pendingRender = false; renderFantasy(); } });
     const tabs = document.getElementById("tabs");
     if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="fantasy"]')) renderFantasy(); });
+    // Real-time data: if Firebase is configured, mirror Firestore into F. Otherwise
+    // stay on localStorage (offline / no-account mode), exactly as before.
+    if (window.HCCL && window.HCCL.configured && fsDb() && fsApi()) {
+      usingFirestore = true;
+      startFantasySync();
+    }
     // Re-render when sign-in / role changes so gating applies live.
     if (window.HCCL && typeof window.HCCL.onChange === "function") window.HCCL.onChange(() => renderFantasy());
     renderFantasy();

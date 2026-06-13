@@ -11,8 +11,8 @@ import {
   signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  initializeFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp,
-  collection, getDocs,
+  initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp,
+  collection, getDocs, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const listeners = new Set();
@@ -175,7 +175,7 @@ try {
 
     window.HCCL.configured = true;
     window.HCCL.db = db;
-    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp, collection, getDocs };
+    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection, getDocs, writeBatch };
     window.HCCL.listMembers = async () => {
       const snap = await getDocs(collection(db, "users"));
       return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
