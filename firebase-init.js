@@ -82,7 +82,7 @@ function buildMembersModal() {
         <button class="auth-btn ghost" id="membersClose">Close</button>
       </div>
       <div class="members-list" id="membersList"></div>
-      <p class="members-hint"><b>admin</b> = full control incl. roles · <b>moderator</b> = edit/delete data · <b>viewer</b> = read-only</p>
+      // <p class="members-hint"><b>admin</b> = full control incl. roles · <b>moderator</b> = edit/delete data · <b>viewer</b> = read-only</p>
     </div>`;
   document.body.appendChild(membersBackdrop);
 
