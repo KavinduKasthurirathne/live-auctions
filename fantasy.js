@@ -109,9 +109,11 @@
         },
         err => {
           console.error("fantasy snapshot error:", coll, err);
-          fallbackToLocal(err && err.code === "permission-denied"
-            ? "Cloud blocked: publish the latest Firestore rules"
-            : "Live sync unavailable — this device only");
+          const code = err && err.code;
+          fallbackToLocal(
+            code === "permission-denied" ? "Cloud blocked: publish the latest Firestore rules"
+              : code === "not-found" ? "Firestore database not created yet — create it in the Firebase console"
+              : "Live sync unavailable — this device only");
         }
       );
       fsUnsubs.push(unsub);
