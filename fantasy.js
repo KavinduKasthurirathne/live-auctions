@@ -60,6 +60,7 @@
   const fsUnsubs = [];
   let pendingRender = false;           // defer re-render while an editor is typing
   let fsSyncing = false, fsSyncAgain = false;
+  let fsFellBack = false, fsFellBackMsg = "";  // cloud unreachable -> local-only
 
   const fsDb = () => window.HCCL && window.HCCL.db;
   const fsApi = () => window.HCCL && window.HCCL.fs;
@@ -85,6 +86,15 @@
     return { id, name: d.name || "" }; // teams, contestants
   }
 
+  function fallbackToLocal(msg) {
+    if (fsFellBack || fsReady) return;     // already loaded fine, or already fell back
+    fsFellBack = true; fsFellBackMsg = msg;
+    fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+    usingFirestore = false;
+    F = loadF();
+    ftoast(msg, "bad");
+    renderFantasy();
+  }
   function startFantasySync() {
     const api = fsApi(), db = fsDb();
     FS_COLLS.forEach(coll => {
@@ -97,22 +107,17 @@
           if (!fsReady && fsLoaded.size === FS_COLLS.length) fsReady = true;
           onRemoteChange();
         },
-        err => { console.error("fantasy snapshot error:", coll, err); }
+        err => {
+          console.error("fantasy snapshot error:", coll, err);
+          fallbackToLocal(err && err.code === "permission-denied"
+            ? "Cloud blocked: publish the latest Firestore rules"
+            : "Live sync unavailable — this device only");
+        }
       );
       fsUnsubs.push(unsub);
     });
-    // If Firestore can't be reached (blocked/offline), don't hang on "Loading…":
-    // drop to local-only mode after a short grace period.
-    setTimeout(() => {
-      if (usingFirestore && !fsReady) {
-        console.warn("Firestore unreachable — falling back to local-only mode");
-        fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
-        usingFirestore = false;
-        F = loadF();
-        ftoast("Live sync unavailable — this device only", "bad");
-        renderFantasy();
-      }
-    }, 6000);
+    // If Firestore just hangs (blocked/offline, no error fired), don't sit on "Loading…".
+    setTimeout(() => fallbackToLocal("Live sync unavailable — this device only"), 6000);
   }
 
   function onRemoteChange() {
@@ -254,6 +259,7 @@
           ${subBtn("manage", "⚙️ Manage")}
         </div>
       </div>
+      ${fsFellBack ? `<div class="card" style="border-color:var(--red)"><p class="hint" style="margin:0">⚠ ${esc(fsFellBackMsg)}. Showing this device only — changes won't sync and the cloud-upload button is hidden. Fix the cause (publish rules / disable ad-blocker) and reload.</p></div>` : ""}
       <div id="fan-body"></div>`;
     renderFanBody();
   }
