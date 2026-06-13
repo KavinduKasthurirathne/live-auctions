@@ -974,6 +974,8 @@ function wireEvents() {
   // keyboard shortcuts (auction tab only)
   document.addEventListener("keydown", e => {
     if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
+    // Viewers can't drive the auction by keyboard either.
+    if (window.HCCL && window.HCCL.configured && !window.HCCL.canEdit()) return;
     if (overlayVisible()) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nextPlayer(); }
       return;

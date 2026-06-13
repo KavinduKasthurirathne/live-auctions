@@ -149,13 +149,19 @@ async function openMembers() {
 }
 
 function applyRoleAttr() {
-  document.body.dataset.role = window.HCCL.role; // for future CSS gating (Phases C/D)
+  const H = window.HCCL;
+  document.body.dataset.role = H.role;
+  // Editors (admin/moderator) get .can-edit, which reveals the edit/control UI.
+  // Fully-offline mode (no Firebase configured) also gets it so the app still
+  // works without any sign-in, exactly as before.
+  document.body.classList.toggle("can-edit", !H.configured || H.canEdit());
 }
 
 try {
   const cfg = window.FIREBASE_CONFIG;
   const configured = cfg && cfg.apiKey && !String(cfg.apiKey).startsWith("PASTE") && cfg.projectId;
   if (!configured) {
+    applyRoleAttr(); // offline mode: enable editing (no auth gate)
     renderAuthBox();
   } else {
     const app = initializeApp(cfg);
@@ -191,10 +197,10 @@ try {
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
+        const owner = (window.HCCL_ADMIN_EMAILS || []).includes(user.email);
         let role = "viewer";
         try {
           const ref = doc(db, "users", user.uid);
-          const owner = (window.HCCL_ADMIN_EMAILS || []).includes(user.email);
           let snap = await getDoc(ref);
           if (!snap.exists()) {
             await setDoc(ref, {
@@ -215,6 +221,10 @@ try {
         } catch (e) {
           console.error("role provisioning failed (did you publish firestore.rules?)", e);
         }
+        // The bootstrap owner is ALWAYS admin in the UI, even if the role write
+        // was blocked (e.g. rules not published yet) — so the owner is never
+        // locked out of the controls.
+        if (owner) role = "admin";
         window.HCCL.user = { uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL };
         window.HCCL.role = role;
       } else {

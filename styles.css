@@ -393,3 +393,16 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .member-email { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .member-role-select { width: auto; flex: none; padding: 6px 8px; font-size: 13px; }
 .members-hint { color: var(--muted); font-size: 12px; margin-top: 12px; }
+
+/* ===================== ROLE GATING ===================== */
+/* Viewers (and signed-out users, when Firebase is configured) get a read-only
+   app: no control buttons, no setup/management pages. firebase-init.js toggles
+   .can-edit on <body> for admin/moderator (and for fully-offline mode). */
+body:not(.can-edit) .auctioneer-bar,           /* SOLD / Unsold / Undo / Reset */
+body:not(.can-edit) #teamsBidGrid,             /* per-team bid buttons */
+body:not(.can-edit) .tab[data-tab="setup"],    /* auction Setup tab */
+body:not(.can-edit) [data-auction],            /* "Auction now" buttons */
+body:not(.can-edit) .fan-tab[data-fan-sub="matchday"],  /* fantasy Match Day */
+body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
+  display: none !important;
+}

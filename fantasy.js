@@ -121,8 +121,13 @@
   /* ============================================================
      RENDER
      ============================================================ */
+  function canEditApp() {
+    const H = window.HCCL;
+    return !H || !H.configured || H.canEdit();
+  }
   function renderFantasy() {
     const v = fanEl(); if (!v) return;
+    if (!canEditApp() && UI.sub !== "leaderboard") UI.sub = "leaderboard";
     v.innerHTML = `
       <div class="view-head">
         <h2>Fantasy League</h2>
@@ -140,6 +145,8 @@
   }
   function renderFanBody() {
     const body = document.getElementById("fan-body"); if (!body) return;
+    // Viewers only get the read-only Leaderboards (Match Day & Manage are editing surfaces).
+    if (!canEditApp() && UI.sub !== "leaderboard") UI.sub = "leaderboard";
     if (UI.sub === "leaderboard") body.innerHTML = renderLeaderboards();
     else if (UI.sub === "manage") body.innerHTML = renderManage();
     else body.innerHTML = renderMatchDay();
@@ -669,6 +676,8 @@
     });
     const tabs = document.getElementById("tabs");
     if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="fantasy"]')) renderFantasy(); });
+    // Re-render when sign-in / role changes so gating applies live.
+    if (window.HCCL && typeof window.HCCL.onChange === "function") window.HCCL.onChange(() => renderFantasy());
     renderFantasy();
   }
   if (typeof document !== "undefined") {
