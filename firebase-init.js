@@ -155,11 +155,12 @@ let authGateEl = null;
 function gateLogoHtml() {
   const brand = document.getElementById("brandLogo");
   const bg = brand && brand.style && brand.style.backgroundImage;
-  if (bg && bg !== "none" && bg !== "") {
-    return `<div class="auth-gate-logo" style="background-image:${bg};background-size:cover;background-position:center"></div>`;
-  }
-  const txt = (brand && brand.textContent && brand.textContent.trim()) || "HCCL";
-  return `<div class="auth-gate-logo">${esc(txt)}</div>`;
+  // Prefer the live league logo (loaded into #brandLogo); otherwise fall back to
+  // the committed brand-logo.jpg so the wall ALWAYS shows a badge — even on a
+  // fresh device before any cloud/local data has loaded. Swap brand-logo.jpg in
+  // the repo to rebrand for a new league.
+  const img = (bg && bg !== "none" && bg !== "") ? bg : "url('brand-logo.jpg')";
+  return `<div class="auth-gate-logo" style="background-image:${img};background-size:cover;background-position:center"></div>`;
 }
 function renderAuthGate() {
   const H = window.HCCL;
