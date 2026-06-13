@@ -144,7 +144,7 @@ async function openMembers() {
     list.innerHTML = members.map(memberRowHtml).join("") || `<p class="members-hint">No members yet.</p>`;
   } catch (e) {
     console.error(e);
-    list.innerHTML = `<p class="members-hint">Couldn't load members. Make sure you're admin and the latest rules are published.</p>`;
+    list.innerHTML = `<p class="members-hint">Couldn't load members. If the console shows <b>ERR_BLOCKED_BY_CLIENT</b> or "client is offline", an ad-blocker / privacy shield is blocking Firestore — allow this site, then retry.</p>`;
   }
 }
 
