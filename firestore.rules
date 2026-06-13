@@ -29,7 +29,10 @@ service cloud.firestore {
 
     // User profiles + roles
     match /users/{uid} {
-      allow read: if signedIn();
+      // You can read your own profile; admins can read anyone's.
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      // Only admins can enumerate the whole member list (Members screen).
+      allow list: if isAdmin();
       // A user may create only their OWN profile, and only as 'viewer'
       // (the owner email may bootstrap itself as 'admin').
       allow create: if signedIn() && request.auth.uid == uid

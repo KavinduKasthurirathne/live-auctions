@@ -11,7 +11,8 @@ import {
   signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp,
+  getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp,
+  collection, getDocs,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const listeners = new Set();
@@ -32,9 +33,16 @@ window.HCCL = {
   isAdmin() { return this.role === "admin"; },
   onChange(cb) { listeners.add(cb); if (this.ready) cb(this); return () => listeners.delete(cb); },
   signIn() {}, signOut() {},
+  listMembers() { return Promise.resolve([]); },   // admin: read all users/{uid}
+  setMemberRole() { return Promise.resolve(); },   // admin: change a user's role
   db: null,
-  fs: null,              // { doc, getDoc, setDoc, onSnapshot, serverTimestamp } for later phases
+  fs: null,              // Firestore fns for later phases (doc, getDoc, onSnapshot, …)
 };
+
+function notify(msg, kind) {
+  if (typeof window.toast === "function") window.toast(msg, kind);
+  else console.log("[HCCL]", msg);
+}
 
 function renderAuthBox() {
   const box = document.getElementById("authBox");
@@ -52,9 +60,91 @@ function renderAuthBox() {
           <span class="auth-name">${esc(H.user.displayName || H.user.email || "")}</span>
           <span class="auth-role role-${esc(H.role)}">${esc(H.role)}</span>
         </div>
+        ${H.isAdmin() ? `<button class="auth-btn ghost" id="authMembers">👤 Members</button>` : ""}
         <button class="auth-btn ghost" id="authSignOut">Sign out</button>
       </div>`;
+    const mb = document.getElementById("authMembers"); if (mb) mb.onclick = openMembers;
     const b = document.getElementById("authSignOut"); if (b) b.onclick = () => H.signOut();
+  }
+}
+
+/* ---------- admin: Members & Roles screen ---------- */
+const ROLES = ["admin", "moderator", "viewer"];
+let membersBackdrop = null;
+
+function buildMembersModal() {
+  membersBackdrop = document.createElement("div");
+  membersBackdrop.className = "members-backdrop hidden";
+  membersBackdrop.innerHTML = `
+    <div class="members-modal" role="dialog" aria-modal="true">
+      <div class="members-head">
+        <h3>Members &amp; Roles</h3>
+        <button class="auth-btn ghost" id="membersClose">Close</button>
+      </div>
+      <div class="members-list" id="membersList"></div>
+      <p class="members-hint"><b>admin</b> = full control incl. roles · <b>moderator</b> = edit/delete data · <b>viewer</b> = read-only</p>
+    </div>`;
+  document.body.appendChild(membersBackdrop);
+
+  membersBackdrop.addEventListener("click", (e) => {
+    if (e.target === membersBackdrop || e.target.id === "membersClose") membersBackdrop.classList.add("hidden");
+  });
+  membersBackdrop.addEventListener("change", async (e) => {
+    const sel = e.target.closest(".member-role-select");
+    if (!sel) return;
+    const uid = sel.getAttribute("data-uid");
+    const role = sel.value;
+    const prev = sel.getAttribute("data-prev") || "viewer";
+    sel.disabled = true;
+    try {
+      await window.HCCL.setMemberRole(uid, role);
+      sel.setAttribute("data-prev", role);
+      notify(`Role updated to ${role}`, "good");
+      if (window.HCCL.user && window.HCCL.user.uid === uid) {
+        // Changed my own role — reflect it immediately.
+        window.HCCL.role = role; applyRoleAttr(); renderAuthBox();
+      }
+    } catch (err) {
+      console.error(err);
+      sel.value = prev; // revert the dropdown
+      notify("Couldn't update role (need admin + published rules)", "bad");
+    } finally {
+      sel.disabled = false;
+    }
+  });
+}
+
+function memberRowHtml(m) {
+  const isSelf = window.HCCL.user && window.HCCL.user.uid === m.uid;
+  const initial = esc((m.displayName || m.email || "?").slice(0, 1).toUpperCase());
+  const avatar = m.photoURL
+    ? `<img src="${esc(m.photoURL)}" alt="" referrerpolicy="no-referrer"/>`
+    : `<div class="member-avatar">${initial}</div>`;
+  return `<div class="member-row">
+      ${avatar}
+      <div class="member-meta">
+        <span class="member-name">${esc(m.displayName || "(no name)")}${isSelf ? " · you" : ""}</span>
+        <span class="member-email">${esc(m.email || "")}</span>
+      </div>
+      <select class="member-role-select" data-uid="${esc(m.uid)}" data-prev="${esc(m.role || "viewer")}">
+        ${ROLES.map(r => `<option value="${r}" ${m.role === r ? "selected" : ""}>${r}</option>`).join("")}
+      </select>
+    </div>`;
+}
+
+async function openMembers() {
+  if (!window.HCCL.isAdmin()) return;
+  if (!membersBackdrop) buildMembersModal();
+  membersBackdrop.classList.remove("hidden");
+  const list = document.getElementById("membersList");
+  list.innerHTML = `<p class="members-hint">Loading…</p>`;
+  try {
+    const members = await window.HCCL.listMembers();
+    members.sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || (a.email || "").localeCompare(b.email || ""));
+    list.innerHTML = members.map(memberRowHtml).join("") || `<p class="members-hint">No members yet.</p>`;
+  } catch (e) {
+    console.error(e);
+    list.innerHTML = `<p class="members-hint">Couldn't load members. Make sure you're admin and the latest rules are published.</p>`;
   }
 }
 
@@ -75,7 +165,15 @@ try {
 
     window.HCCL.configured = true;
     window.HCCL.db = db;
-    window.HCCL.fs = { doc, getDoc, setDoc, onSnapshot, serverTimestamp };
+    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp, collection, getDocs };
+    window.HCCL.listMembers = async () => {
+      const snap = await getDocs(collection(db, "users"));
+      return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    };
+    window.HCCL.setMemberRole = async (uid, role) => {
+      if (!ROLES.includes(role)) throw new Error("invalid role");
+      await updateDoc(doc(db, "users", uid), { role });
+    };
     // Popup first (nicer UX); if the browser blocks it, fall back to a
     // full-page redirect, which popup blockers can't stop.
     const POPUP_FALLBACK = new Set(["auth/popup-blocked", "auth/popup-closed-by-user", "auth/cancelled-popup-request", "auth/operation-not-supported-in-this-environment"]);
@@ -96,15 +194,21 @@ try {
         let role = "viewer";
         try {
           const ref = doc(db, "users", user.uid);
+          const owner = (window.HCCL_ADMIN_EMAILS || []).includes(user.email);
           let snap = await getDoc(ref);
           if (!snap.exists()) {
-            const owner = (window.HCCL_ADMIN_EMAILS || []).includes(user.email);
             await setDoc(ref, {
               email: user.email || "",
               displayName: user.displayName || "",
+              photoURL: user.photoURL || "",
               role: owner ? "admin" : "viewer",
               createdAt: serverTimestamp(),
             });
+            snap = await getDoc(ref);
+          } else if (owner && snap.data().role !== "admin") {
+            // Self-heal: the bootstrap owner is ALWAYS admin. (A viewer doc can
+            // get created during an earlier half-finished sign-in.)
+            await updateDoc(ref, { role: "admin" });
             snap = await getDoc(ref);
           }
           role = (snap.exists() && snap.data().role) || "viewer";
