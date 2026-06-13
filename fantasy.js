@@ -401,8 +401,8 @@
 
   function renderDayStandings(day) {
     if (!day.entries.length) return "";
-    let html = `<div class="card"><h3>Day standings - ${esc(dayLabel(day))}</h3>`;
-    if (!day.hasResults) return html + `<p class="hint">Save match results to see points.</p></div>`;
+    if (!day.hasResults) return `<div class="card"><h3>Day Standings - ${esc(dayLabel(day))}</h3><p class="hint">Save match results to see points.</p></div>`;
+    let html = `<div class="card"><div class="fan-card-head"><h3>Day Standings - ${esc(dayLabel(day))}</h3><button class="btn btn-dark fan-share-btn" data-share-day title="Download as image">📷 Share</button></div>`;
     html += `<table class="fan-table"><thead><tr><th>#</th><th>Contestant</th><th class="num">Points</th></tr></thead><tbody>`;
     dayStandings(day).forEach((row, i) => {
       html += `<tr><td>${medal(i)}</td><td>${esc(row.contestant ? row.contestant.name : "?")}</td><td class="num strong">${fmtPts(row.points)}</td></tr>`;
@@ -446,20 +446,14 @@
       ? `<div style="${base}color:#1a1300;background:${grad};">${i + 1}</div>`
       : `<div style="${base}color:#9b9ba3;background:#2a2a2e;">${i + 1}</div>`;
   }
-  function buildShareCard(kind, stats) {
-    const isPlayer = kind === "player";
+  function shareDateStr() {
+    return new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
+  }
+  // The branded off-screen card shell shared by every share image: season title,
+  // subtitle, date, divider, the row body, and the footer. `innerHtml` is the table.
+  function buildShareShell(subTitle, dateStr, innerHtml) {
     const seasonEl = document.getElementById("seasonTitle");
     const seasonTitle = (seasonEl && seasonEl.textContent.trim()) || "HCCL";
-    // Players board: top 10 only. Contestants board: everyone.
-    const ranked = isPlayer ? stats.slice(0, 10) : stats;
-    const rows = ranked.map((s, i) => isPlayer
-      ? { i, name: s.player.name, sub: teamName(s.player.teamId), total: s.total, days: s.days, avg: s.avg }
-      : { i, name: s.contestant.name, sub: "", total: s.total, days: s.days, avg: s.avg });
-    const subTitle = isPlayer ? "Fantasy Player of the Season" : "Fantasy Leaderboard";
-    const dateStr = new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
-    const statCell = (val, hi) =>
-      `<div style="width:120px;text-align:right;font-size:${hi ? 30 : 24}px;font-weight:${hi ? 800 : 600};color:${hi ? "#ffcc00" : "#f6f6f7"};">${val}</div>`;
-    const headCell = label => `<div style="width:120px;text-align:right;">${label}</div>`;
     const card = document.createElement("div");
     // Lay out at the origin (NOT off-screen via a huge negative offset - the
     // node's own position is copied onto html-to-image's clone, so left:-99999px
@@ -479,7 +473,24 @@
         <div style="font-size:16px;color:#9b9ba3;margin-top:10px;">${esc(dateStr)}</div>
       </div>
       <div style="height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#e10600,#f5b301,transparent);margin:26px 0 30px;"></div>
-      <div style="max-width:840px;margin:0 auto;">
+      <div style="max-width:840px;margin:0 auto;">${innerHtml}</div>
+      <div style="margin-top:30px;text-align:center;color:#5a5a62;font-size:15px;letter-spacing:3px;text-transform:uppercase;">
+        HC Champions League
+      </div>`;
+    return card;
+  }
+  function buildShareCard(kind, stats) {
+    const isPlayer = kind === "player";
+    // Players board: top 10 only. Contestants board: everyone.
+    const ranked = isPlayer ? stats.slice(0, 10) : stats;
+    const rows = ranked.map((s, i) => isPlayer
+      ? { i, name: s.player.name, sub: teamName(s.player.teamId), total: s.total, days: s.days, avg: s.avg }
+      : { i, name: s.contestant.name, sub: "", total: s.total, days: s.days, avg: s.avg });
+    const subTitle = isPlayer ? "Fantasy Player of the Season" : "Fantasy Leaderboard";
+    const statCell = (val, hi) =>
+      `<div style="width:120px;text-align:right;font-size:${hi ? 30 : 24}px;font-weight:${hi ? 800 : 600};color:${hi ? "#ffcc00" : "#f6f6f7"};">${val}</div>`;
+    const headCell = label => `<div style="width:120px;text-align:right;">${label}</div>`;
+    const body = `
         <div style="display:flex;align-items:center;padding:0 24px 14px;color:#9b9ba3;font-size:14px;letter-spacing:2px;text-transform:uppercase;">
           <div style="width:56px;">#</div>
           <div style="flex:1;">${isPlayer ? "Player" : "Contestant"}</div>
@@ -493,12 +504,45 @@
               ${r.sub ? `<div style="font-size:16px;color:#9b9ba3;margin-top:3px;">${esc(r.sub)}</div>` : ""}
             </div>
             ${isPlayer ? statCell(fmtPts(r.days)) : ""}${statCell(fmtPts(r.total))}${statCell(fmtPts(r.avg), true)}
-          </div>`).join("")}
-      </div>
-      <div style="margin-top:30px;text-align:center;color:#5a5a62;font-size:15px;letter-spacing:3px;text-transform:uppercase;">
-        HC Champions League
-      </div>`;
-    return card;
+          </div>`).join("")}`;
+    return buildShareShell(subTitle, shareDateStr(), body);
+  }
+  function buildDayShareCard(day) {
+    const rows = dayStandings(day).map((row, i) => ({ i, name: row.contestant ? row.contestant.name : "?", points: row.points }));
+    const body = `
+        <div style="display:flex;align-items:center;padding:0 24px 14px;color:#9b9ba3;font-size:14px;letter-spacing:2px;text-transform:uppercase;">
+          <div style="width:56px;">#</div>
+          <div style="flex:1;">Contestant</div>
+          <div style="width:140px;text-align:right;">Points</div>
+        </div>
+        ${rows.map(r => `
+          <div style="display:flex;align-items:center;background:#161618;border:1px solid #34343a;border-radius:16px;padding:16px 24px;margin-bottom:10px;">
+            <div style="width:56px;">${shareRankBadge(r.i)}</div>
+            <div style="flex:1;min-width:0;padding-right:16px;">
+              <div style="font-size:27px;font-weight:700;line-height:1.15;">${esc(r.name)}</div>
+            </div>
+            <div style="width:140px;text-align:right;font-size:30px;font-weight:800;color:#ffcc00;">${fmtPts(r.points)}</div>
+          </div>`).join("")}`;
+    return buildShareShell("Today's Leaderboard", shareDateStr(), body);
+  }
+  async function captureAndDownload(node, filename, doneMsg) {
+    document.body.appendChild(node);
+    try {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      const opts = { pixelRatio: 2, backgroundColor: "#0a0a0b", cacheBust: true, width: 1080, height: node.scrollHeight };
+      // First render is unreliable (fonts/styles not embedded yet) and often
+      // comes back blank - run it as a throwaway, then capture for real.
+      await window.htmlToImage.toPng(node, opts);
+      const dataUrl = await window.htmlToImage.toPng(node, opts);
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = dataUrl; link.click();
+      ftoast(doneMsg, "good");
+    } catch (err) {
+      ftoast("Could not generate image", "bad");
+    } finally {
+      node.remove();
+    }
   }
   async function shareBoard(kind) {
     const lib = window.htmlToImage;
@@ -507,23 +551,17 @@
     if (!stats.length) { ftoast("No results to share yet", "bad"); return; }
     ftoast("Building image...", "");
     const node = buildShareCard(kind, stats);
-    document.body.appendChild(node);
-    try {
-      if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      const opts = { pixelRatio: 2, backgroundColor: "#0a0a0b", cacheBust: true, width: 1080, height: node.scrollHeight };
-      // First render is unreliable (fonts/styles not embedded yet) and often
-      // comes back blank - run it as a throwaway, then capture for real.
-      await lib.toPng(node, opts);
-      const dataUrl = await lib.toPng(node, opts);
-      const link = document.createElement("a");
-      link.download = kind === "player" ? "hccl-player-of-season-leaderboard.png" : "hccl-contestants-leaderboard.png";
-      link.href = dataUrl; link.click();
-      ftoast("Leaderboard image downloaded", "good");
-    } catch (err) {
-      ftoast("Could not generate image", "bad");
-    } finally {
-      node.remove();
-    }
+    const filename = kind === "player" ? "hccl-player-of-season-leaderboard.png" : "hccl-contestants-leaderboard.png";
+    await captureAndDownload(node, filename, "Leaderboard image downloaded");
+  }
+  async function shareDay() {
+    const lib = window.htmlToImage;
+    if (!lib || typeof lib.toPng !== "function") { ftoast("Image library still loading - try again", "bad"); return; }
+    const day = currentDay();
+    if (!day || !day.entries.length || !day.hasResults) { ftoast("No results to share yet", "bad"); return; }
+    ftoast("Building image...", "");
+    const node = buildDayShareCard(day);
+    await captureAndDownload(node, "hccl-today-leaderboard.png", "Day standings image downloaded");
   }
 
   /* ---------- manage ---------- */
@@ -796,6 +834,7 @@
     if ((m = t.closest("[data-del-player]"))) return delPlayer(m.getAttribute("data-del-player"));
     if ((m = t.closest("[data-del-contestant]"))) return delContestant(m.getAttribute("data-del-contestant"));
     if ((m = t.closest("[data-share-board]"))) return shareBoard(m.getAttribute("data-share-board"));
+    if (t.closest("[data-share-day]")) return shareDay();
     if (t.closest("[data-import-auction]")) return importFromAuction();
     if (t.closest("[data-export]")) return exportF();
     if (t.closest("[data-cloud-upload]")) return uploadLocalToCloud();
