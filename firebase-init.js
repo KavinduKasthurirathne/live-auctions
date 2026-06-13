@@ -153,14 +153,11 @@ let authGateEl = null;
 // Mirror the header's #brandLogo (league logo image, or initials fallback) so the
 // gate shows the ongoing league's badge. app.js fills #brandLogo before this runs.
 function gateLogoHtml() {
-  const brand = document.getElementById("brandLogo");
-  const bg = brand && brand.style && brand.style.backgroundImage;
-  // Prefer the live league logo (loaded into #brandLogo); otherwise fall back to
-  // the committed brand-logo.jpg so the wall ALWAYS shows a badge — even on a
-  // fresh device before any cloud/local data has loaded. Swap brand-logo.jpg in
-  // the repo to rebrand for a new league.
-  const img = (bg && bg !== "none" && bg !== "") ? bg : "url('brand-logo.jpg')";
-  return `<div class="auth-gate-logo" style="background-image:${img};background-size:cover;background-position:center"></div>`;
+  // Always use the committed brand-logo.jpg. It's the league badge and the only
+  // logo guaranteed to be available before sign-in (the cloud logo isn't readable
+  // yet, and a stale/broken #brandLogo background must not pre-empt it). Swap
+  // brand-logo.jpg in the repo to rebrand for a new league.
+  return `<div class="auth-gate-logo" style="background-image:url('brand-logo.jpg');background-size:cover;background-position:center"></div>`;
 }
 function renderAuthGate() {
   const H = window.HCCL;
