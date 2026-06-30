@@ -1238,4 +1238,8 @@ function init() {
     });
   }
 }
-init();
+// Defer to DOMContentLoaded so the firebase-init.js MODULE (deferred) has already run
+// and exposed window.HCCL — otherwise the onChange hook above never registers and the
+// auction never syncs to Firestore. (fantasy.js does the same; that's why it works.)
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+else init();
