@@ -154,50 +154,50 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .empty-state p { color: var(--muted); margin-bottom: 18px; }
 
 /* ===================== AUCTION STAGE ===================== */
-.auction-stage { display: grid; grid-template-columns: minmax(320px, 5fr) 7fr; gap: 22px; align-items: start; }
+.auction-stage { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: 22px; align-items: start; }
 
 .player-card {
   background: linear-gradient(160deg, var(--panel-2), var(--panel));
   border: 1px solid var(--border);
-  border-radius: 22px;
-  padding: 18px;
+  border-radius: 18px;
+  padding: 14px;
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
 }
 .player-card::before {
   content: ""; position: absolute; inset: 0;
-  border-radius: 22px; padding: 2px;
+  border-radius: 18px; padding: 2px;
   background: linear-gradient(135deg, var(--red), var(--gold));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
   pointer-events: none;
 }
-.player-photo-wrap { position: relative; }
+.player-photo-wrap { position: relative; max-width: 200px; margin: 0 auto; }
 .player-photo {
   width: 100%; aspect-ratio: 4 / 5;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #0d0d0f center/cover no-repeat;
   display: grid; place-items: center;
-  font-family: "Anton", sans-serif; font-size: 84px; color: #2f2f35;
+  font-family: "Anton", sans-serif; font-size: 52px; color: #2f2f35;
   border: 1px solid var(--border);
 }
 .player-status-chip {
-  position: absolute; top: 12px; left: 12px;
+  position: absolute; top: 10px; left: 10px;
   background: rgba(0,0,0,0.65); color: var(--yellow);
-  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
   backdrop-filter: blur(6px);
 }
-.player-info { padding: 16px 6px 6px; text-align: center; }
-.player-role { color: var(--yellow); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; font-size: 12px; min-height: 14px; }
-.player-name { font-family: "Anton", sans-serif; font-size: clamp(26px, 3vw, 40px); letter-spacing: 1px; margin: 6px 0 14px; }
+.player-info { padding: 12px 4px 4px; text-align: center; }
+.player-role { color: var(--yellow); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; min-height: 13px; }
+.player-name { font-family: "Anton", sans-serif; font-size: clamp(20px, 2.4vw, 30px); letter-spacing: 1px; margin: 4px 0 12px; }
 .base-price-box {
   display: inline-flex; flex-direction: column; gap: 2px;
   background: var(--black); border: 1px solid var(--border);
-  padding: 10px 26px; border-radius: 14px;
+  padding: 8px 20px; border-radius: 12px;
 }
-.base-price-box .label { color: var(--muted); font-size: 11px; letter-spacing: 2px; }
-.base-price-box .value { font-family: "Anton", sans-serif; font-size: 26px; color: var(--yellow); }
+.base-price-box .label { color: var(--muted); font-size: 10px; letter-spacing: 2px; }
+.base-price-box .value { font-family: "Anton", sans-serif; font-size: 22px; color: var(--yellow); }
 
 /* BID PANEL */
 .bid-panel { display: flex; flex-direction: column; gap: 16px; }
@@ -550,15 +550,7 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .stats-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
 .stats-grid input { width: 100%; min-width: 0; }
 
-/* ===================== HEADER CONTROLS + POLISH (Phase E) ===================== */
-.header-controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-.hdr-btn {
-  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
-  padding: 8px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s ease;
-}
-.hdr-btn:hover { color: var(--text); border-color: #4a4a52; }
-@media (max-width: 720px) { .header-controls { margin-left: 0; } .hdr-btn { padding: 7px 10px; font-size: 12px; } }
-
+/* ===================== POLISH (Phase E) ===================== */
 /* Confetti overlay (auction complete) */
 .confetti-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; display: none; }
 

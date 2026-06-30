@@ -44,8 +44,7 @@ Two ways to run, automatically chosen:
   animated raise feed on the presenter screen.
 - 📊 **Auction Insights tab** — live analytics, top-buys/role-spend/team tables, and Chart.js
   visualisations, all derived client-side (no extra reads).
-- 📈 **Optional player season stats** shown on the block; ✨ confetti, glow and pulse polish;
-  ⛶ presenter fullscreen.
+- 📈 **Optional player season stats** shown on the block; ✨ confetti, glow and pulse polish.
 - 🏏 **Fantasy league** with match days, captain/vice-captain multipliers, live points,
   season leaderboards and a Player of the Season board.
 - ☁️ **Real-time sync** via Firestore — auction and fantasy state mirror instantly to
@@ -157,8 +156,7 @@ Google before you can see anything. Each user has one of three roles:
 - **📈 Season stats** — players can carry optional historical stats (matches, runs, wickets,
   strike rate, economy, average, fantasy points, previous price), entered in the player form
   under *Season stats (optional)* and shown as a card under the photo during the auction.
-- **✨ Polish** — a confetti burst at auction completion, plus glow and pulse animations and an
-  optional **⛶ Fullscreen** presenter mode.
+- **✨ Polish** — a confetti burst at auction completion, plus glow and pulse animations.
 
 ---
 

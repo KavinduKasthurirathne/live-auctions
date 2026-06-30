@@ -1468,14 +1468,6 @@ function wireEvents() {
   $("#btnUndo").onclick = undoLast;
   $("#btnReset").onclick = resetBid;
 
-  // presenter fullscreen toggle (Phase E)
-  const fsBtn = $("#btnFullscreen");
-  if (fsBtn) fsBtn.onclick = () => {
-    const d = document;
-    if (d.fullscreenElement) { (d.exitFullscreen || d.webkitExitFullscreen || function () {}).call(d); }
-    else { const el = d.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el); }
-  };
-
   // settings
   $("#btnSaveSettings").onclick = saveSettings;
 
