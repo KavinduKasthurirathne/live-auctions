@@ -89,6 +89,31 @@ const auStateRef = name     => auApi().doc(auDb(), "auction", "league", "state",
 function auStrip(o) { const c = Object.assign({}, o); delete c.id; return c; }
 function auClone(x) { return JSON.parse(JSON.stringify(x)); }
 
+// Player photos & team logos live in their OWN one-image-per-doc collections
+// (auction/league/playerPhotos|teamLogos) so the heavy base64 blobs don't bloat the
+// frequently-synced text docs (which used to blow past Firestore's per-write size cap
+// and silently fail). These maps mirror the cloud images, keyed by player/team id.
+const auImg = { playerPhotos: new Map(), teamLogos: new Map() };
+function auStripPlayer(p) { const c = auStrip(p); delete c.photo; return c; } // text-only doc
+function auStripTeam(t)   { const c = auStrip(t); delete c.logo;  return c; }
+// Re-apply the mirrored images onto state whenever either the text docs OR the image
+// docs change (the text snapshots rebuild the arrays and would otherwise drop photos).
+function auApplyImages() {
+  state.players.forEach(p => { p.photo = auImg.playerPhotos.get(p.id) || ""; });
+  state.teams.forEach(t => { t.logo = auImg.teamLogos.get(t.id) || ""; });
+}
+// Build set/delete ops for an image collection by comparing current images to the mirror.
+function auDiffImages(coll, items, getImg, ops) {
+  const map = auImg[coll];
+  const curIds = new Set(items.map(x => x.id));
+  items.forEach(x => {
+    const img = getImg(x) || "";
+    if (img && map.get(x.id) !== img) ops.push({ t: "set", ref: auItemRef(coll, x.id), data: { data: img } });
+    else if (!img && map.has(x.id)) ops.push({ t: "del", ref: auItemRef(coll, x.id) });
+  });
+  map.forEach((_, id) => { if (!curIds.has(id)) ops.push({ t: "del", ref: auItemRef(coll, id) }); });
+}
+
 function auNormTeam(id, d) {
   return { id, name: d.name || "", logo: d.logo || "",
     purse: (d.purse === undefined ? null : d.purse), order: d.order || 0 };
@@ -105,10 +130,16 @@ function startAuctionSync() {
   const api = auApi();
   auUnsubs.push(api.onSnapshot(auCollRef("teams"),
     snap => { const items = snap.docs.map(s => auNormTeam(s.id, s.data())).sort((a, b) => a.order - b.order);
-      auMirror.teams = auClone(items); state.teams = items.map(auDropOrder); auLoaded("teams"); }, auErr));
+      auMirror.teams = auClone(items); state.teams = items.map(auDropOrder); auApplyImages(); auLoaded("teams"); }, auErr));
   auUnsubs.push(api.onSnapshot(auCollRef("players"),
     snap => { const items = snap.docs.map(s => auNormPlayer(s.id, s.data())).sort((a, b) => a.order - b.order);
-      auMirror.players = auClone(items); state.players = items.map(auDropOrder); auLoaded("players"); }, auErr));
+      auMirror.players = auClone(items); state.players = items.map(auDropOrder); auApplyImages(); auLoaded("players"); }, auErr));
+  auUnsubs.push(api.onSnapshot(auCollRef("playerPhotos"),
+    snap => { auImg.playerPhotos = new Map(snap.docs.map(s => [s.id, s.data().data || ""]));
+      auApplyImages(); auLoaded("playerPhotos"); }, auErr));
+  auUnsubs.push(api.onSnapshot(auCollRef("teamLogos"),
+    snap => { auImg.teamLogos = new Map(snap.docs.map(s => [s.id, s.data().data || ""]));
+      auApplyImages(); auLoaded("teamLogos"); }, auErr));
   auUnsubs.push(api.onSnapshot(auStateRef("settings"),
     snap => { if (snap.exists()) { auMirror.settings = auClone(snap.data()); state.settings = { ...defaultState().settings, ...snap.data() }; }
       else auMirror.settings = null; auLoaded("settings"); }, auErr));
@@ -122,7 +153,7 @@ function startAuctionSync() {
 }
 function auLoaded(which) {
   auFsLoaded.add(which);
-  if (!auFsReady && auFsLoaded.size === 4) auFsReady = true;
+  if (!auFsReady && auFsLoaded.size === 6) auFsReady = true;
   auRemote();
 }
 function auErr(err) {
@@ -157,14 +188,15 @@ async function auctionSyncDiff() {
     const api = auApi();
     const ops = [];
     AU_COLLS.forEach(coll => {
+      const stripDoc = coll === "players" ? auStripPlayer : auStripTeam; // text-only (no image)
       const cur = state[coll].map((item, i) => ({ ...item, order: i })); // positional order
       const prev = auMirror[coll] || [];
       const prevMap = new Map(prev.map(x => [x.id, x]));
       const curIds = new Set(cur.map(x => x.id));
       cur.forEach(item => {
         const before = prevMap.get(item.id);
-        if (!before || JSON.stringify(auStrip(before)) !== JSON.stringify(auStrip(item)))
-          ops.push({ t: "set", ref: auItemRef(coll, item.id), data: auStrip(item) });
+        if (!before || JSON.stringify(stripDoc(before)) !== JSON.stringify(stripDoc(item)))
+          ops.push({ t: "set", ref: auItemRef(coll, item.id), data: stripDoc(item) });
       });
       prev.forEach(item => { if (!curIds.has(item.id)) ops.push({ t: "del", ref: auItemRef(coll, item.id) }); });
     });
@@ -173,15 +205,27 @@ async function auctionSyncDiff() {
     const live = { auction: state.auction, lastAction: state.lastAction || null };
     if (JSON.stringify(live) !== JSON.stringify(auMirror.live))
       ops.push({ t: "set", ref: auStateRef("live"), data: auClone(live) });
-    for (let i = 0; i < ops.length; i += 50) {   // small chunks: player photos make docs heavy
+    // Images go to their own one-per-doc collections (kept out of the text docs above).
+    const imgOps = [];
+    auDiffImages("playerPhotos", state.players, p => p.photo, imgOps);
+    auDiffImages("teamLogos",   state.teams,   t => t.logo,  imgOps);
+    for (let i = 0; i < ops.length; i += 50) {   // text docs are light
       const batch = api.writeBatch(auDb());
       ops.slice(i, i + 50).forEach(op => op.t === "set" ? batch.set(op.ref, op.data) : batch.delete(op.ref));
+      await batch.commit();
+    }
+    for (let i = 0; i < imgOps.length; i += 6) {  // images are big — tiny batches stay under the request-size cap
+      const batch = api.writeBatch(auDb());
+      imgOps.slice(i, i + 6).forEach(op => op.t === "set" ? batch.set(op.ref, op.data) : batch.delete(op.ref));
       await batch.commit();
     }
     auMirror.teams = auClone(state.teams.map((t, i) => ({ ...t, order: i })));
     auMirror.players = auClone(state.players.map((p, i) => ({ ...p, order: i })));
     auMirror.settings = auClone(state.settings);
     auMirror.live = auClone(live);
+    // reflect the images we just wrote so the next diff is a no-op until they actually change
+    auImg.playerPhotos = new Map(state.players.filter(p => p.photo).map(p => [p.id, p.photo]));
+    auImg.teamLogos    = new Map(state.teams.filter(t => t.logo).map(t => [t.id, t.logo]));
   } catch (e) {
     console.error("auction sync failed:", e);
     toast("Couldn't save to the cloud", "bad");
@@ -199,10 +243,20 @@ function uploadAuctionToCloud() {
   const local = normalize(load());
   if (!local.teams.length && !local.players.length) { toast("No saved auction data on this device", "bad"); return; }
   if (!confirm(`Add this device's ${local.teams.length} teams and ${local.players.length} players to the shared cloud auction?`)) return;
-  const haveT = new Set(state.teams.map(t => t.id));
-  local.teams.forEach(t => { if (!haveT.has(t.id)) state.teams.push(t); });
-  const haveP = new Set(state.players.map(p => p.id));
-  local.players.forEach(p => { if (!haveP.has(p.id)) state.players.push(p); });
+  // Add brand-new teams/players; for ones already in the cloud, backfill a missing
+  // logo/photo from this device so the one-time upload actually pushes the images.
+  const teamById = new Map(state.teams.map(t => [t.id, t]));
+  local.teams.forEach(t => {
+    const ex = teamById.get(t.id);
+    if (!ex) state.teams.push(t);
+    else if (!ex.logo && t.logo) ex.logo = t.logo;
+  });
+  const playerById = new Map(state.players.map(p => [p.id, p]));
+  local.players.forEach(p => {
+    const ex = playerById.get(p.id);
+    if (!ex) state.players.push(p);
+    else if (!ex.photo && p.photo) ex.photo = p.photo;
+  });
   if (!auMirror.settings) state.settings = { ...state.settings, ...local.settings };
   save(); fillSettingsInputs(); renderAll(); toast("Uploading auction to the cloud…", "good");
 }
