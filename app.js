@@ -491,7 +491,7 @@ function renderSeasonStats(player) {
   const row = (label, val, fmt) => (val === "" || val == null) ? ""
     : `<div><span class="ss-k">${esc(label)}</span><span class="ss-v">${esc(String(fmt ? fmt(val) : val))}</span></div>`;
   box.classList.remove("hidden");
-  box.innerHTML = `<div class="ss-title">📈 Season Stats</div><div class="ss-grid">
+  box.innerHTML = `<div class="ss-title">Previous Season Stats</div><div class="ss-grid">
     ${row("Matches", s.matches)}${row("Runs", s.runs)}${row("Wickets", s.wickets)}
     ${row("Strike Rate", s.strikeRate)}${row("Economy", s.economy)}${row("Average", s.average)}
     ${row("Fantasy Pts", s.fantasyPoints)}${row("Prev Price", s.previousPrice, fmtPrev)}
@@ -544,8 +544,9 @@ function renderSquadTracker() {
       const info = squadInfo(state, t.id);
       const bought = state.players.filter(p => p.status === "sold" && !p.retained && p.soldTo === t.id);
       const avg = bought.length ? info.spent / bought.length : 0;
-      const pct = info.purse > 0 ? Math.max(0, Math.min(100, (info.remaining / info.purse) * 100)) : 0;
-      const health = info.slotsLeft <= 0 ? "full" : pct >= 50 ? "good" : pct >= 25 ? "warn" : "bad";
+      const fillPct = (info.squadCount / MAX_PLAYERS) * 100;            // bar tracks squad completion
+      const budgetPct = info.purse > 0 ? Math.max(0, Math.min(100, (info.remaining / info.purse) * 100)) : 0;
+      const health = info.slotsLeft <= 0 ? "full" : budgetPct >= 50 ? "good" : budgetPct >= 25 ? "warn" : "bad";
       const dots = Array.from({ length: MAX_PLAYERS }, (_, k) =>
         `<span class="dot${k < info.squadCount ? " on" : ""}"></span>`).join("");
       const leading = a.currentBidderId === t.id;
@@ -553,7 +554,7 @@ function renderSquadTracker() {
         <div class="tc-head">${logoHTML("tc-logo", t.logo, t.name)}<span class="tc-name">${esc(t.name)}</span></div>
         <div class="tc-dots" title="${info.squadCount} of ${MAX_PLAYERS} players">${dots}</div>
         <div class="tc-players">${info.squadCount} / ${MAX_PLAYERS} Players</div>
-        <div class="tc-bar"><span style="width:${pct}%"></span></div>
+        <div class="tc-bar"><span style="width:${fillPct}%"></span></div>
         <div class="tc-stats">
           <div><span class="tc-k">Purse</span><span class="tc-v">${money(info.remaining)}</span></div>
           <div><span class="tc-k">Slots</span><span class="tc-v">${info.slotsLeft}</span></div>
@@ -867,16 +868,6 @@ function overlayVisible() { return !$("#overlay").classList.contains("hidden"); 
    📊 AUCTION INSIGHTS (Phase E)
    Everything here is DERIVED from local `state` — no Firestore reads/writes.
    ============================================================ */
-const ROLE_BUCKETS = ["Batsmen", "Bowlers", "All-rounders", "Wicketkeepers", "Other"];
-/* Free-text player.role → a coarse category for the role-spending breakdown. */
-function roleBucket(role) {
-  const r = (role || "").toLowerCase();
-  if (/all|rounder/.test(r)) return "All-rounders";
-  if (/keep|wk|gloves|stump/.test(r)) return "Wicketkeepers";
-  if (/bowl|pace|spin|seam/.test(r)) return "Bowlers";
-  if (/bat|open|order/.test(r)) return "Batsmen";
-  return "Other";
-}
 let insCharts = {};
 
 function renderInsights() {
@@ -904,10 +895,6 @@ function renderInsights() {
   const card = (label, value, accent) =>
     `<div class="ins-card"><div class="ins-k">${label}</div><div class="ins-v${accent ? " accent" : ""}">${value}</div></div>`;
 
-  const buckets = {};
-  ROLE_BUCKETS.forEach(b => buckets[b] = { spent: 0, count: 0 });
-  sold.forEach(p => { const b = buckets[roleBucket(p.role)]; b.spent += p.soldPrice || 0; b.count++; });
-
   view.innerHTML = `
     <div class="view-head"><h2>📊 Auction Insights</h2></div>
     <div class="ins-complete">
@@ -931,7 +918,6 @@ function renderInsights() {
     <div class="ins-charts">
       <div class="ins-chart"><h3>Price Distribution</h3><canvas id="chartPrices"></canvas></div>
       <div class="ins-chart"><h3>Sold vs Unsold</h3><canvas id="chartSold"></canvas></div>
-      <div class="ins-chart"><h3>Role Distribution</h3><canvas id="chartRoles"></canvas></div>
       <div class="ins-chart"><h3>Team Spending</h3><canvas id="chartTeamSpend"></canvas></div>
       <div class="ins-chart"><h3>Remaining Purse</h3><canvas id="chartTeamPurse"></canvas></div>
     </div>
@@ -939,10 +925,6 @@ function renderInsights() {
       <div class="ins-table"><h3>Top Sold Players</h3>
         <table><thead><tr><th>#</th><th>Player</th><th>Team</th><th class="num">Price</th></tr></thead><tbody>
           ${byPrice.slice(0, 10).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td>${teamName(p.soldTo)}</td><td class="num">${money(p.soldPrice)}</td></tr>`).join("") || `<tr><td colspan="4">No sales yet</td></tr>`}
-        </tbody></table></div>
-      <div class="ins-table"><h3>Role Spending</h3>
-        <table><thead><tr><th>Role</th><th class="num">Sold</th><th class="num">Total</th><th class="num">Avg</th></tr></thead><tbody>
-          ${ROLE_BUCKETS.filter(b => buckets[b].count).map(b => `<tr><td>${b}</td><td class="num">${buckets[b].count}</td><td class="num">${money(buckets[b].spent)}</td><td class="num">${money(buckets[b].spent / buckets[b].count)}</td></tr>`).join("") || `<tr><td colspan="4">No sales yet</td></tr>`}
         </tbody></table></div>
       <div class="ins-table"><h3>Team Analytics</h3>
         <table><thead><tr><th>Team</th><th class="num">Players</th><th class="num">Spent</th><th class="num">Spent %</th><th class="num">Safe Bid</th></tr></thead><tbody>
@@ -952,7 +934,7 @@ function renderInsights() {
     </div>`;
 
   // Charts: only when the tab is visible and Chart.js actually loaded (offline-safe).
-  if (view.classList.contains("active") && window.Chart) buildInsightCharts({ sold, unsold, available, byPrice, teamSpends, buckets });
+  if (view.classList.contains("active") && window.Chart) buildInsightCharts({ sold, unsold, available, byPrice, teamSpends });
 }
 
 function buildInsightCharts(d) {
@@ -972,9 +954,6 @@ function buildInsightCharts(d) {
     datasets: [{ label: "Players", data: bins, backgroundColor: "#ffcc00" }] }, options: axis });
   mk("chartSold", { type: "doughnut", data: { labels: ["Sold", "Unsold", "Remaining"],
     datasets: [{ data: [d.sold.length, d.unsold.length, d.available.length], backgroundColor: ["#22c55e", "#e10600", "#34343a"] }] }, options: pie });
-  const roleLabels = ROLE_BUCKETS.filter(b => d.buckets[b].count);
-  mk("chartRoles", { type: "pie", data: { labels: roleLabels,
-    datasets: [{ data: roleLabels.map(b => d.buckets[b].count), backgroundColor: ["#ffcc00", "#e10600", "#22c55e", "#3b82f6", "#9b9ba3"] }] }, options: pie });
   mk("chartTeamSpend", { type: "bar", data: { labels: d.teamSpends.map(x => x.t.name),
     datasets: [{ label: "Spent", data: d.teamSpends.map(x => x.spent), backgroundColor: "#e10600" }] }, options: axis });
   mk("chartTeamPurse", { type: "bar", data: { labels: d.teamSpends.map(x => x.t.name),

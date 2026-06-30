@@ -431,7 +431,9 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 /* ===================== SQUAD TRACKER (Phase E) ===================== */
 .squad-tracker { margin-top: 22px; }
 .tracker-title { font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-.tracker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); gap: 12px; }
+.tracker-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1000px) { .tracker-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .tracker-grid { grid-template-columns: 1fr; } }
 .tracker-card {
   background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--border);
   border-radius: 12px; padding: 12px 13px; transition: border-color .2s, transform .2s, box-shadow .2s;
@@ -521,7 +523,8 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .ins-chart { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
 .ins-chart h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
 .ins-chart canvas { height: 240px !important; max-height: 240px; }
-.ins-tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.ins-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 16px; }
+@media (max-width: 520px) { .ins-tables { grid-template-columns: 1fr; } }
 .ins-table { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
 .ins-table h3 { font-size: 14px; margin-bottom: 10px; }
 .ins-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -542,7 +545,10 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .stats-fieldset summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 4px 0; }
 .stats-fieldset[open] summary { color: var(--text); margin-bottom: 8px; }
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
-.stats-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+/* min-width:0 lets the number inputs shrink to their grid cell instead of overflowing
+   the card (which made the panel spill over the neighbouring setup card). */
+.stats-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+.stats-grid input { width: 100%; min-width: 0; }
 
 /* ===================== HEADER CONTROLS + POLISH (Phase E) ===================== */
 .header-controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }

@@ -151,9 +151,9 @@ Google before you can see anything. Each user has one of three roles:
   still controls SOLD / Unsold / Undo / Next.
 - **📊 Insights tab** — live, read-only analytics derived entirely from local state: most
   expensive / cheapest / averages, sold-vs-unsold, completion %, money spent/remaining,
-  biggest bid war, per-team and per-role spending tables, plus Chart.js charts (price
-  histogram, sold/unsold, role and team spending, remaining purse). Charts degrade gracefully
-  if the Chart.js CDN is blocked — the numbers and tables still render.
+  biggest bid war, plus Top Sold Players and Team Analytics tables and Chart.js charts (price
+  histogram, sold/unsold, team spending, remaining purse). Charts degrade gracefully if the
+  Chart.js CDN is blocked — the numbers and tables still render.
 - **📈 Season stats** — players can carry optional historical stats (matches, runs, wickets,
   strike rate, economy, average, fantasy points, previous price), entered in the player form
   under *Season stats (optional)* and shown as a card under the photo during the auction.
