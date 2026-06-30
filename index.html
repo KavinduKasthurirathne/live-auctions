@@ -28,9 +28,13 @@
       <button class="tab" data-tab="players">👥 Players</button>
       <button class="tab" data-tab="purse">💰 Teams &amp; Purse</button>
       <button class="tab" data-tab="squads">🏆 Squads</button>
+      <button class="tab" data-tab="insights">📊 Insights</button>
       <button class="tab" data-tab="setup">⚙️ Setup</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
     </nav>
+    <div class="header-controls">
+      <button class="hdr-btn" id="btnFullscreen" title="Presenter fullscreen">⛶ Fullscreen</button>
+    </div>
     <div class="auth-box" id="authBox"></div>
   </header>
 
@@ -59,6 +63,8 @@
               <span class="value" id="playerBase"></span>
             </div>
           </div>
+          <!-- Optional season stats (shown only when the player carries stats) -->
+          <div class="season-stats hidden" id="seasonStats"></div>
         </div>
 
         <!-- RIGHT: Bidding panel -->
@@ -86,6 +92,15 @@
           <div class="bidlog" id="bidLog"></div>
         </div>
       </div>
+
+      <!-- Live Squad Tracker (all teams) — visible to every role -->
+      <div id="squadTracker" class="squad-tracker"></div>
+
+      <!-- Captain dashboard (only rendered for the captain role) -->
+      <div id="captainCard"></div>
+
+      <!-- Floating "raised paddle" feed -->
+      <div id="raiseFeed" class="raise-feed" aria-live="polite"></div>
     </section>
 
     <!-- ===================== PLAYERS ===================== -->
@@ -184,6 +199,19 @@
           <label>Player photo
             <input type="file" id="pPhotoFile" accept="image/*" />
           </label>
+          <details class="stats-fieldset">
+            <summary>Season stats (optional)</summary>
+            <div class="stats-grid">
+              <label>Matches<input type="number" id="pStatMatches" min="0" step="any" /></label>
+              <label>Runs<input type="number" id="pStatRuns" min="0" step="any" /></label>
+              <label>Wickets<input type="number" id="pStatWickets" min="0" step="any" /></label>
+              <label>Strike rate<input type="number" id="pStatSR" min="0" step="any" /></label>
+              <label>Economy<input type="number" id="pStatEcon" min="0" step="any" /></label>
+              <label>Average<input type="number" id="pStatAvg" min="0" step="any" /></label>
+              <label>Fantasy points<input type="number" id="pStatFP" min="0" step="any" /></label>
+              <label>Previous price<input type="number" id="pStatPrev" min="0" step="any" /></label>
+            </div>
+          </details>
           <div class="form-row">
             <button class="btn btn-red" id="btnSavePlayer">Add Player</button>
             <button class="btn btn-dark hidden" id="btnCancelPlayer">Cancel</button>
@@ -252,6 +280,9 @@
       </div>
     </section>
 
+    <!-- ===================== INSIGHTS (built by app.js renderInsights) ============ -->
+    <section class="view" id="view-insights"></section>
+
     <!-- ===================== FANTASY (built by fantasy.js) ===================== -->
     <section class="view" id="view-fantasy"></section>
 
@@ -277,6 +308,8 @@
   <script src="app.js"></script>
   <!-- DOM-to-PNG for the leaderboard share cards (exposes window.htmlToImage) -->
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js"></script>
+  <!-- Charts for the 📊 Insights tab (exposes window.Chart). Degrades gracefully if blocked. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="fantasy.js"></script>
   <!-- Auth + roles (Google sign-in); exposes window.HCCL -->
   <script type="module" src="firebase-init.js"></script>

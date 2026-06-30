@@ -427,3 +427,146 @@ body:not(.can-edit) .fan-tab[data-fan-sub="matchday"],  /* fantasy Match Day */
 body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
   display: none !important;
 }
+
+/* ===================== SQUAD TRACKER (Phase E) ===================== */
+.squad-tracker { margin-top: 22px; }
+.tracker-title { font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+.tracker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); gap: 12px; }
+.tracker-card {
+  background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--border);
+  border-radius: 12px; padding: 12px 13px; transition: border-color .2s, transform .2s, box-shadow .2s;
+}
+.tracker-card.good { border-left-color: var(--green); }
+.tracker-card.warn { border-left-color: var(--yellow); }
+.tracker-card.bad  { border-left-color: var(--red); }
+.tracker-card.full { border-left-color: var(--gold); opacity: 0.85; }
+.tracker-card.leading { box-shadow: 0 0 0 1px var(--gold), 0 8px 22px rgba(245,179,1,0.18); transform: translateY(-2px); }
+.tc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.tc-logo { width: 26px; height: 26px; border-radius: 7px; flex: none; font-size: 10px; display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat; color: #fff; font-weight: 800; }
+.tc-name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-dots { display: flex; gap: 5px; margin-bottom: 6px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; background: var(--panel-3); border: 1px solid var(--border); }
+.dot.on { background: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 6px rgba(255,204,0,0.5); }
+.tc-players { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.tc-bar { height: 7px; border-radius: 6px; background: var(--panel-3); overflow: hidden; margin-bottom: 11px; }
+.tc-bar > span { display: block; height: 100%; border-radius: 6px; transition: width .35s ease; background: var(--green); }
+.tracker-card.warn .tc-bar > span { background: var(--yellow); }
+.tracker-card.bad  .tc-bar > span { background: var(--red); }
+.tracker-card.full .tc-bar > span { background: var(--gold); }
+.tc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; }
+.tc-stats > div { display: flex; flex-direction: column; }
+.tc-k { font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.tc-v { font-size: 14px; font-weight: 700; }
+.tc-v.safe { color: var(--yellow); }
+
+/* ===================== CAPTAIN DASHBOARD (Phase E) ===================== */
+#captainCard:empty { display: none; }
+.captain-card {
+  margin-top: 22px; max-width: 520px;
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
+}
+.captain-card.leading { border-color: var(--green); box-shadow: 0 0 0 1px var(--green), var(--shadow); }
+.cap-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.cap-logo { width: 44px; height: 44px; border-radius: 11px; flex: none; font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat; color: #fff; font-weight: 800; }
+.cap-team { font-size: 20px; font-weight: 800; }
+.cap-sub { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.cap-block { font-size: 14px; color: var(--text); background: rgba(0,0,0,0.25); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+.cap-block b { color: var(--yellow); }
+.cap-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.cap-stats > div { display: flex; flex-direction: column; gap: 2px; }
+.cap-k { font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.cap-v { font-size: 16px; font-weight: 800; }
+.cap-v.safe { color: var(--yellow); }
+.paddle-btn {
+  width: 100%; padding: 18px; border: none; border-radius: 14px; cursor: pointer;
+  font-family: "Anton", sans-serif; font-size: 22px; letter-spacing: 1px; color: #1a1300;
+  background: linear-gradient(135deg, var(--yellow), var(--gold));
+  box-shadow: 0 10px 24px rgba(245,179,1,0.35); transition: transform .1s, filter .15s, box-shadow .15s;
+}
+.paddle-btn:hover:not(:disabled) { filter: brightness(1.06); }
+.paddle-btn:active:not(:disabled) { transform: scale(0.97); }
+.paddle-btn:disabled { opacity: 0.45; cursor: not-allowed; background: var(--panel-3); color: var(--muted); box-shadow: none; }
+.cap-reason { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+/* ===================== RAISE FEED (Phase E) ===================== */
+.raise-feed { position: fixed; top: 84px; right: 18px; z-index: 60; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.raise-chip {
+  background: linear-gradient(135deg, rgba(225,6,0,0.95), rgba(245,179,1,0.92)); color: #fff;
+  font-size: 14px; font-weight: 600; padding: 9px 14px; border-radius: 999px; box-shadow: var(--shadow);
+  opacity: 0; transform: translateX(40px) scale(0.96); transition: opacity .35s, transform .35s;
+}
+.raise-chip.show { opacity: 1; transform: translateX(0) scale(1); }
+.raise-chip.out { opacity: 0; transform: translateX(40px) scale(0.96); }
+.raise-chip .amt { font-weight: 800; }
+@media (max-width: 640px) {
+  .raise-feed { top: auto; bottom: 16px; right: 10px; left: 10px; align-items: center; }
+  .cap-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ===================== INSIGHTS (Phase E) ===================== */
+.ins-complete { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; }
+.ins-complete-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.ins-complete-top b { color: var(--yellow); }
+.ins-bar { height: 10px; border-radius: 6px; background: var(--panel-3); overflow: hidden; }
+.ins-bar > span { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--yellow), var(--gold)); transition: width .4s ease; }
+.ins-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.ins-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; }
+.ins-k { font-size: 10px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.ins-v { font-size: 16px; font-weight: 700; }
+.ins-v.accent { color: var(--yellow); }
+.ins-charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.ins-chart { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.ins-chart h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+.ins-chart canvas { height: 240px !important; max-height: 240px; }
+.ins-tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.ins-table { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.ins-table h3 { font-size: 14px; margin-bottom: 10px; }
+.ins-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ins-table th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.ins-table td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.ins-table .num { text-align: right; }
+.ins-table tbody tr:last-child td { border-bottom: none; }
+
+/* ===================== SEASON STATS (Phase E) ===================== */
+.season-stats { margin-top: 14px; background: rgba(0,0,0,0.28); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.ss-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--yellow); margin-bottom: 10px; }
+.ss-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; }
+.ss-grid > div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
+.ss-k { font-size: 12px; color: var(--muted); }
+.ss-v { font-size: 13px; font-weight: 700; }
+/* Season-stats form section */
+.stats-fieldset { margin: 4px 0 6px; border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; background: var(--panel-2); }
+.stats-fieldset summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 4px 0; }
+.stats-fieldset[open] summary { color: var(--text); margin-bottom: 8px; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.stats-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+
+/* ===================== HEADER CONTROLS + POLISH (Phase E) ===================== */
+.header-controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.hdr-btn {
+  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+  padding: 8px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s ease;
+}
+.hdr-btn:hover { color: var(--text); border-color: #4a4a52; }
+@media (max-width: 720px) { .header-controls { margin-left: 0; } .hdr-btn { padding: 7px 10px; font-size: 12px; } }
+
+/* Confetti overlay (auction complete) */
+.confetti-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; display: none; }
+
+/* A little life on the live bid + leading team */
+.current-bid-box { transition: box-shadow .3s, border-color .3s; }
+.cb-amount { font-family: "Anton", sans-serif; font-size: clamp(26px, 4vw, 40px); color: var(--yellow); transition: transform .12s; }
+.team-bid-btn.leading { animation: ledGlow 1.4s ease-in-out infinite; }
+@keyframes ledGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.0); }
+  50% { box-shadow: 0 0 0 4px rgba(34,197,94,0.22); }
+}
+/* Raise paddle gets an inviting pulse while it's actionable */
+.paddle-btn:not(:disabled) { animation: paddlePulse 1.8s ease-in-out infinite; }
+@keyframes paddlePulse {
+  0%, 100% { box-shadow: 0 10px 24px rgba(245,179,1,0.30); }
+  50% { box-shadow: 0 10px 30px rgba(245,179,1,0.55); }
+}

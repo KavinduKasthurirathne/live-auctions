@@ -119,10 +119,13 @@ function auNormTeam(id, d) {
     purse: (d.purse === undefined ? null : d.purse), order: d.order || 0 };
 }
 function auNormPlayer(id, d) {
-  return { id, name: d.name || "", role: d.role || "", basePrice: d.basePrice || 0,
+  const p = { id, name: d.name || "", role: d.role || "", basePrice: d.basePrice || 0,
     photo: d.photo || "", status: d.status || "available",
     soldTo: d.soldTo == null ? null : d.soldTo, soldPrice: d.soldPrice == null ? null : d.soldPrice,
     retained: !!d.retained, order: d.order || 0 };
+  if (d.soldBids != null) p.soldBids = d.soldBids; // optional (Phase E)
+  if (d.stats) p.stats = d.stats;                  // optional season stats (Phase E)
+  return p;
 }
 const auDropOrder = x => { const c = { ...x }; delete c.order; return c; };
 
@@ -290,6 +293,30 @@ function teamSpent(id)   { return state.players.filter(p => p.status === "sold" 
 function teamRemaining(t){ return teamPurse(t) - teamSpent(t.id); }
 function teamPlayers(id) { return state.players.filter(p => p.status === "sold" && p.soldTo === id); }
 
+/* Hard squad cap. Every team must end with exactly this many players. */
+const MAX_PLAYERS = 5;
+
+/* Budget + slot math for one team — DERIVED ONLY (no writes). Takes a state-like `s`
+   so the bid transaction can run it against the SERVER's live auction snapshot.
+     remainingSlots = MAX_PLAYERS - squad.length
+     reserve        = max(0, remainingSlots - 1) * minimumBasePrice (of available players)
+     safeBid        = remainingPurse - reserve
+   safeBid is the most a team can bid now and still afford to fill its empty slots. */
+function squadInfo(s, teamId) {
+  const team = s.teams.find(t => t.id === teamId);
+  const sold = s.players.filter(p => p.status === "sold" && p.soldTo === teamId);
+  const squadCount = sold.length;                                  // retained players count too
+  const slotsLeft = Math.max(0, MAX_PLAYERS - squadCount);
+  const purse = (team && team.purse != null) ? team.purse : s.settings.defaultPurse;
+  const spent = sold.filter(p => !p.retained).reduce((x, p) => x + (p.soldPrice || 0), 0);
+  const remaining = purse - spent;
+  const avail = s.players.filter(p => p.status === "available").map(p => Number(p.basePrice) || 0);
+  const minBase = avail.length ? Math.min(...avail) : 0;
+  const reserve = Math.max(0, slotsLeft - 1) * minBase;
+  const safeBid = remaining - reserve;
+  return { squadCount, slotsLeft, purse, spent, remaining, minBase, reserve, safeBid };
+}
+
 /* turn an image File into a resized data URL so it fits in localStorage */
 function fileToDataURL(file, maxSize = 400, format = "jpeg") {
   return new Promise((resolve, reject) => {
@@ -346,6 +373,7 @@ function toast(msg, kind = "") {
 function switchTab(name) {
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
+  if (name === "insights") renderInsights(); // build charts now that the view is visible
 }
 
 /* ============================================================
@@ -358,6 +386,7 @@ function renderAll() {
   renderPurse();
   renderSquads();
   renderSetup();
+  renderInsights();
 }
 
 function renderHeader() {
@@ -387,6 +416,10 @@ function ensureCurrentPlayer() {
 
 function renderAuction() {
   ensureCurrentPlayer();
+  renderSquadTracker();
+  renderCaptainCard();
+  detectRaise(state.auction);
+  maybeAnnounceComplete();
   const player = currentPlayer();
   const stage = $("#auctionStage");
   const empty = $("#auctionEmpty");
@@ -424,6 +457,7 @@ function renderAuction() {
   $("#playerBase").textContent = money(player.basePrice);
   const queue = state.players.filter(p => !p.retained);
   $("#playerCounter").textContent = `Player ${queue.indexOf(player) + 1} / ${queue.length}`;
+  renderSeasonStats(player);
 
   // Current bid box
   const leader = a.currentBidderId ? getTeam(a.currentBidderId) : null;
@@ -446,6 +480,24 @@ function nextBidAmount() {
   return a.currentBidderId == null ? player.basePrice : a.currentBid + state.settings.bidIncrement;
 }
 
+/* Optional "Season Stats" card under the player photo (only when the player has stats). */
+function renderSeasonStats(player) {
+  const box = $("#seasonStats");
+  if (!box) return;
+  const s = player && player.stats;
+  const has = s && Object.keys(s).some(k => s[k] !== "" && s[k] != null);
+  if (!has) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  const fmtPrev = v => { const n = Number(v); return isNaN(n) ? v : money(n); };
+  const row = (label, val, fmt) => (val === "" || val == null) ? ""
+    : `<div><span class="ss-k">${esc(label)}</span><span class="ss-v">${esc(String(fmt ? fmt(val) : val))}</span></div>`;
+  box.classList.remove("hidden");
+  box.innerHTML = `<div class="ss-title">📈 Season Stats</div><div class="ss-grid">
+    ${row("Matches", s.matches)}${row("Runs", s.runs)}${row("Wickets", s.wickets)}
+    ${row("Strike Rate", s.strikeRate)}${row("Economy", s.economy)}${row("Average", s.average)}
+    ${row("Fantasy Pts", s.fantasyPoints)}${row("Prev Price", s.previousPrice, fmtPrev)}
+  </div>`;
+}
+
 function renderTeamButtons() {
   const grid = $("#teamsBidGrid");
   grid.innerHTML = "";
@@ -458,25 +510,166 @@ function renderTeamButtons() {
   }
 
   state.teams.forEach((t, i) => {
-    const remaining = teamRemaining(t);
+    const info = squadInfo(state, t.id);
     const leading = a.currentBidderId === t.id;
-    const cantAfford = remaining < next;
+    const full = info.slotsLeft <= 0;
+    const overSafe = info.safeBid < next;
     const btn = document.createElement("button");
     btn.className = "team-bid-btn" + (leading ? " leading" : "");
-    btn.disabled = leading || cantAfford;
+    btn.disabled = leading || full || overSafe;
     btn.title = leading ? "Currently leading"
-      : cantAfford ? `Not enough purse for ${money(next)}`
+      : full ? "Squad full (5 players)"
+      : overSafe ? "Cannot exceed Safe Bid and still complete squad"
       : `Bid ${money(next)} for ${t.name}`;
     btn.innerHTML = `
       ${logoHTML("tb-logo", t.logo, t.name)}
       <span class="tb-meta">
         <span class="tb-name">${esc(t.name)}</span>
-        <span class="tb-purse">${leading ? "★ Leading" : money(remaining) + " left"}</span>
+        <span class="tb-purse">${leading ? "★ Leading" : money(info.remaining) + " left"}</span>
       </span>
       ${i < 9 ? `<span class="tb-key">${i + 1}</span>` : ""}`;
     btn.onclick = () => placeBid(t.id);
     grid.appendChild(btn);
   });
+}
+
+/* Live Squad Tracker — one card per team, visible to everyone. Derived only. */
+function renderSquadTracker() {
+  const box = $("#squadTracker");
+  if (!box) return;
+  if (!state.teams.length) { box.innerHTML = ""; return; }
+  const a = state.auction;
+  box.innerHTML = `<h3 class="tracker-title">📋 Squad Tracker</h3>
+    <div class="tracker-grid">${state.teams.map(t => {
+      const info = squadInfo(state, t.id);
+      const bought = state.players.filter(p => p.status === "sold" && !p.retained && p.soldTo === t.id);
+      const avg = bought.length ? info.spent / bought.length : 0;
+      const pct = info.purse > 0 ? Math.max(0, Math.min(100, (info.remaining / info.purse) * 100)) : 0;
+      const health = info.slotsLeft <= 0 ? "full" : pct >= 50 ? "good" : pct >= 25 ? "warn" : "bad";
+      const dots = Array.from({ length: MAX_PLAYERS }, (_, k) =>
+        `<span class="dot${k < info.squadCount ? " on" : ""}"></span>`).join("");
+      const leading = a.currentBidderId === t.id;
+      return `<div class="tracker-card ${health}${leading ? " leading" : ""}">
+        <div class="tc-head">${logoHTML("tc-logo", t.logo, t.name)}<span class="tc-name">${esc(t.name)}</span></div>
+        <div class="tc-dots" title="${info.squadCount} of ${MAX_PLAYERS} players">${dots}</div>
+        <div class="tc-players">${info.squadCount} / ${MAX_PLAYERS} Players</div>
+        <div class="tc-bar"><span style="width:${pct}%"></span></div>
+        <div class="tc-stats">
+          <div><span class="tc-k">Purse</span><span class="tc-v">${money(info.remaining)}</span></div>
+          <div><span class="tc-k">Slots</span><span class="tc-v">${info.slotsLeft}</span></div>
+          <div><span class="tc-k">Safe Bid</span><span class="tc-v safe">${money(Math.max(0, info.safeBid))}</span></div>
+          <div><span class="tc-k">Avg Spend</span><span class="tc-v">${bought.length ? money(avg) : "—"}</span></div>
+        </div>
+      </div>`;
+    }).join("")}</div>`;
+}
+
+/* Captain Dashboard — a single mobile-first card with the team's live numbers and a big
+   RAISE PADDLE. Only rendered for a signed-in captain who has been assigned a team. */
+function renderCaptainCard() {
+  const box = $("#captainCard");
+  if (!box) return;
+  const H = window.HCCL;
+  if (!H || !H.configured || !H.isCaptain || !H.isCaptain() || !H.teamId) { box.innerHTML = ""; return; }
+  const t = getTeam(H.teamId);
+  if (!t) { box.innerHTML = `<div class="captain-card"><p class="cap-reason">Your team isn't in this auction yet — ask the admin.</p></div>`; return; }
+  const info = squadInfo(state, t.id);
+  const bought = state.players.filter(p => p.status === "sold" && !p.retained && p.soldTo === t.id);
+  const avg = bought.length ? info.spent / bought.length : 0;
+  const player = currentPlayer();
+  const a = state.auction;
+  const next = nextBidAmount();
+  const leading = a.currentBidderId === t.id;
+  const full = info.slotsLeft <= 0;
+  const overSafe = info.safeBid < next;
+  const biddable = !!player && player.status === "available" && !a.lastResult;
+  const shownBid = a.currentBidderId ? a.currentBid : (player ? player.basePrice : 0);
+  const canRaise = biddable && !leading && !full && !overSafe;
+  const reason = !biddable ? "Waiting for the next player…"
+    : leading ? "★ You're the leading bidder"
+    : full ? "Squad full (5 players)"
+    : overSafe ? "Safe Bid reached — can't raise further" : "";
+  box.innerHTML = `<div class="captain-card${leading ? " leading" : ""}">
+    <div class="cap-head">${logoHTML("cap-logo", t.logo, t.name)}
+      <div><div class="cap-team">${esc(t.name)}</div><div class="cap-sub">Your paddle</div></div></div>
+    <div class="cap-block">${player
+      ? `On the block: <b>${esc(player.name)}</b> · Current bid <b>${money(shownBid)}</b>`
+      : "Waiting for the next player…"}</div>
+    <div class="cap-stats">
+      <div><span class="cap-k">Purse</span><span class="cap-v">${money(info.remaining)}</span></div>
+      <div><span class="cap-k">Slots</span><span class="cap-v">${info.slotsLeft}</span></div>
+      <div><span class="cap-k">Safe Bid</span><span class="cap-v safe">${money(Math.max(0, info.safeBid))}</span></div>
+      <div><span class="cap-k">Avg Spend</span><span class="cap-v">${bought.length ? money(avg) : "—"}</span></div>
+    </div>
+    <button class="paddle-btn" id="btnRaisePaddle"${canRaise ? "" : " disabled"}>🏏 RAISE PADDLE${canRaise ? ` · ${money(next)}` : ""}</button>
+    ${reason ? `<div class="cap-reason">${esc(reason)}</div>` : ""}
+  </div>`;
+  const btn = $("#btnRaisePaddle");
+  if (btn) btn.onclick = () => placeBid(t.id, "captain");
+}
+
+/* Floating "raised paddle" feed (Feature 5) — announce each new bid, then fade. */
+function showRaise(teamName, amount) {
+  const feed = $("#raiseFeed");
+  if (!feed) return;
+  const chip = document.createElement("div");
+  chip.className = "raise-chip";
+  chip.innerHTML = `🔥 <b>${esc(teamName)}</b> raised paddle <span class="amt">${money(amount)}</span>`;
+  feed.appendChild(chip);
+  requestAnimationFrame(() => chip.classList.add("show"));
+  setTimeout(() => { chip.classList.add("out"); setTimeout(() => chip.remove(), 420); }, 2600);
+  while (feed.children.length > 4) feed.firstChild.remove();
+}
+
+/* Detect a brand-new bid between renders and announce it (+ sound). bidLog resets to []
+   on a new player, so we only celebrate when the count grows. */
+let auLastBidCount = null;
+function detectRaise(a) {
+  const count = (a.bidLog || []).length;
+  if (auLastBidCount === null) { auLastBidCount = count; return; } // first paint: stay quiet
+  if (count > auLastBidCount && a.currentBidderId) {
+    const t = getTeam(a.currentBidderId);
+    if (t) showRaise(t.name, a.currentBid);
+  }
+  auLastBidCount = count;
+}
+
+/* Fire a one-time confetti + sound the moment the auction finishes (every player
+   resolved). Resets if the auction is re-opened. Stays quiet on initial page load. */
+let auCompleteState = null;
+function maybeAnnounceComplete() {
+  const hasAny = state.players.some(p => !p.retained);
+  const hasAvailable = state.players.some(p => p.status === "available" && !p.retained);
+  const complete = hasAny && !hasAvailable;
+  if (auCompleteState === null) { auCompleteState = complete; return; } // baseline — no fanfare on load
+  if (complete && !auCompleteState) burstConfetti();
+  auCompleteState = complete;
+}
+
+/* Tiny dependency-free confetti burst. */
+function burstConfetti() {
+  let cv = $("#confettiCanvas");
+  if (!cv) { cv = document.createElement("canvas"); cv.id = "confettiCanvas"; cv.className = "confetti-canvas"; document.body.appendChild(cv); }
+  const ctx = cv.getContext("2d");
+  cv.width = window.innerWidth; cv.height = window.innerHeight; cv.style.display = "block";
+  const colors = ["#ffcc00", "#e10600", "#22c55e", "#ffffff", "#f5b301"];
+  const pieces = Array.from({ length: 150 }, () => ({
+    x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * 0.3,
+    r: 4 + Math.random() * 6, c: colors[(Math.random() * colors.length) | 0],
+    vx: -2 + Math.random() * 4, vy: 2 + Math.random() * 4, rot: Math.random() * 6.28, vr: -0.2 + Math.random() * 0.4,
+  }));
+  const start = performance.now();
+  (function frame(now) {
+    const t = now - start;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    pieces.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.rot += p.vr;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c;
+      ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6); ctx.restore();
+    });
+    if (t < 2600) requestAnimationFrame(frame);
+    else { ctx.clearRect(0, 0, cv.width, cv.height); cv.style.display = "none"; }
+  })(start);
 }
 
 function renderSoldButton() {
@@ -506,33 +699,64 @@ function resetBidState() {
   a.currentBid = 0; a.currentBidderId = null; a.soldStage = 0; a.bidLog = [];
 }
 
-/* Pure bid rule. Returns the new auction object, or null if the bid isn't allowed. */
-function computeBidResult(s, teamId) {
+/* Pure bid rule. Returns the new auction object, or null if the bid isn't allowed.
+   `source` ("presenter" | "captain") is stamped on the bid-log entry. Enforces the
+   hard 5-player squad cap and the Safe Bid budget guard (see squadInfo). */
+function computeBidResult(s, teamId, source = "presenter") {
   const a = s.auction;
-  if (!a || a.currentBidderId === teamId) return null; // can't out-bid yourself
+  if (!a || a.lastResult) return null;                 // not while a SOLD/UNSOLD result is showing
+  if (a.currentBidderId === teamId) return null;       // can't out-bid yourself
   const player = s.players.find(p => p.id === a.currentPlayerId);
-  if (!player) return null;
+  if (!player || player.status !== "available") return null; // only the player on the block
   const inc = Number(s.settings.bidIncrement) || 1;
   const amount = a.currentBidderId == null ? player.basePrice : a.currentBid + inc;
   const team = s.teams.find(t => t.id === teamId);
   if (!team) return null;
-  const purse = (team.purse != null ? team.purse : s.settings.defaultPurse);
-  const spent = s.players.filter(p => p.status === "sold" && !p.retained && p.soldTo === teamId).reduce((x, p) => x + (p.soldPrice || 0), 0);
-  if (purse - spent < amount) return null; // can't afford
+  const info = squadInfo(s, teamId);
+  if (info.slotsLeft <= 0) return null;   // squad already full (5 players)
+  if (info.safeBid < amount) return null; // would break squad-completion budget
   return {
     currentPlayerId: a.currentPlayerId,
     currentBid: amount, currentBidderId: teamId, soldStage: 0,
-    bidLog: [...(a.bidLog || []), { teamId, amount }],
+    bidLog: [...(a.bidLog || []), { teamId, amount, by: source }],
     lastResult: null,
   };
 }
 
-function placeBid(teamId) {
-  const res = computeBidResult(state, teamId);
+/* Place a bid. In cloud mode bids commit through a Firestore transaction so multiple
+   captains tapping at once can't clobber each other; offline we mutate locally. */
+function placeBid(teamId, source = "presenter") {
+  if (auUsingFirestore && auApi() && auApi().runTransaction) { commitBid(teamId, source); return; }
+  const res = computeBidResult(state, teamId, source);
   if (!res) { const t = getTeam(teamId); if (t) toast(`${t.name} can't place that bid`, "bad"); return; }
   state.auction = res;
   save();
   renderAuction();
+}
+
+/* Transaction-safe bid: read the SERVER live doc, apply the same pure rule against it,
+   write it back atomically. The live onSnapshot then re-renders every device. */
+async function commitBid(teamId, source = "presenter") {
+  const api = auApi(), db = auDb(), liveRef = auStateRef("live");
+  try {
+    await api.runTransaction(db, async (tx) => {
+      const snap = await tx.get(liveRef);
+      const live = snap.exists() ? snap.data() : null;
+      const auction = { ...defaultState().auction, ...((live && live.auction) || {}) };
+      // Cold start: if no presenter has written the live doc yet, seed the player on the
+      // block from this device's own pick so the very first bid still works.
+      if (!auction.currentPlayerId) auction.currentPlayerId = state.auction.currentPlayerId || null;
+      if (!Array.isArray(auction.bidLog)) auction.bidLog = [];
+      const s = { players: state.players, teams: state.teams, settings: state.settings, auction };
+      const res = computeBidResult(s, teamId, source);
+      if (!res) throw new Error("BID_REJECTED");
+      tx.set(liveRef, { auction: res, lastAction: (live && live.lastAction) || null });
+    });
+  } catch (e) {
+    if (e && e.message === "BID_REJECTED") {
+      const t = getTeam(teamId); if (t) toast(`${t.name} can't place that bid`, "bad");
+    } else { console.error("bid transaction failed:", e); toast("Couldn't place bid — try again", "bad"); }
+  }
 }
 
 function advanceSold() {  const a = state.auction;
@@ -550,6 +774,7 @@ function finalizeSold() {
   player.status = "sold";
   player.soldTo = team.id;
   player.soldPrice = price;
+  player.soldBids = (a.bidLog || []).length; // bid count, for the Insights "Biggest Bid War"
   state.lastAction = { type: "sold", playerId: player.id };
   a.lastResult = { type: "sold", playerId: player.id, playerName: player.name, teamId: team.id, teamName: team.name, price };
   resetBidState();
@@ -637,6 +862,124 @@ function showResultView(r) {
 }
 function hideOverlay() { $("#overlay").classList.add("hidden"); }
 function overlayVisible() { return !$("#overlay").classList.contains("hidden"); }
+
+/* ============================================================
+   📊 AUCTION INSIGHTS (Phase E)
+   Everything here is DERIVED from local `state` — no Firestore reads/writes.
+   ============================================================ */
+const ROLE_BUCKETS = ["Batsmen", "Bowlers", "All-rounders", "Wicketkeepers", "Other"];
+/* Free-text player.role → a coarse category for the role-spending breakdown. */
+function roleBucket(role) {
+  const r = (role || "").toLowerCase();
+  if (/all|rounder/.test(r)) return "All-rounders";
+  if (/keep|wk|gloves|stump/.test(r)) return "Wicketkeepers";
+  if (/bowl|pace|spin|seam/.test(r)) return "Bowlers";
+  if (/bat|open|order/.test(r)) return "Batsmen";
+  return "Other";
+}
+let insCharts = {};
+
+function renderInsights() {
+  const view = $("#view-insights");
+  if (!view) return;
+  const teams = state.teams, players = state.players;
+  const sold = players.filter(p => p.status === "sold" && !p.retained);
+  const unsold = players.filter(p => p.status === "unsold");
+  const available = players.filter(p => p.status === "available" && !p.retained);
+  const auctionable = players.filter(p => !p.retained);
+  const done = auctionable.filter(p => p.status !== "available").length;
+  const completion = auctionable.length ? Math.round(done / auctionable.length * 100) : 0;
+  const moneySpent = sold.reduce((a, p) => a + (p.soldPrice || 0), 0);
+  const avgSale = sold.length ? moneySpent / sold.length : 0;
+  const byPrice = sold.slice().sort((a, b) => (b.soldPrice || 0) - (a.soldPrice || 0));
+  const mostExp = byPrice[0], cheapest = byPrice[byPrice.length - 1];
+  const totalPurse = teams.reduce((a, t) => a + teamPurse(t), 0);
+  const moneyRemaining = totalPurse - moneySpent;
+  const teamSpends = teams.map(t => ({ t, spent: teamSpent(t.id), info: squadInfo(state, t.id) }))
+    .sort((a, b) => b.spent - a.spent);
+  const highSpend = teamSpends[0], lowSpend = teamSpends[teamSpends.length - 1];
+  const avgPerTeam = teams.length ? moneySpent / teams.length : 0;
+  const bidWar = sold.slice().sort((a, b) => (b.soldBids || 0) - (a.soldBids || 0))[0];
+  const teamName = id => { const t = getTeam(id); return t ? esc(t.name) : "—"; };
+  const card = (label, value, accent) =>
+    `<div class="ins-card"><div class="ins-k">${label}</div><div class="ins-v${accent ? " accent" : ""}">${value}</div></div>`;
+
+  const buckets = {};
+  ROLE_BUCKETS.forEach(b => buckets[b] = { spent: 0, count: 0 });
+  sold.forEach(p => { const b = buckets[roleBucket(p.role)]; b.spent += p.soldPrice || 0; b.count++; });
+
+  view.innerHTML = `
+    <div class="view-head"><h2>📊 Auction Insights</h2></div>
+    <div class="ins-complete">
+      <div class="ins-complete-top"><span>Auction Completion</span><span><b>${completion}%</b> · ${done} / ${auctionable.length} done</span></div>
+      <div class="ins-bar"><span style="width:${completion}%"></span></div>
+    </div>
+    <div class="ins-cards">
+      ${card("Most Expensive", mostExp ? `${esc(mostExp.name)} · ${money(mostExp.soldPrice)}` : "—", true)}
+      ${card("Cheapest Sold", cheapest ? `${esc(cheapest.name)} · ${money(cheapest.soldPrice)}` : "—")}
+      ${card("Average Sale", sold.length ? money(avgSale) : "—")}
+      ${card("Players Sold", sold.length)}
+      ${card("Players Unsold", unsold.length)}
+      ${card("Remaining", available.length)}
+      ${card("Money Spent", money(moneySpent), true)}
+      ${card("Money Remaining", money(moneyRemaining))}
+      ${card("Highest Team Spend", highSpend ? `${esc(highSpend.t.name)} · ${money(highSpend.spent)}` : "—")}
+      ${card("Lowest Team Spend", lowSpend ? `${esc(lowSpend.t.name)} · ${money(lowSpend.spent)}` : "—")}
+      ${card("Avg Spend / Team", money(avgPerTeam))}
+      ${card("Biggest Bid War", (bidWar && bidWar.soldBids) ? `${esc(bidWar.name)} · ${bidWar.soldBids} bids` : "—", true)}
+    </div>
+    <div class="ins-charts">
+      <div class="ins-chart"><h3>Price Distribution</h3><canvas id="chartPrices"></canvas></div>
+      <div class="ins-chart"><h3>Sold vs Unsold</h3><canvas id="chartSold"></canvas></div>
+      <div class="ins-chart"><h3>Role Distribution</h3><canvas id="chartRoles"></canvas></div>
+      <div class="ins-chart"><h3>Team Spending</h3><canvas id="chartTeamSpend"></canvas></div>
+      <div class="ins-chart"><h3>Remaining Purse</h3><canvas id="chartTeamPurse"></canvas></div>
+    </div>
+    <div class="ins-tables">
+      <div class="ins-table"><h3>Top Sold Players</h3>
+        <table><thead><tr><th>#</th><th>Player</th><th>Team</th><th class="num">Price</th></tr></thead><tbody>
+          ${byPrice.slice(0, 10).map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td>${teamName(p.soldTo)}</td><td class="num">${money(p.soldPrice)}</td></tr>`).join("") || `<tr><td colspan="4">No sales yet</td></tr>`}
+        </tbody></table></div>
+      <div class="ins-table"><h3>Role Spending</h3>
+        <table><thead><tr><th>Role</th><th class="num">Sold</th><th class="num">Total</th><th class="num">Avg</th></tr></thead><tbody>
+          ${ROLE_BUCKETS.filter(b => buckets[b].count).map(b => `<tr><td>${b}</td><td class="num">${buckets[b].count}</td><td class="num">${money(buckets[b].spent)}</td><td class="num">${money(buckets[b].spent / buckets[b].count)}</td></tr>`).join("") || `<tr><td colspan="4">No sales yet</td></tr>`}
+        </tbody></table></div>
+      <div class="ins-table"><h3>Team Analytics</h3>
+        <table><thead><tr><th>Team</th><th class="num">Players</th><th class="num">Spent</th><th class="num">Spent %</th><th class="num">Safe Bid</th></tr></thead><tbody>
+          ${teamSpends.map(({ t, spent, info }) => { const purse = teamPurse(t); const pct = purse ? Math.round(spent / purse * 100) : 0;
+            return `<tr><td>${esc(t.name)}</td><td class="num">${info.squadCount}/${MAX_PLAYERS}</td><td class="num">${money(spent)}</td><td class="num">${pct}%</td><td class="num">${money(Math.max(0, info.safeBid))}</td></tr>`; }).join("") || `<tr><td colspan="5">No teams</td></tr>`}
+        </tbody></table></div>
+    </div>`;
+
+  // Charts: only when the tab is visible and Chart.js actually loaded (offline-safe).
+  if (view.classList.contains("active") && window.Chart) buildInsightCharts({ sold, unsold, available, byPrice, teamSpends, buckets });
+}
+
+function buildInsightCharts(d) {
+  Object.values(insCharts).forEach(c => { try { c.destroy(); } catch (e) {} });
+  insCharts = {};
+  const gridC = "rgba(255,255,255,0.08)", tickC = "#9b9ba3";
+  const axis = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickC } } },
+    scales: { x: { ticks: { color: tickC }, grid: { color: gridC } }, y: { ticks: { color: tickC }, grid: { color: gridC } } } };
+  const pie = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickC } } } };
+  const mk = (id, cfg) => { const el = document.getElementById(id); if (el) insCharts[id] = new window.Chart(el, cfg); };
+
+  const prices = d.sold.map(p => p.soldPrice || 0);
+  const max = Math.max(1, ...prices), binCount = 6, binSize = Math.ceil(max / binCount) || 1;
+  const bins = Array.from({ length: binCount }, () => 0);
+  prices.forEach(v => { bins[Math.min(binCount - 1, Math.floor(v / binSize))]++; });
+  mk("chartPrices", { type: "bar", data: { labels: bins.map((_, i) => `${i * binSize}-${(i + 1) * binSize}`),
+    datasets: [{ label: "Players", data: bins, backgroundColor: "#ffcc00" }] }, options: axis });
+  mk("chartSold", { type: "doughnut", data: { labels: ["Sold", "Unsold", "Remaining"],
+    datasets: [{ data: [d.sold.length, d.unsold.length, d.available.length], backgroundColor: ["#22c55e", "#e10600", "#34343a"] }] }, options: pie });
+  const roleLabels = ROLE_BUCKETS.filter(b => d.buckets[b].count);
+  mk("chartRoles", { type: "pie", data: { labels: roleLabels,
+    datasets: [{ data: roleLabels.map(b => d.buckets[b].count), backgroundColor: ["#ffcc00", "#e10600", "#22c55e", "#3b82f6", "#9b9ba3"] }] }, options: pie });
+  mk("chartTeamSpend", { type: "bar", data: { labels: d.teamSpends.map(x => x.t.name),
+    datasets: [{ label: "Spent", data: d.teamSpends.map(x => x.spent), backgroundColor: "#e10600" }] }, options: axis });
+  mk("chartTeamPurse", { type: "bar", data: { labels: d.teamSpends.map(x => x.t.name),
+    datasets: [{ label: "Remaining", data: d.teamSpends.map(x => x.info.remaining), backgroundColor: "#22c55e" }] }, options: axis });
+}
 
 /* ---------- PLAYERS ---------- */
 function renderPlayers() {
@@ -899,11 +1242,15 @@ async function savePlayer() {
   if (f) { try { photo = await fileToDataURL(f, 460, "jpeg"); } catch (e) { toast("Couldn't read photo", "bad"); } }
 
   const editId = $("#playerEditId").value;
+  const stats = readStatsForm();
   if (editId) {
     const p = getPlayer(editId);
-    if (p) { p.name = name; p.role = role; p.basePrice = base; if (photo) p.photo = photo; }
+    if (p) { p.name = name; p.role = role; p.basePrice = base; if (photo) p.photo = photo;
+      if (stats) p.stats = stats; else delete p.stats; }
   } else {
-    state.players.push({ id: uid(), name, role, basePrice: base, photo: photo || "", status: "available", soldTo: null, soldPrice: null });
+    const np = { id: uid(), name, role, basePrice: base, photo: photo || "", status: "available", soldTo: null, soldPrice: null };
+    if (stats) np.stats = stats;
+    state.players.push(np);
   }
   clearPlayerForm();
   save();
@@ -916,6 +1263,7 @@ function editPlayer(id) {
   $("#pName").value = p.name;
   $("#pRole").value = p.role || "";
   $("#pBase").value = p.basePrice;
+  fillStatsForm(p.stats);
   $("#playerFormTitle").textContent = "Edit Player";
   $("#btnSavePlayer").textContent = "Save Changes";
   $("#btnCancelPlayer").classList.remove("hidden");
@@ -924,9 +1272,29 @@ function editPlayer(id) {
 }
 function clearPlayerForm() {
   $("#playerEditId").value = ""; $("#pName").value = ""; $("#pRole").value = ""; $("#pBase").value = ""; $("#pPhotoFile").value = "";
+  fillStatsForm(null);
   $("#playerFormTitle").textContent = "Add Player";
   $("#btnSavePlayer").textContent = "Add Player";
   $("#btnCancelPlayer").classList.add("hidden");
+}
+
+/* Optional player season stats (Phase E) — backwards compatible (omitted when blank). */
+const STAT_FIELDS = [
+  ["matches", "pStatMatches"], ["runs", "pStatRuns"], ["wickets", "pStatWickets"],
+  ["strikeRate", "pStatSR"], ["economy", "pStatEcon"], ["average", "pStatAvg"],
+  ["fantasyPoints", "pStatFP"], ["previousPrice", "pStatPrev"],
+];
+function readStatsForm() {
+  const stats = {}; let any = false;
+  STAT_FIELDS.forEach(([key, id]) => {
+    const el = $("#" + id); if (!el) return;
+    const v = el.value.trim();
+    if (v !== "") { const n = Number(v); stats[key] = isNaN(n) ? v : n; any = true; }
+  });
+  return any ? stats : null;
+}
+function fillStatsForm(stats) {
+  STAT_FIELDS.forEach(([key, id]) => { const el = $("#" + id); if (el) el.value = (stats && stats[key] != null) ? stats[key] : ""; });
 }
 function deletePlayer(id) {
   const p = getPlayer(id); if (!p) return;
@@ -1120,6 +1488,14 @@ function wireEvents() {
   $("#btnUnsold").onclick = markUnsold;
   $("#btnUndo").onclick = undoLast;
   $("#btnReset").onclick = resetBid;
+
+  // presenter fullscreen toggle (Phase E)
+  const fsBtn = $("#btnFullscreen");
+  if (fsBtn) fsBtn.onclick = () => {
+    const d = document;
+    if (d.fullscreenElement) { (d.exitFullscreen || d.webkitExitFullscreen || function () {}).call(d); }
+    else { const el = d.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el); }
+  };
 
   // settings
   $("#btnSaveSettings").onclick = saveSettings;
