@@ -1,110 +1,306 @@
-# HCCL Live Auction
+# 🏏 HCCL — Hand Cricket Champions League
 
-A simple, single-screen live auction tool for the **HCCL Champions League**.
-Built with plain HTML/CSS/JavaScript — no installation, no internet, no accounts.
-Everything is saved automatically in your browser.
+A single-page web app for running a **live cricket player auction** *and* a **fantasy
+league** for the Hand Cricket Champions League (HCCL). It's built with plain
+HTML/CSS/JavaScript — **no build step, no framework, no bundler**. Open it and it runs.
 
----
+Two ways to run, automatically chosen:
 
-## How to run
+- **☁️ Live multi-device mode** — when Firebase is configured, everyone signs in with
+  Google and sees the **same auction and fantasy data in real time** across phones and
+  laptops. Roles control who can edit.
+- **💾 Single-device mode** — with no Firebase (or if the cloud is unreachable), the app
+  quietly falls back to saving everything in the browser's local storage, exactly as a
+  standalone tool. Nothing is lost.
 
-**Option A – just open it (easiest)**
-Double-click **`index.html`**. It opens in your browser and works offline.
-
-**Option B – run a tiny local server (most reliable for saving)**
-Some browsers are stricter about saving data on `file://` pages. If you want to be
-100% safe, open a terminal in this folder and run one of:
-
-```powershell
-# If you have Python:
-python -m http.server 8000
-# then open  http://localhost:8000
-```
-
-Either way, **export a backup regularly** (Setup → Data & Backup) so your auction
-is never lost.
+🔗 **Live site:** https://live-auctions-hazel.vercel.app
 
 ---
 
-## First-time setup (do this before the auction)
+## Table of contents
 
-Open the **⚙️ Setup** tab:
-
-1. **League Settings** – set the season name/number (e.g. *HCCL Season 06*),
-   currency label (default `Cr`), default purse per team, bid increment, and upload
-   your league logo. Click **Save Settings**.
-   *(The season number is changed here each season — that's the only thing you edit
-   manually season-to-season.)*
-2. **Add Team** – name + purse + logo for each team. Repeat for all teams.
-3. **Add Player** – name, role, base price and photo for each player. They are
-   auctioned **top-to-bottom** in this list — use ▲ ▼ to reorder.
-4. **Retain / Pre-assign Player** (optional) – players a team keeps from last
-   season. Pick the team; the price is optional (record only). They go straight
-   into that team's squad (with a **RET** tag), are skipped by the auction, and
-   survive a "Reset auction results". The retention price is **not** deducted —
-   the purse you set is the fresh new-season budget, so only buying new players
-   in the auction reduces it.
-
-Want to try it first? Click **Load sample data**.
+- [Highlights](#highlights)
+- [Sign-in & roles](#sign-in--roles)
+- [The Auction](#-the-auction)
+- [The Fantasy League](#-the-fantasy-league)
+- [Cloud sync (how live mode works)](#️-cloud-sync-how-live-mode-works)
+- [Data, backup & reset](#-data-backup--reset)
+- [Running it](#-running-it)
+- [Deployment](#-deployment)
+- [Firebase setup](#-firebase-setup)
+- [Branding a new season](#-branding-a-new-season)
+- [Project structure](#-project-structure)
+- [Tech notes](#-tech-notes)
 
 ---
 
-## Running the auction (🔨 Live Auction tab)
+## Highlights
 
-- The first player appears automatically with their **photo, name and base price**.
-- Each **team has a bid button**. The first click bids the **base price**; every click
-  after that raises the bid by your increment (1 → 2 → 3 …). The bid is tagged with
-  that team's name. The leading team is highlighted green and can't out-bid itself.
-- Teams that can't afford the next bid are automatically disabled.
-- **SOLD button** steps through **GOING ONCE → GOING TWICE → GOING THRICE → SELL**.
-  A new bid during the countdown resets it.
-- When finalized, the screen shows **"{Player} SOLD to {Team} for {Price}"**, the
-  team's purse drops, and their squad updates.
-- **Unsold** marks a player unsold (use when there are no bids).
-- **Next Player ▶** brings the next player automatically.
-- **↩ Undo** reverts the last sold/unsold result (great for mistakes).
-- **⟳ Reset Bid** clears the current player's bids and starts them over.
+- 🔨 **Presenter-driven live auction** with team bidding, a SOLD countdown, undo, and a
+  full-screen result reveal.
+- 🏏 **Fantasy league** with match days, captain/vice-captain multipliers, live points,
+  season leaderboards and a Player of the Season board.
+- ☁️ **Real-time sync** via Firestore — auction and fantasy state mirror instantly to
+  every signed-in device.
+- 🔐 **Google sign-in with Admin / Moderator / Viewer roles** and a members-management
+  screen.
+- 🖼️ **Player photos & team logos in the cloud**, stored so every viewer sees them.
+- 📷 **Share leaderboards as branded PNG images** (one-tap download).
+- 💾 **Export / import JSON backups** any time, and a graceful offline fallback.
+- 🎨 Dark **red / yellow / black** theme, custom league logo, favicon and tab title.
 
-### Keyboard shortcuts (auction tab)
+---
+
+## Sign-in & roles
+
+When Firebase is configured, the app shows a **sign-in wall** — you must sign in with
+Google before you can see anything. Each user has one of three roles:
+
+| Role | Can do |
+|------|--------|
+| **Admin** | Everything: run the auction, edit fantasy, **and manage members/roles**. |
+| **Moderator** | Create / update / delete auction **and** fantasy data. No role management. |
+| **Viewer** | Read-only. Sees the auction, squads, fantasy and leaderboards — no edit controls, no setup pages. |
+
+- The **owner email** (configured in `firestore.rules` and `firebase-config.js`) is always
+  treated as an admin, even before any profile exists — it bootstraps the system.
+- New users default to **Viewer**. An admin promotes them from the **👤 Members** screen
+  (open it from the header chip after signing in).
+- The UI gates itself by role: viewers never see edit buttons, the Setup tab, or keyboard
+  auction shortcuts.
+
+---
+
+## 🔨 The Auction
+
+### First-time setup (⚙️ Setup tab)
+
+1. **League Settings** — season name & number (e.g. *HCCL Season 06*), currency label
+   (default `Cr`), default purse per team, bid increment, and the league logo. The season
+   name + number also become the **browser tab title**, and the logo becomes the
+   **favicon**.
+2. **Add Team** — name, purse (blank = default) and logo for each team.
+3. **Add Player** — name, role/category, base price and photo. Players are auctioned
+   **top-to-bottom** in this list; reorder with ▲ ▼.
+4. **Retain / Pre-assign Player** *(optional)* — players a team keeps from last season.
+   They go straight into that team's squad with a **RET** tag, are skipped by the auction,
+   survive a "Reset auction results", and their (optional) retention price is **not**
+   deducted from the new-season purse.
+
+> New here? Click **Load sample data** to try it instantly.
+
+### Running the auction (🔨 Live Auction tab)
+
+- The current player appears with **photo, name and base price**.
+- Each team has a **bid button**. First click bids the base price; each later click raises
+  it by the increment. The leading team is highlighted and can't out-bid itself; teams that
+  can't afford the next bid are disabled automatically.
+- **SOLD** steps through **GOING ONCE → GOING TWICE → GOING THRICE → SELL**. A new bid
+  during the countdown resets it.
+- On finalize: a full-screen **"{Player} SOLD to {Team} for {Price}"** reveal, the team's
+  purse drops, and their squad updates.
+- **Unsold** marks a player unsold · **↩ Undo** reverts the last sold/unsold result ·
+  **⟳ Reset Bid** clears the current player's bids · **Next Player ▶** advances.
+
+#### Keyboard shortcuts (auction tab)
+
 | Key | Action |
 |-----|--------|
 | `1`–`9` | Bid for team 1–9 |
-| `Space` | Advance SOLD (once/twice/thrice/sell) |
+| `Space` | Advance SOLD (once / twice / thrice / sell) |
 | `U` | Unsold |
 | `N` | Next player |
 | `Z` | Undo |
 | `Enter` | Next player (on the result screen) |
 
----
+*(Disabled for viewers.)*
 
-## The other tabs
+### The other auction tabs
 
-- **👥 Players** – every player with base price and status (Available / Sold / Unsold),
-  sale price and buying team. Search and filter. You can also "Auction now" any player
-  out of order, or "Re-auction" an unsold one.
-- **💰 Teams & Purse** – each team's total, spent and **remaining purse** (updates live
-  as players sell).
-- **🏆 Squads** – each team's logo, name and the players they've bought with prices.
-
----
-
-## Backup & reset (Setup → Data & Backup)
-
-- **Export backup** – downloads a `.json` file with the whole auction. Keep this safe.
-- **Import backup** – restore from a `.json` file (e.g. on another laptop).
-- **Re-open unsold players** – puts unsold players back up for auction.
-- **Reset auction results** – keeps teams/players but clears all sales and refills purses.
-- **Erase everything** – wipes all data back to empty.
-
-> **Note on the logo:** the image shared in chat looked like a screenshot rather than a
-> logo file, so the league logo is left blank. Upload the real HCCL logo in
-> **Setup → League Settings** and it appears in the header and on the SOLD screen.
+- **👥 Players** — every player with base price and status (Available / Sold / Unsold),
+  sale price and buying team. Search & filter; auction any player out of order, or
+  re-auction an unsold one.
+- **💰 Teams & Purse** — each team's total, spent and **remaining purse**, live.
+- **🏆 Squads** — each team's logo, name and the players they bought, with prices.
 
 ---
 
-## Files
+## 🏏 The Fantasy League
+
+A self-contained fantasy game that lives in the **🏏 Fantasy** tab. It has its own data and
+storage and does **not** touch the auction.
+
+### Concepts
+
+- **Teams** and **Players** (each player belongs to a team).
+- **Contestants** — the people playing fantasy (your friends/participants).
+- **Match Days** — each day picks which teams are playing, records every player's
+  performance, and holds each contestant's **entry** (their picked squad).
+
+### Match Day (📅) — build entries & enter results
+
+- Create a day (date + optional label) and choose which **teams** play that day.
+- Each **contestant's entry** picks players from that day's pool and designates a
+  **Captain (C)** and **Vice-Captain (VC)**.
+- Enter each player's **runs** and **wickets**; points compute live.
+
+### Scoring
+
+```
+player points  = runs + (wickets × 10)
+captain        = player points × 2
+vice-captain   = player points × 1.5
+entry points   = sum of the entry's player points (with C/VC multipliers)
+```
+
+- **Day Standings** rank that day's entries by points (🥇🥈🥉).
+- **Leaderboards (🏆)**:
+  - **Contestants** — every contestant ranked by **total** points across all days that
+    have results.
+  - **Player of the Season (⭐)** — top players ranked by total fantasy points.
+  - Totals are shown in **yellow**; ranking is by total.
+
+### 📷 Share as image
+
+Both leaderboards and the Day Standings card have a **📷 Share** button that renders a
+branded, dark-themed **PNG** (1080px wide, league title + subheading + date + medal
+badges + the *HC Champions League* footer) and downloads it — ready to post in a group
+chat. Built with the `html-to-image` library (loaded from a CDN).
+
+---
+
+## ☁️ Cloud sync (how live mode works)
+
+When Firebase is configured and you're signed in, the app switches from local storage to
+**Firestore** as the source of truth:
+
+```
+fantasy/league/{teams, players, contestants, days}/{id}     ← fantasy data
+auction/league/{teams, players}/{id}                        ← auction text data
+auction/league/state/{settings, live}                       ← settings + live auction state
+auction/league/playerPhotos/{playerId}   { data: <base64> } ← one image per doc
+auction/league/teamLogos/{teamId}        { data: <base64> } ← one image per doc
+```
+
+- `onSnapshot` listeners mirror server state into the app **in real time**; local edits are
+  pushed back as a **minimal diff** (only changed/added/removed docs, in small batches).
+- The auction is **presenter-driven** (last-write-wins): whoever is running it drives the
+  state for everyone — it is deliberately *not* crowd-bidding.
+- **Images live in their own one-image-per-document collections** (`playerPhotos`,
+  `teamLogos`) so the heavy base64 blobs never bloat the frequently-synced player/team
+  docs (which would otherwise hit Firestore's write-size limits and fail). Every signed-in
+  viewer sees the same photos and logos.
+- If the cloud is unreachable (offline, blocked, rules not published), the app **falls back
+  to the local backup** and shows a "this device only" notice instead of getting stuck.
+
+### Moving an existing local setup into the cloud
+
+If you built teams/players on one device before turning on live mode, sign in there, open
+**Setup → Data & Backup**, and click **☁ Upload local data to cloud** (this row appears
+once live sync is active). It pushes this device's saved data — including photos and
+logos — into the shared cloud. Other signed-in devices then receive everything live.
+
+---
+
+## 💾 Data, backup & reset
+
+In **Setup → Data & Backup**:
+
+- **⬇ Export backup** — downloads a `.json` of the whole auction. Keep it safe.
+- **⬆ Import backup** — restore from a `.json` (e.g. onto another laptop).
+- **Re-open unsold players** — puts unsold players back up for auction.
+- **Reset auction results** — keeps teams/players but clears all sales and refills purses.
+- **Erase everything** — wipes back to empty.
+
+The fantasy module has its own export/import in the Fantasy tab.
+
+> 💡 Even in cloud mode, your last local copy is preserved as a backup, and exporting JSON
+> regularly is the safest habit.
+
+---
+
+## 🚀 Running it
+
+**Open it directly** — double-click `index.html`. (With no Firebase config it runs as a
+local single-device tool.)
+
+**Run a tiny local server** (recommended; some browsers restrict storage on `file://`):
+
+```bash
+# Python
+python -m http.server 8000
+# then open http://localhost:8000
+```
+
+There is **nothing to install or build** — no `npm install`, no compile step.
+
+---
+
+## 🌐 Deployment
+
+The site is a static bundle, deployed on **Vercel** at
+https://live-auctions-hazel.vercel.app. Any static host works (Vercel, Netlify, GitHub
+Pages, Firebase Hosting). `vercel.json` is included for optional auth-handler rewrites.
+
+To deploy your own copy: push this folder to a static host and make sure
+`firebase-config.js` points at your Firebase project.
+
+---
+
+## 🔥 Firebase setup
+
+Live mode needs a Firebase project with **Authentication** and **Firestore**:
+
+1. **Firestore Database** — create it (in production mode).
+2. **Authentication** — enable the **Google** sign-in provider, and add your site's domain
+   to the **Authorized domains** list. For OAuth, the redirect URI
+   `https://<your-domain>/__/auth/handler` must be allowed.
+3. **Security rules** — paste the contents of `firestore.rules` into
+   *Firestore → Rules → Publish*. They enforce: signed-in to read, editors-only to write,
+   admins-only to manage roles, and an owner-email bootstrap admin.
+4. **Config** — put your project's public web config in `firebase-config.js`, and set the
+   admin/owner email there and in `firestore.rules`.
+
+> The values in `firebase-config.js` are **public client keys** (safe to commit) — access
+> is protected by the Firestore security rules, not by hiding the config.
+
+---
+
+## 🎨 Branding a new season
+
+- **In-app:** set the season name/number and upload the league logo in
+  **Setup → League Settings**. This drives the header, the tab title, and the favicon.
+- **Sign-in wall + default favicon:** swap the committed `brand-logo.jpg` (the league
+  shield shown on the landing/sign-in screen and as the fallback tab icon) to rebrand for a
+  new season.
+
+---
+
+## 📁 Project structure
+
 | File | Purpose |
 |------|---------|
-| `index.html` | Page structure |
-| `styles.css` | Dark red/yellow/black theme |
-| `app.js` | All auction logic & storage |
+| `index.html` | Page structure (header, auction tabs, fantasy mount, overlays) |
+| `app.js` | Auction logic, state, and Firestore sync (Phase D) |
+| `fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
+| `firebase-init.js` | Google auth, roles, members screen, sign-in wall, `window.HCCL` API |
+| `firebase-config.js` | Public Firebase web config + admin email list |
+| `firestore.rules` | Security rules (roles, read/write gating) |
+| `styles.css` | Theme + auction UI + role/sign-in gating |
+| `fantasy.css` | Fantasy tab styling |
+| `brand-logo.jpg` | League logo for the sign-in wall and default favicon |
+| `vercel.json` | Static host config / optional auth rewrites |
+
+---
+
+## 🛠 Tech notes
+
+- **Vanilla JS, no build.** `app.js` and `fantasy.js` are classic scripts; `firebase-init.js`
+  is an ES module loaded from the gstatic Firebase CDN (v10).
+- **Two storage seams:** `hccl_auction_v1` (auction) and `hccl_fantasy_v1` (fantasy) in
+  local storage; Firestore takes over transparently in cloud mode.
+- **`window.HCCL`** is the bridge the auction/fantasy modules use for auth state, roles
+  (`canEdit()`, `isAdmin()`), the `onChange` sign-in hook, and Firestore helpers.
+- **Image sharing** uses `html-to-image` from a CDN to rasterize off-screen branded cards.
+- **Resilient by design:** every cloud path has a local-storage fallback, so a blocked or
+  offline Firestore never bricks the app.
