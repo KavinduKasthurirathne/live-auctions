@@ -254,7 +254,7 @@
     if (!canEditApp() && UI.sub !== "leaderboard") UI.sub = "leaderboard";
     v.innerHTML = `
       <div class="view-head">
-        <h2>Fantasy League</h2>
+        <h2>FANTASY LEAGUE</h2>
         <div class="fan-subnav">
           ${subBtn("matchday", "📅 Match Day")}
           ${subBtn("leaderboard", "🏆 Leaderboards")}
