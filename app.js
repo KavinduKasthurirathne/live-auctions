@@ -896,7 +896,7 @@ function renderInsights() {
     `<div class="ins-card"><div class="ins-k">${label}</div><div class="ins-v${accent ? " accent" : ""}">${value}</div></div>`;
 
   view.innerHTML = `
-    <div class="view-head"><h2>📊 Auction Insights</h2></div>
+    <div class="view-head"><h2>📊 AUCTION INSIGHTS</h2></div>
     <div class="ins-complete">
       <div class="ins-complete-top"><span>Auction Completion</span><span><b>${completion}%</b> · ${done} / ${auctionable.length} done</span></div>
       <div class="ins-bar"><span style="width:${completion}%"></span></div>
