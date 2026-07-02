@@ -154,7 +154,7 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .empty-state p { color: var(--muted); margin-bottom: 18px; }
 
 /* ===================== AUCTION STAGE ===================== */
-.auction-stage { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: 22px; align-items: start; }
+.auction-stage { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 22px; align-items: start; }
 
 .player-card {
   background: linear-gradient(160deg, var(--panel-2), var(--panel));
