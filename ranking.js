@@ -64,7 +64,7 @@
       <div class="card rank-import">
         <h3>⬆ Weekly Stats Import</h3>
         <p class="hint">Pick the season, then choose the weekly CSV export from the stats system.
-          Rankings recalculate instantly on this device - commit the same CSV to the repo to publish it for everyone.</p>
+          Rankings recalculate instantly on this device commit the same CSV to the repo to publish it for everyone.</p>
         <div class="form-row">
           <select id="rankSeasonSel" title="Season this CSV belongs to">${opts}</select>
           <label class="btn btn-dark file-btn">⬆ Import CSV
