@@ -59,7 +59,7 @@ function save() {
   // (KEY) so a one-time "upload to cloud" can still recover this device's data.
   if (auUsingFirestore) { if (auCanEdit()) auctionSyncDiff(); return; }
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
-  catch (e) { toast("Storage full — export a backup and use smaller images", "bad"); }
+  catch (e) { toast("Storage full - export a backup and use smaller images", "bad"); }
 }
 
 /* ============================================================
@@ -152,7 +152,7 @@ function startAuctionSync() {
         if (!Array.isArray(state.auction.bidLog)) state.auction.bidLog = [];
         state.lastAction = d.lastAction || null; }
       else auMirror.live = null; auLoaded("live"); }, auErr));
-  setTimeout(() => auFallback("Live sync unavailable — this device only"), 6000);
+  setTimeout(() => auFallback("Live sync unavailable - this device only"), 6000);
 }
 function auLoaded(which) {
   auFsLoaded.add(which);
@@ -164,7 +164,7 @@ function auErr(err) {
   const code = err && err.code;
   auFallback(code === "permission-denied" ? "Cloud blocked: publish the latest Firestore rules"
     : code === "not-found" ? "Firestore database not created yet"
-    : "Live sync unavailable — this device only");
+    : "Live sync unavailable - this device only");
 }
 function auFallback(msg) {
   if (auFellBack || auFsReady) return;
@@ -217,7 +217,7 @@ async function auctionSyncDiff() {
       ops.slice(i, i + 50).forEach(op => op.t === "set" ? batch.set(op.ref, op.data) : batch.delete(op.ref));
       await batch.commit();
     }
-    for (let i = 0; i < imgOps.length; i += 6) {  // images are big — tiny batches stay under the request-size cap
+    for (let i = 0; i < imgOps.length; i += 6) {  // images are big - tiny batches stay under the request-size cap
       const batch = api.writeBatch(auDb());
       imgOps.slice(i, i + 6).forEach(op => op.t === "set" ? batch.set(op.ref, op.data) : batch.delete(op.ref));
       await batch.commit();
@@ -296,7 +296,7 @@ function teamPlayers(id) { return state.players.filter(p => p.status === "sold" 
 /* Hard squad cap. Every team must end with exactly this many players. */
 const MAX_PLAYERS = 5;
 
-/* Budget + slot math for one team — DERIVED ONLY (no writes). Takes a state-like `s`
+/* Budget + slot math for one team - DERIVED ONLY (no writes). Takes a state-like `s`
    so the bid transaction can run it against the SERVER's live auction snapshot.
      remainingSlots = MAX_PLAYERS - squad.length
      reserve        = max(0, remainingSlots - 1) * minimumBasePrice (of available players)
@@ -540,7 +540,7 @@ function renderTeamButtons() {
   });
 }
 
-/* Live Squad Tracker — one card per team, visible to everyone. Derived only. */
+/* Live Squad Tracker - one card per team, visible to everyone. Derived only. */
 function renderSquadTracker() {
   const box = $("#squadTracker");
   if (!box) return;
@@ -566,7 +566,7 @@ function renderSquadTracker() {
           <div><span class="tc-k">Purse</span><span class="tc-v">${money(info.remaining)}</span></div>
           <div><span class="tc-k">Slots</span><span class="tc-v">${info.slotsLeft}</span></div>
           <div><span class="tc-k">Safe Bid</span><span class="tc-v safe">${money(Math.max(0, info.safeBid))}</span></div>
-          <div><span class="tc-k">Avg Spend</span><span class="tc-v">${bought.length ? money(avg) : "—"}</span></div>
+          <div><span class="tc-k">Avg Spend</span><span class="tc-v">${bought.length ? money(avg) : "-"}</span></div>
         </div>
       </div>`;
     }).join("")}</div>`;
@@ -580,7 +580,7 @@ function maybeAnnounceComplete() {
   const hasAny = state.players.some(p => !p.retained);
   const hasAvailable = state.players.some(p => p.status === "available" && !p.retained);
   const complete = hasAny && !hasAvailable;
-  if (auCompleteState === null) { auCompleteState = complete; return; } // baseline — no fanfare on load
+  if (auCompleteState === null) { auCompleteState = complete; return; } // baseline - no fanfare on load
   if (complete && !auCompleteState) burstConfetti();
   auCompleteState = complete;
 }
@@ -776,7 +776,7 @@ function overlayVisible() { return !$("#overlay").classList.contains("hidden"); 
 
 /* ============================================================
    📊 AUCTION INSIGHTS (Phase E)
-   Everything here is DERIVED from local `state` — no Firestore reads/writes.
+   Everything here is DERIVED from local `state` - no Firestore reads/writes.
    ============================================================ */
 let insCharts = {};
 
@@ -801,7 +801,7 @@ function renderInsights() {
   const highSpend = teamSpends[0], lowSpend = teamSpends[teamSpends.length - 1];
   const avgPerTeam = teams.length ? moneySpent / teams.length : 0;
   const bidWar = sold.slice().sort((a, b) => (b.soldBids || 0) - (a.soldBids || 0))[0];
-  const teamName = id => { const t = getTeam(id); return t ? esc(t.name) : "—"; };
+  const teamName = id => { const t = getTeam(id); return t ? esc(t.name) : "-"; };
   const card = (label, value, accent) =>
     `<div class="ins-card"><div class="ins-k">${label}</div><div class="ins-v${accent ? " accent" : ""}">${value}</div></div>`;
 
@@ -812,18 +812,18 @@ function renderInsights() {
       <div class="ins-bar"><span style="width:${completion}%"></span></div>
     </div>
     <div class="ins-cards">
-      ${card("Most Expensive", mostExp ? `${esc(mostExp.name)} · ${money(mostExp.soldPrice)}` : "—", true)}
-      ${card("Cheapest Sold", cheapest ? `${esc(cheapest.name)} · ${money(cheapest.soldPrice)}` : "—")}
-      ${card("Average Sale", sold.length ? money(avgSale) : "—")}
+      ${card("Most Expensive", mostExp ? `${esc(mostExp.name)} · ${money(mostExp.soldPrice)}` : "-", true)}
+      ${card("Cheapest Sold", cheapest ? `${esc(cheapest.name)} · ${money(cheapest.soldPrice)}` : "-")}
+      ${card("Average Sale", sold.length ? money(avgSale) : "-")}
       ${card("Players Sold", sold.length)}
       ${card("Players Unsold", unsold.length)}
       ${card("Remaining", available.length)}
       ${card("Money Spent", money(moneySpent), true)}
       ${card("Money Remaining", money(moneyRemaining))}
-      ${card("Highest Team Spend", highSpend ? `${esc(highSpend.t.name)} · ${money(highSpend.spent)}` : "—")}
-      ${card("Lowest Team Spend", lowSpend ? `${esc(lowSpend.t.name)} · ${money(lowSpend.spent)}` : "—")}
+      ${card("Highest Team Spend", highSpend ? `${esc(highSpend.t.name)} · ${money(highSpend.spent)}` : "-")}
+      ${card("Lowest Team Spend", lowSpend ? `${esc(lowSpend.t.name)} · ${money(lowSpend.spent)}` : "-")}
       ${card("Avg Spend / Team", money(avgPerTeam))}
-      ${card("Biggest Bid War", (bidWar && bidWar.soldBids) ? `${esc(bidWar.name)} · ${bidWar.soldBids} bids` : "—", true)}
+      ${card("Biggest Bid War", (bidWar && bidWar.soldBids) ? `${esc(bidWar.name)} · ${bidWar.soldBids} bids` : "-", true)}
     </div>
     <div class="ins-charts">
       <div class="ins-chart"><h3>Price Distribution</h3><canvas id="chartPrices"></canvas></div>
@@ -1167,7 +1167,7 @@ function clearPlayerForm() {
   $("#btnCancelPlayer").classList.add("hidden");
 }
 
-/* Optional player season stats (Phase E) — backwards compatible (omitted when blank). */
+/* Optional player season stats (Phase E) - backwards compatible (omitted when blank). */
 const STAT_FIELDS = [
   ["matches", "pStatMatches"], ["runs", "pStatRuns"], ["wickets", "pStatWickets"],
   ["strikeRate", "pStatSR"], ["economy", "pStatEcon"], ["average", "pStatAvg"],
@@ -1504,7 +1504,7 @@ function init() {
   }
 }
 // Defer to DOMContentLoaded so the firebase-init.js MODULE (deferred) has already run
-// and exposed window.HCCL — otherwise the onChange hook above never registers and the
+// and exposed window.HCCL - otherwise the onChange hook above never registers and the
 // auction never syncs to Firestore. (fantasy.js does the same; that's why it works.)
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();

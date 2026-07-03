@@ -112,14 +112,14 @@
           const code = err && err.code;
           fallbackToLocal(
             code === "permission-denied" ? "Cloud blocked: publish the latest Firestore rules"
-              : code === "not-found" ? "Firestore database not created yet — create it in the Firebase console"
-              : "Live sync unavailable — this device only");
+              : code === "not-found" ? "Firestore database not created yet - create it in the Firebase console"
+              : "Live sync unavailable - this device only");
         }
       );
       fsUnsubs.push(unsub);
     });
     // If Firestore just hangs (blocked/offline, no error fired), don't sit on "Loading…".
-    setTimeout(() => fallbackToLocal("Live sync unavailable — this device only"), 6000);
+    setTimeout(() => fallbackToLocal("Live sync unavailable - this device only"), 6000);
   }
 
   function onRemoteChange() {
@@ -261,7 +261,7 @@
           ${subBtn("manage", "⚙️ Manage")}
         </div>
       </div>
-      ${fsFellBack ? `<div class="card" style="border-color:var(--red)"><p class="hint" style="margin:0">⚠ ${esc(fsFellBackMsg)}. Showing this device only — changes won't sync and the cloud-upload button is hidden. Fix the cause (publish rules / disable ad-blocker) and reload.</p></div>` : ""}
+      ${fsFellBack ? `<div class="card" style="border-color:var(--red)"><p class="hint" style="margin:0">⚠ ${esc(fsFellBackMsg)}. Showing this device only - changes won't sync and the cloud-upload button is hidden. Fix the cause (publish rules / disable ad-blocker) and reload.</p></div>` : ""}
       <div id="fan-body"></div>`;
     renderFanBody();
   }
@@ -594,7 +594,7 @@
         <div class="form-row"><button class="btn btn-dark" data-export>Export fantasy backup</button>
           <label class="btn btn-dark file-btn">Import backup<input type="file" id="fanImportFile" accept="application/json" hidden/></label></div>
         <hr/>
-        ${usingFirestore ? `<p class="hint">Live cloud sync is on — everyone sees the same data. Copy this device's saved data into the shared cloud (one-time).</p>
+        ${usingFirestore ? `<p class="hint">Live cloud sync is on - everyone sees the same data. Copy this device's saved data into the shared cloud (one-time).</p>
         <div class="form-row"><button class="btn btn-yellow" data-cloud-upload>☁ Upload local data to cloud</button></div>
         <hr/>` : ""}
         <div class="form-row"><button class="btn btn-danger" data-reset>Erase fantasy data</button></div>

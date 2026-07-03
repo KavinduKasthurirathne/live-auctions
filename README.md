@@ -1,15 +1,15 @@
-# 🏏 HCCL — Hand Cricket Champions League
+# 🏏 HCCL - Hand Cricket Champions League
 
 A single-page web app for running a **live cricket player auction** *and* a **fantasy
 league** for the Hand Cricket Champions League (HCCL). It's built with plain
-HTML/CSS/JavaScript — **no build step, no framework, no bundler**. Open it and it runs.
+HTML/CSS/JavaScript - **no build step, no framework, no bundler**. Open it and it runs.
 
 Two ways to run, automatically chosen:
 
-- **☁️ Live multi-device mode** — when Firebase is configured, everyone signs in with
+- **☁️ Live multi-device mode** - when Firebase is configured, everyone signs in with
   Google and sees the **same auction and fantasy data in real time** across phones and
   laptops. Roles control who can edit.
-- **💾 Single-device mode** — with no Firebase (or if the cloud is unreachable), the app
+- **💾 Single-device mode** - with no Firebase (or if the cloud is unreachable), the app
   quietly falls back to saving everything in the browser's local storage, exactly as a
   standalone tool. Nothing is lost.
 
@@ -38,14 +38,14 @@ Two ways to run, automatically chosen:
 
 - 🔨 **Presenter-driven live auction** with team bidding, a SOLD countdown, undo, and a
   full-screen result reveal.
-- 📋 **Live Squad Tracker + Safe Bid** — every team's slots, purse and budget health at a
+- 📋 **Live Squad Tracker + Safe Bid** - every team's slots, purse and budget health at a
   glance; bids are capped so no team can spend itself out of completing a 5-player squad.
-- 📊 **Auction Insights tab** — live analytics, top-buys and team tables, and Chart.js
+- 📊 **Auction Insights tab** - live analytics, top-buys and team tables, and Chart.js
   visualisations, all derived client-side (no extra reads).
 - 📈 **Optional player season stats** shown on the block; ✨ confetti, glow and pulse polish.
 - 🏏 **Fantasy league** with match days, captain/vice-captain multipliers, live points,
   season leaderboards and a Player of the Season board.
-- ☁️ **Real-time sync** via Firestore — auction and fantasy state mirror instantly to
+- ☁️ **Real-time sync** via Firestore - auction and fantasy state mirror instantly to
   every signed-in device.
 - 🔐 **Google sign-in with Admin / Moderator / Viewer roles** and a members screen.
 - 🖼️ **Player photos & team logos in the cloud**, stored so every viewer sees them.
@@ -57,19 +57,19 @@ Two ways to run, automatically chosen:
 
 ## Sign-in & roles
 
-When Firebase is configured, the app shows a **sign-in wall** — you must sign in with
+When Firebase is configured, the app shows a **sign-in wall** - you must sign in with
 Google before you can see anything. Each user has one of three roles:
 
 | Role | Can do |
 |------|--------|
 | **Admin** | Everything: run the auction, edit fantasy, **and manage members/roles**. |
 | **Moderator** | Create / update / delete auction **and** fantasy data. No role management. |
-| **Viewer** | Read-only. Sees the auction, squads, fantasy and leaderboards — no edit controls, no setup pages. |
+| **Viewer** | Read-only. Sees the auction, squads, fantasy and leaderboards - no edit controls, no setup pages. |
 
 > The role hierarchy is **admin ▸ moderator ▸ viewer**.
 
 - The **owner email** (configured in `firestore.rules` and `firebase-config.js`) is always
-  treated as an admin, even before any profile exists — it bootstraps the system.
+  treated as an admin, even before any profile exists - it bootstraps the system.
 - New users default to **Viewer**. An admin promotes them from the **👤 Members** screen
   (open it from the header chip after signing in).
 - The UI gates itself by role: viewers never see edit buttons, the Setup tab, or keyboard
@@ -81,14 +81,14 @@ Google before you can see anything. Each user has one of three roles:
 
 ### First-time setup (⚙️ Setup tab)
 
-1. **League Settings** — season name & number (e.g. *HCCL Season 06*), currency label
+1. **League Settings** - season name & number (e.g. *HCCL Season 06*), currency label
    (default `Cr`), default purse per team, bid increment, and the league logo. The season
    name + number also become the **browser tab title**, and the logo becomes the
    **favicon**.
-2. **Add Team** — name, purse (blank = default) and logo for each team.
-3. **Add Player** — name, role/category, base price and photo. Players are auctioned
+2. **Add Team** - name, purse (blank = default) and logo for each team.
+3. **Add Player** - name, role/category, base price and photo. Players are auctioned
    **top-to-bottom** in this list; reorder with ▲ ▼.
-4. **Retain / Pre-assign Player** *(optional)* — players a team keeps from last season.
+4. **Retain / Pre-assign Player** *(optional)* - players a team keeps from last season.
    They go straight into that team's squad with a **RET** tag, are skipped by the auction,
    survive a "Reset auction results", and their (optional) retention price is **not**
    deducted from the new-season purse.
@@ -123,30 +123,30 @@ Google before you can see anything. Each user has one of three roles:
 
 ### The other auction tabs
 
-- **👥 Players** — every player with base price and status (Available / Sold / Unsold),
+- **👥 Players** - every player with base price and status (Available / Sold / Unsold),
   sale price and buying team. Search & filter; auction any player out of order, or
   re-auction an unsold one.
-- **💰 Teams & Purse** — each team's total, spent and **remaining purse**, live.
-- **🏆 Squads** — each team's logo, name and the players they bought, with prices.
+- **💰 Teams & Purse** - each team's total, spent and **remaining purse**, live.
+- **🏆 Squads** - each team's logo, name and the players they bought, with prices.
 
 ### Auction intelligence (Phase E)
 
-- **📋 Live Squad Tracker** — a card per team in the Live Auction (visible to everyone):
+- **📋 Live Squad Tracker** - a card per team in the Live Auction (visible to everyone):
   player dots, `x / 5` slots, remaining purse, **Safe Bid**, average spend, and a
   green/yellow/red budget-health bar.
-- **Safe Bid & smart restrictions** — every team must finish with **5 players**, so the app
+- **Safe Bid & smart restrictions** - every team must finish with **5 players**, so the app
   reserves enough purse to fill empty slots and **disables bids above the Safe Bid**
   (`safeBid = remainingPurse − max(0, slotsLeft−1) × cheapestAvailableBase`). A team that's
   full (5 players) can't bid.
-- **📊 Insights tab** — live, read-only analytics derived entirely from local state: most
+- **📊 Insights tab** - live, read-only analytics derived entirely from local state: most
   expensive / cheapest / averages, sold-vs-unsold, completion %, money spent/remaining,
   biggest bid war, plus Top Sold Players and Team Analytics tables and Chart.js charts (price
   histogram, sold/unsold, team spending, remaining purse). Charts degrade gracefully if the
-  Chart.js CDN is blocked — the numbers and tables still render.
-- **📈 Season stats** — players can carry optional historical stats (matches, runs, wickets,
+  Chart.js CDN is blocked - the numbers and tables still render.
+- **📈 Season stats** - players can carry optional historical stats (matches, runs, wickets,
   strike rate, economy, average, fantasy points, previous price), entered in the player form
   under *Season stats (optional)* and shown as a card under the photo during the auction.
-- **✨ Polish** — a confetti burst at auction completion, plus glow and pulse animations.
+- **✨ Polish** - a confetti burst at auction completion, plus glow and pulse animations.
 
 ---
 
@@ -158,11 +158,11 @@ storage and does **not** touch the auction.
 ### Concepts
 
 - **Teams** and **Players** (each player belongs to a team).
-- **Contestants** — the people playing fantasy (your friends/participants).
-- **Match Days** — each day picks which teams are playing, records every player's
+- **Contestants** - the people playing fantasy (your friends/participants).
+- **Match Days** - each day picks which teams are playing, records every player's
   performance, and holds each contestant's **entry** (their picked squad).
 
-### Match Day (📅) — build entries & enter results
+### Match Day (📅) - build entries & enter results
 
 - Create a day (date + optional label) and choose which **teams** play that day.
 - Each **contestant's entry** picks players from that day's pool and designates a
@@ -180,16 +180,16 @@ entry points   = sum of the entry's player points (with C/VC multipliers)
 
 - **Day Standings** rank that day's entries by points (🥇🥈🥉).
 - **Leaderboards (🏆)**:
-  - **Contestants** — every contestant ranked by **total** points across all days that
+  - **Contestants** - every contestant ranked by **total** points across all days that
     have results.
-  - **Player of the Season (⭐)** — top players ranked by total fantasy points.
+  - **Player of the Season (⭐)** - top players ranked by total fantasy points.
   - Totals are shown in **yellow**; ranking is by total.
 
 ### 📷 Share as image
 
 Both leaderboards and the Day Standings card have a **📷 Share** button that renders a
 branded, dark-themed **PNG** (1080px wide, league title + subheading + date + medal
-badges + the *HC Champions League* footer) and downloads it — ready to post in a group
+badges + the *HC Champions League* footer) and downloads it - ready to post in a group
 chat. Built with the `html-to-image` library (loaded from a CDN).
 
 ---
@@ -210,7 +210,7 @@ auction/league/teamLogos/{teamId}        { data: <base64> } ← one image per do
 - `onSnapshot` listeners mirror server state into the app **in real time**; local edits are
   pushed back as a **minimal diff** (only changed/added/removed docs, in small batches).
 - The auction is **presenter-driven** (last-write-wins): whoever is running it drives the
-  state for everyone — it is deliberately *not* crowd-bidding.
+  state for everyone - it is deliberately *not* crowd-bidding.
 - **Images live in their own one-image-per-document collections** (`playerPhotos`,
   `teamLogos`) so the heavy base64 blobs never bloat the frequently-synced player/team
   docs (which would otherwise hit Firestore's write-size limits and fail). Every signed-in
@@ -222,8 +222,8 @@ auction/league/teamLogos/{teamId}        { data: <base64> } ← one image per do
 
 If you built teams/players on one device before turning on live mode, sign in there, open
 **Setup → Data & Backup**, and click **☁ Upload local data to cloud** (this row appears
-once live sync is active). It pushes this device's saved data — including photos and
-logos — into the shared cloud. Other signed-in devices then receive everything live.
+once live sync is active). It pushes this device's saved data - including photos and
+logos - into the shared cloud. Other signed-in devices then receive everything live.
 
 ---
 
@@ -231,11 +231,11 @@ logos — into the shared cloud. Other signed-in devices then receive everything
 
 In **Setup → Data & Backup**:
 
-- **⬇ Export backup** — downloads a `.json` of the whole auction. Keep it safe.
-- **⬆ Import backup** — restore from a `.json` (e.g. onto another laptop).
-- **Re-open unsold players** — puts unsold players back up for auction.
-- **Reset auction results** — keeps teams/players but clears all sales and refills purses.
-- **Erase everything** — wipes back to empty.
+- **⬇ Export backup** - downloads a `.json` of the whole auction. Keep it safe.
+- **⬆ Import backup** - restore from a `.json` (e.g. onto another laptop).
+- **Re-open unsold players** - puts unsold players back up for auction.
+- **Reset auction results** - keeps teams/players but clears all sales and refills purses.
+- **Erase everything** - wipes back to empty.
 
 The fantasy module has its own export/import in the Fantasy tab.
 
@@ -246,7 +246,7 @@ The fantasy module has its own export/import in the Fantasy tab.
 
 ## 🚀 Running it
 
-**Open it directly** — double-click `index.html`. (With no Firebase config it runs as a
+**Open it directly** - double-click `index.html`. (With no Firebase config it runs as a
 local single-device tool.)
 
 **Run a tiny local server** (recommended; some browsers restrict storage on `file://`):
@@ -257,7 +257,7 @@ python -m http.server 8000
 # then open http://localhost:8000
 ```
 
-There is **nothing to install or build** — no `npm install`, no compile step.
+There is **nothing to install or build** - no `npm install`, no compile step.
 
 ---
 
@@ -276,17 +276,17 @@ To deploy your own copy: push this folder to a static host and make sure
 
 Live mode needs a Firebase project with **Authentication** and **Firestore**:
 
-1. **Firestore Database** — create it (in production mode).
-2. **Authentication** — enable the **Google** sign-in provider, and add your site's domain
+1. **Firestore Database** - create it (in production mode).
+2. **Authentication** - enable the **Google** sign-in provider, and add your site's domain
    to the **Authorized domains** list. For OAuth, the redirect URI
    `https://<your-domain>/__/auth/handler` must be allowed.
-3. **Security rules** — paste the contents of `firestore.rules` into
+3. **Security rules** - paste the contents of `firestore.rules` into
    *Firestore → Rules → Publish*. They enforce: signed-in to read, editors-only to write,
    admins-only to manage roles, and an owner-email bootstrap admin.
-4. **Config** — put your project's public web config in `firebase-config.js`, and set the
+4. **Config** - put your project's public web config in `firebase-config.js`, and set the
    admin/owner email there and in `firestore.rules`.
 
-> The values in `firebase-config.js` are **public client keys** (safe to commit) — access
+> The values in `firebase-config.js` are **public client keys** (safe to commit) - access
 > is protected by the Firestore security rules, not by hiding the config.
 
 ---
@@ -326,7 +326,7 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
   local storage; Firestore takes over transparently in cloud mode.
 - **`window.HCCL`** is the bridge the auction/fantasy modules use for auth state, roles
   (`canEdit()`, `isAdmin()`), the `onChange` sign-in hook, and Firestore helpers.
-- **Image sharing** uses `html-to-image` and **charts** use `Chart.js` — both from a CDN, no
+- **Image sharing** uses `html-to-image` and **charts** use `Chart.js` - both from a CDN, no
   npm/build step.
 - **Resilient by design:** every cloud path has a local-storage fallback, so a blocked or
   offline Firestore never bricks the app.

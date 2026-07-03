@@ -1,5 +1,5 @@
 /* ============================================================
-   Firebase bootstrap (ES module via CDN — no build step).
+   Firebase bootstrap (ES module via CDN - no build step).
    Phase B: Google sign-in + role provisioning (users/{uid}).
    Exposes a small window.HCCL API that later phases (real-time
    data sync) build on. If config is missing, the app keeps
@@ -100,7 +100,7 @@ function buildMembersModal() {
       sel.setAttribute("data-prev", role);
       notify(`Role updated to ${role}`, "good");
       if (window.HCCL.user && window.HCCL.user.uid === uid) {
-        // Changed my own role — reflect it immediately.
+        // Changed my own role - reflect it immediately.
         window.HCCL.role = role; applyRoleAttr(); renderAuthBox();
       }
     } catch (err) {
@@ -141,7 +141,7 @@ async function refreshMembers() {
     list.innerHTML = members.map(memberRowHtml).join("") || `<p class="members-hint">No members yet.</p>`;
   } catch (e) {
     console.error(e);
-    list.innerHTML = `<p class="members-hint">Couldn't load members. If the console shows <b>ERR_BLOCKED_BY_CLIENT</b> or "client is offline", an ad-blocker / privacy shield is blocking Firestore — allow this site, then retry.</p>`;
+    list.innerHTML = `<p class="members-hint">Couldn't load members. If the console shows <b>ERR_BLOCKED_BY_CLIENT</b> or "client is offline", an ad-blocker / privacy shield is blocking Firestore - allow this site, then retry.</p>`;
   }
 }
 
@@ -209,7 +209,7 @@ try {
     const auth = getAuth(app);
     // Auto-detect long-polling: falls back from the streaming WebChannel to
     // plain XHR long-polling on restrictive networks/proxies. (Does NOT defeat
-    // a deliberate ad-block rule on firestore.googleapis.com — that needs the
+    // a deliberate ad-block rule on firestore.googleapis.com - that needs the
     // user to whitelist the site.)
     const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
     const provider = new GoogleAuthProvider();
@@ -267,7 +267,7 @@ try {
           console.error("role provisioning failed (did you publish firestore.rules?)", e);
         }
         // The bootstrap owner is ALWAYS admin in the UI, even if the role write
-        // was blocked (e.g. rules not published yet) — so the owner is never
+        // was blocked (e.g. rules not published yet) - so the owner is never
         // locked out of the controls.
         if (owner) role = "admin";
         window.HCCL.user = { uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL };

@@ -1,17 +1,17 @@
 /* ============================================================
-   HCCL Player Ranking ENGINE  (data + math only — no UI)
+   HCCL Player Ranking ENGINE  (data + math only - no UI)
 
    Consumed by ranking.js (the UI). Exposes window.HCCLRanking:
-     onChange(cb)      — subscribe; called (immediately if ready) when
+     onChange(cb)      - subscribe; called (immediately if ready) when
                          rankings are (re)computed
-     getRanking(cat)   — "batting" | "bowling" | "allrounder" →
+     getRanking(cat)   - "batting" | "bowling" | "allrounder" →
                          { available, updated, rows:[{pos,name,rating}] }
-     refresh()         — re-fetch the CSVs and recompute
+     refresh()         - re-fetch the CSVs and recompute
 
    DATA FLOW
    1. On load, fetch every season CSV listed in SEASONS (the folder is
       served as a static asset). Each file is one season's cumulative
-      player stats — a weekly export mid-season simply REPLACES that
+      player stats - a weekly export mid-season simply REPLACES that
       season's snapshot; older seasons are never touched.
    2. Parsed snapshots are merged into a history store in localStorage
       (keyed by season id → append/update, never overwrite the rest),
@@ -19,22 +19,22 @@
    3. Rankings are recalculated from the FULL history every load and
       the latest result is saved as a dated snapshot.
 
-   WEEKLY UPDATES — two ways:
+   WEEKLY UPDATES - two ways:
    a) In-app: an admin/moderator uses the "Weekly Stats Import" card on
       the Player Ranking page (importSeasonCSV). Instant, but local to
       that device until the CSV is also committed.
-   b) Repo: overwrite the current season's CSV (e.g. S6.csv) — or add
-      S7.csv plus one line in SEASONS — commit, deploy. Every device
+   b) Repo: overwrite the current season's CSV (e.g. S6.csv) - or add
+      S7.csv plus one line in SEASONS - commit, deploy. Every device
       re-imports and re-ranks on next load. A manual in-app import for
       a season takes precedence over the fetched baseline on that device.
 
-   RATING MODEL — based on the "HCCL Batting Rankings Explanation" PDF:
+   RATING MODEL - based on the "HCCL Batting Rankings Explanation" PDF:
      Rating = 100 + 5×Career + 3×RecentForm + 1×Achievements + 1×Experience
      (each component 0–100, rating clamped to the 0–1000 scale)
    Career/achievements are normalized against the best QUALIFIED player
    (score = player ÷ best × 100). The PDF's "last 5 matches" form is
    season-based here (the CSVs are per-season), using recency weights:
-   latest 1.00, then 0.80, 0.60, 0.40, 0.20 for older seasons — plus an
+   latest 1.00, then 0.80, 0.60, 0.40, 0.20 for older seasons - plus an
    inactivity decay so players who stopped playing fade over time.
    A confidence factor shrinks ratings toward the 100 base when a
    player has too few innings to judge reliably.
@@ -142,7 +142,7 @@
   }
 
   // One CSV row → a normalized per-season player snapshot. Missing
-  // columns/values just become 0 — a thinner weekly export still works.
+  // columns/values just become 0 - a thinner weekly export still works.
   function normalizeRow(r) {
     return {
       name: displayName(r["Player Name"]),
@@ -192,7 +192,7 @@
   }
   function saveHistory(h) {
     if (!hasStorage) return;
-    try { localStorage.setItem(KEY_HISTORY, JSON.stringify(h)); } catch (e) { /* full — history is rebuilt from CSVs anyway */ }
+    try { localStorage.setItem(KEY_HISTORY, JSON.stringify(h)); } catch (e) { /* full - history is rebuilt from CSVs anyway */ }
   }
   // Append/update one season snapshot; the rest of history is untouched.
   // `source` is "file" (baseline CSV fetched from the repo) or "import"
@@ -262,7 +262,7 @@
                 + 0.10 * ratioHi(dotPct(c.bowl), P.maxDot));
   }
 
-  // Same shapes applied to a single season row (vs per-season pools) —
+  // Same shapes applied to a single season row (vs per-season pools) -
   // these feed the recency-weighted form component.
   const seasonBatScore = (s, P) => 100 * (0.5 * ratioHi(s.bat.runs, P.maxRuns)
     + 0.3 * ratioHi(batAvg(s.bat), P.maxAvg) + 0.2 * ratioHi(batSR(s.bat), P.maxSR));
@@ -274,7 +274,7 @@
 
   // Recency-weighted form: weighted mean of season scores (weights by how
   // long ago the season was), then decayed by the weight of the player's
-  // most recent season — so inactive players fade instead of freezing.
+  // most recent season - so inactive players fade instead of freezing.
   function formScore(c, latestOrder, played, score) {
     const rows = c.seasons.filter(x => played(x.snap));
     if (!rows.length) return 0;
@@ -306,7 +306,7 @@
     const batQ = careers.filter(batQualified);
     const bowlQ = careers.filter(bowlQualified);
 
-    // Normalization pools — "best qualified player" per the PDF.
+    // Normalization pools - "best qualified player" per the PDF.
     const batPool = {
       maxRuns: Math.max(0, ...batQ.map(c => c.bat.runs)),
       maxAvg: Math.max(0, ...batQ.map(c => batAvg(c.bat))),
@@ -363,7 +363,7 @@
       date: dateStr,
       batting: list(batQ, c => ratings.get(c.key).bat),
       bowling: list(bowlQ, c => ratings.get(c.key).bowl),
-      // All-rounder: balanced 50/50 combination via the geometric mean —
+      // All-rounder: balanced 50/50 combination via the geometric mean -
       // a player must contribute with BOTH bat and ball to rank highly
       // (one-dimensional stars can't ride a single skill to the top).
       allrounder: list(careers.filter(c => batQualified(c) && bowlQualified(c)),
@@ -392,7 +392,7 @@
     let fetched = 0;
     if (typeof fetch === "function") {
       await Promise.all(SEASONS.map(async se => {
-        // A manual weekly import is fresher than the committed baseline CSV —
+        // A manual weekly import is fresher than the committed baseline CSV -
         // don't clobber it on reload. (Committing the new CSV replaces it for
         // everyone; a newer manual import replaces it on this device.)
         const cur = history.seasons[se.id];
@@ -402,7 +402,7 @@
           if (!res.ok) return;
           const players = parseSeasonCSV(await res.text());
           if (players.length) { mergeSeason(history, se.id, se.order, players, today(), "file"); fetched++; }
-        } catch (e) { /* offline / file:// — stored history covers us */ }
+        } catch (e) { /* offline / file:// - stored history covers us */ }
       }));
     }
     if (fetched) saveHistory(history);

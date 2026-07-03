@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// HCCL — Firestore Security Rules
+// HCCL - Firestore Security Rules
 // Deploy: Firebase console -> Firestore Database -> Rules -> paste -> Publish.
 // Roles: admin (all), moderator (edit/delete app data), viewer (read-only).
 // The owner email is the bootstrap admin (works even before its user doc exists).

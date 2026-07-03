@@ -1,6 +1,6 @@
 /* ============================================================
    Firebase web config for the existing "hand-cricket-league" project.
-   These are PUBLIC client keys (safe to ship) — real security is
+   These are PUBLIC client keys (safe to ship) - real security is
    enforced by Firestore Security Rules + Authorized domains.
    ============================================================ */
 window.FIREBASE_CONFIG = {
@@ -14,6 +14,6 @@ window.FIREBASE_CONFIG = {
   measurementId: "G-F64F1YN320"
 };
 
-// First admin(s) — provisioned automatically on first sign-in.
+// First admin(s) - provisioned automatically on first sign-in.
 // Must match the owner email(s) in firestore.rules (isOwner()).
 window.HCCL_ADMIN_EMAILS = ["kavindu.kasthu@gmail.com"];
