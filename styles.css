@@ -96,6 +96,22 @@ body {
   border-color: transparent;
 }
 
+/* ===================== SUB-TABS (inside the Auctions section) ===================== */
+.subtabs {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 22px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.subtab {
+  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+  padding: 8px 15px; border-radius: 999px; cursor: pointer;
+  font-size: 13px; font-weight: 600; transition: all 0.15s ease;
+}
+.subtab:hover { color: var(--text); border-color: #4a4a52; }
+.subtab.active { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+.subview { display: none; }
+.subview.active { display: block; animation: fade 0.25s ease; }
+
 /* ===================== LAYOUT ===================== */
 .app-main { padding: clamp(14px, 3vw, 30px); max-width: 1400px; margin: 0 auto; }
 .view { display: none; animation: fade 0.25s ease; }

@@ -373,8 +373,17 @@ function toast(msg, kind = "") {
 function switchTab(name) {
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
-  if (name === "insights") renderInsights(); // build charts now that the view is visible
 }
+
+/* Auctions sub-tabs: Auction Room / Players / Teams & Purse / Dashboard. */
+function switchSubTab(name) {
+  $$(".subtab").forEach(t => t.classList.toggle("active", t.dataset.subtab === name));
+  $$(".subview").forEach(v => v.classList.toggle("active", v.id === "subview-" + name));
+  if (name === "dashboard") renderInsights(); // build charts now that the dashboard is visible
+}
+
+/* Jump to the Auctions section, optionally to a sub-tab (defaults to the Auction Room). */
+function goAuctions(sub = "auction") { switchTab("auctions"); switchSubTab(sub); }
 
 /* ============================================================
    RENDER
@@ -737,7 +746,7 @@ function auctionNow(playerId) {
   state.auction.lastResult = null;
   resetBidState();
   save();
-  switchTab("auction");
+  goAuctions();
   renderAll();
 }
 
@@ -772,7 +781,7 @@ function overlayVisible() { return !$("#overlay").classList.contains("hidden"); 
 let insCharts = {};
 
 function renderInsights() {
-  const view = $("#view-insights");
+  const view = $("#subview-dashboard");
   if (!view) return;
   const teams = state.teams, players = state.players;
   const sold = players.filter(p => p.status === "sold" && !p.retained);
@@ -1312,7 +1321,7 @@ function loadSample() {
   save();
   fillSettingsInputs();
   renderAll();
-  switchTab("auction");
+  goAuctions();
   toast("Sample data loaded", "good");
 }
 function reauctionUnsold() {
@@ -1321,7 +1330,7 @@ function reauctionUnsold() {
   u.forEach(p => { p.status = "available"; });
   save();
   renderAll();
-  switchTab("auction");
+  goAuctions();
   toast(`${u.length} player(s) re-opened`, "good");
 }
 function resetAuction() {
@@ -1354,7 +1363,15 @@ function wireEvents() {
   // tabs
   $("#tabs").addEventListener("click", e => {
     const tab = e.target.closest(".tab");
-    if (tab) switchTab(tab.dataset.tab);
+    if (!tab) return;
+    switchTab(tab.dataset.tab);
+    if (tab.dataset.tab === "auctions") switchSubTab("auction"); // land on Auction Room by default
+  });
+  // Auctions sub-tab bar (Auction Room / Players / Teams & Purse / Dashboard)
+  const subtabs = $("#auctionSubtabs");
+  if (subtabs) subtabs.addEventListener("click", e => {
+    const st = e.target.closest(".subtab");
+    if (st) switchSubTab(st.dataset.subtab);
   });
 
   // any [data-goto] button (empty state, overlay)
@@ -1450,7 +1467,7 @@ function wireEvents() {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nextPlayer(); }
       return;
     }
-    if (!$("#view-auction").classList.contains("active")) return;
+    if (!$("#subview-auction").classList.contains("active")) return;
     if (e.key >= "1" && e.key <= "9") {
       const t = state.teams[+e.key - 1];
       if (t) placeBid(t.id);

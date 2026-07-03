@@ -24,21 +24,27 @@
       </div>
     </div>
     <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="auction">🔨 Live Auction</button>
-      <button class="tab" data-tab="players">👥 Players</button>
-      <button class="tab" data-tab="purse">💰 Teams &amp; Purse</button>
+      <button class="tab active" data-tab="auctions">🔨 Auctions</button>
       <button class="tab" data-tab="squads">🏆 Squads</button>
-      <button class="tab" data-tab="insights">📊 Insights</button>
-      <button class="tab" data-tab="setup">⚙️ Setup</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
+      <button class="tab" data-tab="setup">⚙️ Setup</button>
     </nav>
     <div class="auth-box" id="authBox"></div>
   </header>
 
   <main class="app-main">
 
-    <!-- ===================== LIVE AUCTION ===================== -->
-    <section class="view active" id="view-auction">
+    <!-- ============ AUCTIONS: Auction Room / Players / Teams & Purse / Dashboard ============ -->
+    <section class="view active" id="view-auctions">
+      <nav class="subtabs" id="auctionSubtabs">
+        <button class="subtab active" data-subtab="auction">🔨 Auction Room</button>
+        <button class="subtab" data-subtab="players">👥 Players</button>
+        <button class="subtab" data-subtab="purse">💰 Teams &amp; Purse</button>
+        <button class="subtab" data-subtab="dashboard">📊 Dashboard</button>
+      </nav>
+
+      <!-- Auction Room sub-tab -->
+      <div class="subview active" id="subview-auction">
       <div id="auctionEmpty" class="empty-state hidden">
         <h2>No players to auction yet</h2>
         <p>Go to the <strong>⚙️ Setup</strong> tab to add teams and players, or load the sample data to try it out.</p>
@@ -92,10 +98,10 @@
 
       <!-- Live Squad Tracker (all teams) -->
       <div id="squadTracker" class="squad-tracker"></div>
-    </section>
+      </div><!-- /subview-auction -->
 
-    <!-- ===================== PLAYERS ===================== -->
-    <section class="view" id="view-players">
+      <!-- Players sub-tab -->
+      <div class="subview" id="subview-players">
       <div class="view-head">
         <h2>PLAYERS</h2>
         <div class="view-head-tools">
@@ -110,13 +116,17 @@
         </div>
       </div>
       <div class="players-grid" id="playersGrid"></div>
-    </section>
+      </div><!-- /subview-players -->
 
-    <!-- ===================== TEAMS & PURSE ===================== -->
-    <section class="view" id="view-purse">
-      <div class="view-head"><h2>TEAMS &amp; REMAINING PURSE</h2></div>
-      <div class="purse-grid" id="purseGrid"></div>
-    </section>
+      <!-- Teams & Purse sub-tab -->
+      <div class="subview" id="subview-purse">
+        <div class="view-head"><h2>TEAMS &amp; REMAINING PURSE</h2></div>
+        <div class="purse-grid" id="purseGrid"></div>
+      </div><!-- /subview-purse -->
+
+      <!-- Dashboard sub-tab (Insights — built by app.js renderInsights) -->
+      <div class="subview" id="subview-dashboard"></div>
+    </section><!-- /view-auctions -->
 
     <!-- ===================== SQUADS ===================== -->
     <section class="view" id="view-squads">
@@ -270,9 +280,6 @@
 
       </div>
     </section>
-
-    <!-- ===================== INSIGHTS (built by app.js renderInsights) ============ -->
-    <section class="view" id="view-insights"></section>
 
     <!-- ===================== FANTASY (built by fantasy.js) ===================== -->
     <section class="view" id="view-fantasy"></section>
