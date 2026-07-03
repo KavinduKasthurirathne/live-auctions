@@ -27,6 +27,7 @@
       <button class="tab active" data-tab="auctions">🔨 Auctions</button>
       <button class="tab" data-tab="squads">🏆 Squads</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
+      <button class="tab" data-tab="ranking">📈 Player Ranking</button>
       <button class="tab" data-tab="setup">⚙️ Setup</button>
     </nav>
     <div class="auth-box" id="authBox"></div>
@@ -284,6 +285,9 @@
     <!-- ===================== FANTASY (built by fantasy.js) ===================== -->
     <section class="view" id="view-fantasy"></section>
 
+    <!-- ===================== PLAYER RANKING (built by ranking.js) ===================== -->
+    <section class="view" id="view-ranking"></section>
+
   </main>
 
   <!-- ===================== RESULT OVERLAY ===================== -->
@@ -309,6 +313,8 @@
   <!-- Charts for the 📊 Insights tab (exposes window.Chart). Degrades gracefully if blocked. -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="fantasy.js"></script>
+  <!-- Player Ranking section (UI scaffold; placeholder data) -->
+  <script src="ranking.js"></script>
   <!-- Auth + roles (Google sign-in); exposes window.HCCL -->
   <script type="module" src="firebase-init.js"></script>
 </body>

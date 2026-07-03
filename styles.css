@@ -102,13 +102,13 @@ body {
   margin-bottom: 22px; padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
 }
-.subtab {
+.subtab, .rank-subtab {
   background: var(--panel); border: 1px solid var(--border); color: var(--muted);
   padding: 8px 15px; border-radius: 999px; cursor: pointer;
   font-size: 13px; font-weight: 600; transition: all 0.15s ease;
 }
-.subtab:hover { color: var(--text); border-color: #4a4a52; }
-.subtab.active { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+.subtab:hover, .rank-subtab:hover { color: var(--text); border-color: #4a4a52; }
+.subtab.active, .rank-subtab.active { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
 .subview { display: none; }
 .subview.active { display: block; animation: fade 0.25s ease; }
 
@@ -534,4 +534,34 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 @keyframes ledGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.0); }
   50% { box-shadow: 0 0 0 4px rgba(34,197,94,0.22); }
+}
+
+/* ===================== PLAYER RANKING ===================== */
+.rank-panel { display: none; }
+.rank-panel.active { display: block; animation: fade 0.25s ease; }
+.rank-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 6px 6px 4px; max-width: 620px; }
+.rank-table { width: 100%; border-collapse: collapse; }
+.rank-table th, .rank-table td { padding: 12px 16px; text-align: left; }
+.rank-table thead th { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+.rank-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.05); transition: background .15s ease; }
+.rank-table tbody tr:last-child { border-bottom: none; }
+.rank-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+.rank-table th.rk-pos, .rank-table td.rk-pos { width: 62px; text-align: center; }
+.rank-table td.rk-pos { font-family: "Heading Pro", sans-serif; font-weight: 700; font-size: 16px; color: var(--yellow); }
+.rank-table td.rk-name { color: var(--text); font-weight: 600; }
+.rank-table .rk-rating { text-align: right; }
+.rank-table td.rk-rating { font-weight: 800; color: var(--yellow); font-variant-numeric: tabular-nums; }
+.rank-expand {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; margin-top: 2px; padding: 11px; cursor: pointer;
+  background: transparent; border: none; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 13px; font-weight: 600; font-family: inherit; transition: color .15s ease;
+}
+.rank-expand:hover { color: var(--text); }
+.rank-chevron { display: inline-block; transition: transform .2s ease; }
+.rank-expand[aria-expanded="true"] .rank-chevron { transform: rotate(180deg); }
+.rank-foot { color: var(--muted); font-size: 12px; font-style: italic; padding: 8px 16px 6px; }
+@media (max-width: 560px) {
+  .rank-card { max-width: 100%; }
+  .rank-table th, .rank-table td { padding: 10px 12px; }
 }
