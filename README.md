@@ -40,16 +40,14 @@ Two ways to run, automatically chosen:
   full-screen result reveal.
 - 📋 **Live Squad Tracker + Safe Bid** — every team's slots, purse and budget health at a
   glance; bids are capped so no team can spend itself out of completing a 5-player squad.
-- 🏑 **Captains raise the paddle from their phones** — transaction-safe live bidding, with an
-  animated raise feed on the presenter screen.
-- 📊 **Auction Insights tab** — live analytics, top-buys/role-spend/team tables, and Chart.js
+- 📊 **Auction Insights tab** — live analytics, top-buys and team tables, and Chart.js
   visualisations, all derived client-side (no extra reads).
 - 📈 **Optional player season stats** shown on the block; ✨ confetti, glow and pulse polish.
 - 🏏 **Fantasy league** with match days, captain/vice-captain multipliers, live points,
   season leaderboards and a Player of the Season board.
 - ☁️ **Real-time sync** via Firestore — auction and fantasy state mirror instantly to
   every signed-in device.
-- 🔐 **Google sign-in with Admin / Moderator / Captain / Viewer roles** and a members screen.
+- 🔐 **Google sign-in with Admin / Moderator / Viewer roles** and a members screen.
 - 🖼️ **Player photos & team logos in the cloud**, stored so every viewer sees them.
 - 📷 **Share leaderboards as branded PNG images** (one-tap download).
 - 💾 **Export / import JSON backups** any time, and a graceful offline fallback.
@@ -66,11 +64,9 @@ Google before you can see anything. Each user has one of three roles:
 |------|--------|
 | **Admin** | Everything: run the auction, edit fantasy, **and manage members/roles**. |
 | **Moderator** | Create / update / delete auction **and** fantasy data. No role management. |
-| **Captain** | Read-only **except** they may **raise bids** for their one assigned team (the Raise Paddle) and view all insights. No selling, setup, or editing. |
 | **Viewer** | Read-only. Sees the auction, squads, fantasy and leaderboards — no edit controls, no setup pages. |
 
-> Captains are assigned a single team by an admin in the **👤 Members** screen. The
-> hierarchy is **admin ▸ moderator ▸ captain ▸ viewer**.
+> The role hierarchy is **admin ▸ moderator ▸ viewer**.
 
 - The **owner email** (configured in `firestore.rules` and `firebase-config.js`) is always
   treated as an admin, even before any profile exists — it bootstraps the system.
@@ -133,7 +129,7 @@ Google before you can see anything. Each user has one of three roles:
 - **💰 Teams & Purse** — each team's total, spent and **remaining purse**, live.
 - **🏆 Squads** — each team's logo, name and the players they bought, with prices.
 
-### Auction intelligence & captains (Phase E)
+### Auction intelligence (Phase E)
 
 - **📋 Live Squad Tracker** — a card per team in the Live Auction (visible to everyone):
   player dots, `x / 5` slots, remaining purse, **Safe Bid**, average spend, and a
@@ -141,13 +137,7 @@ Google before you can see anything. Each user has one of three roles:
 - **Safe Bid & smart restrictions** — every team must finish with **5 players**, so the app
   reserves enough purse to fill empty slots and **disables bids above the Safe Bid**
   (`safeBid = remainingPurse − max(0, slotsLeft−1) × cheapestAvailableBase`). A team that's
-  full (5 players) can't bid. This applies to the presenter and to captains alike.
-- **🏑 Captains & Raise Paddle** — an admin gives a member the **captain** role and a team in
-  **👤 Members**. That captain signs in on their own phone and sees a single big **RAISE
-  PADDLE** dashboard (team name, purse, slots, Safe Bid). Tapping it raises the live bid.
-  Bids commit through a **Firestore transaction**, so simultaneous taps never drop or double a
-  bid, and the presenter screen shows an animated `🔥 raised paddle` feed. The auctioneer
-  still controls SOLD / Unsold / Undo / Next.
+  full (5 players) can't bid.
 - **📊 Insights tab** — live, read-only analytics derived entirely from local state: most
   expensive / cheapest / averages, sold-vs-unsold, completion %, money spent/remaining,
   biggest bid war, plus Top Sold Players and Team Analytics tables and Chart.js charts (price
@@ -316,12 +306,12 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 | File | Purpose |
 |------|---------|
 | `index.html` | Page structure (header, auction tabs, Insights view, fantasy mount, overlays) |
-| `app.js` | Auction logic, Squad Tracker/Safe Bid, captain paddle + bid transaction, Insights, season stats, confetti, Firestore sync |
+| `app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, confetti, Firestore sync |
 | `fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
-| `firebase-init.js` | Google auth, roles (incl. captain + team), members screen, sign-in wall, `window.HCCL` API |
+| `firebase-init.js` | Google auth, roles, members screen, sign-in wall, `window.HCCL` API |
 | `firebase-config.js` | Public Firebase web config + admin email list |
-| `firestore.rules` | Security rules (roles, read/write gating, captain live-bid rule) |
-| `styles.css` | Theme + auction UI + Squad Tracker / captain / insights / role gating |
+| `firestore.rules` | Security rules (roles, read/write gating) |
+| `styles.css` | Theme + auction UI + Squad Tracker / insights / role gating |
 | `fantasy.css` | Fantasy tab styling |
 | `brand-logo.jpg` | League logo for the sign-in wall and default favicon |
 | `vercel.json` | Static host config / optional auth rewrites |
@@ -335,13 +325,9 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 - **Two storage seams:** `hccl_auction_v1` (auction) and `hccl_fantasy_v1` (fantasy) in
   local storage; Firestore takes over transparently in cloud mode.
 - **`window.HCCL`** is the bridge the auction/fantasy modules use for auth state, roles
-  (`canEdit()`, `isAdmin()`, `isCaptain()`, `canBid()`, `teamId`), the `onChange` sign-in
-  hook, and Firestore helpers (incl. `runTransaction`).
+  (`canEdit()`, `isAdmin()`), the `onChange` sign-in hook, and Firestore helpers.
 - **Image sharing** uses `html-to-image` and **charts** use `Chart.js` — both from a CDN, no
   npm/build step.
-- **Captain bids** are the only multi-writer path, so each one commits via a Firestore
-  **transaction** on `auction/league/state/live`; a dedicated rule lets captains write **only**
-  that doc.
 - **Resilient by design:** every cloud path has a local-storage fallback, so a blocked or
   offline Firestore never bricks the app.
 
@@ -349,6 +335,4 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 - **Player:** `stats { matches, runs, wickets, strikeRate, economy, average, fantasyPoints,
   previousPrice }`, and `soldBids` (bid count captured at sale, for "Biggest Bid War"). Both
   ride inside the existing player doc.
-- **User profile:** `teamId` — the single team a captain bids for (set by an admin).
-- **Bid-log entries:** `by` (`"presenter"` | `"captain"`) — marks who raised each bid.
-- **New role** `captain`; the hard squad cap is **5 players** (`MAX_PLAYERS` in `app.js`).
+- The hard squad cap is **5 players** (`MAX_PLAYERS` in `app.js`).

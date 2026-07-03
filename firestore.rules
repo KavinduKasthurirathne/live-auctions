@@ -2,8 +2,7 @@ rules_version = '2';
 
 // HCCL — Firestore Security Rules
 // Deploy: Firebase console -> Firestore Database -> Rules -> paste -> Publish.
-// Roles: admin (all), moderator (edit/delete app data), captain (read + raise bids
-// on the live auction doc ONLY), viewer (read-only).
+// Roles: admin (all), moderator (edit/delete app data), viewer (read-only).
 // The owner email is the bootstrap admin (works even before its user doc exists).
 
 service cloud.firestore {
@@ -26,11 +25,6 @@ service cloud.firestore {
     }
     function canEdit() {
       return isAdmin() || (signedIn() && hasUserDoc() && myRole() == 'moderator');
-    }
-    // Captains (Phase E) are read-only EXCEPT they may raise auction bids — see the
-    // dedicated /auction/league/state/live rule below. They are NOT editors.
-    function isCaptain() {
-      return signedIn() && hasUserDoc() && myRole() == 'captain';
     }
 
     // User profiles + roles
@@ -58,15 +52,6 @@ service cloud.firestore {
     match /auction/{document=**} {
       allow read: if signedIn();
       allow write: if canEdit();
-    }
-
-    // Captain bidding (Phase E): the live auction state is the ONLY thing captains may
-    // write — this is how "raise paddle" works. Firestore grants access if ANY matching
-    // rule allows, so this only widens write access for this single doc; teams, players,
-    // settings, photos, fantasy and user roles all stay editor/admin-only above.
-    match /auction/league/state/live {
-      allow read: if signedIn();
-      allow write: if canEdit() || isCaptain();
     }
   }
 }

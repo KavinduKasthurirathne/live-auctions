@@ -417,8 +417,6 @@ function ensureCurrentPlayer() {
 function renderAuction() {
   ensureCurrentPlayer();
   renderSquadTracker();
-  renderCaptainCard();
-  detectRaise(state.auction);
   maybeAnnounceComplete();
   const player = currentPlayer();
   const stage = $("#auctionStage");
@@ -565,75 +563,6 @@ function renderSquadTracker() {
     }).join("")}</div>`;
 }
 
-/* Captain Dashboard — a single mobile-first card with the team's live numbers and a big
-   RAISE PADDLE. Only rendered for a signed-in captain who has been assigned a team. */
-function renderCaptainCard() {
-  const box = $("#captainCard");
-  if (!box) return;
-  const H = window.HCCL;
-  if (!H || !H.configured || !H.isCaptain || !H.isCaptain() || !H.teamId) { box.innerHTML = ""; return; }
-  const t = getTeam(H.teamId);
-  if (!t) { box.innerHTML = `<div class="captain-card"><p class="cap-reason">Your team isn't in this auction yet — ask the admin.</p></div>`; return; }
-  const info = squadInfo(state, t.id);
-  const bought = state.players.filter(p => p.status === "sold" && !p.retained && p.soldTo === t.id);
-  const avg = bought.length ? info.spent / bought.length : 0;
-  const player = currentPlayer();
-  const a = state.auction;
-  const next = nextBidAmount();
-  const leading = a.currentBidderId === t.id;
-  const full = info.slotsLeft <= 0;
-  const overSafe = info.safeBid < next;
-  const biddable = !!player && player.status === "available" && !a.lastResult;
-  const shownBid = a.currentBidderId ? a.currentBid : (player ? player.basePrice : 0);
-  const canRaise = biddable && !leading && !full && !overSafe;
-  const reason = !biddable ? "Waiting for the next player…"
-    : leading ? "★ You're the leading bidder"
-    : full ? "Squad full (5 players)"
-    : overSafe ? "Safe Bid reached — can't raise further" : "";
-  box.innerHTML = `<div class="captain-card${leading ? " leading" : ""}">
-    <div class="cap-head">${logoHTML("cap-logo", t.logo, t.name)}
-      <div><div class="cap-team">${esc(t.name)}</div><div class="cap-sub">Your paddle</div></div></div>
-    <div class="cap-block">${player
-      ? `On the block: <b>${esc(player.name)}</b> · Current bid <b>${money(shownBid)}</b>`
-      : "Waiting for the next player…"}</div>
-    <div class="cap-stats">
-      <div><span class="cap-k">Purse</span><span class="cap-v">${money(info.remaining)}</span></div>
-      <div><span class="cap-k">Slots</span><span class="cap-v">${info.slotsLeft}</span></div>
-      <div><span class="cap-k">Safe Bid</span><span class="cap-v safe">${money(Math.max(0, info.safeBid))}</span></div>
-      <div><span class="cap-k">Avg Spend</span><span class="cap-v">${bought.length ? money(avg) : "—"}</span></div>
-    </div>
-    <button class="paddle-btn" id="btnRaisePaddle"${canRaise ? "" : " disabled"}>🏏 RAISE PADDLE${canRaise ? ` · ${money(next)}` : ""}</button>
-    ${reason ? `<div class="cap-reason">${esc(reason)}</div>` : ""}
-  </div>`;
-  const btn = $("#btnRaisePaddle");
-  if (btn) btn.onclick = () => placeBid(t.id, "captain");
-}
-
-/* Floating "raised paddle" feed (Feature 5) — announce each new bid, then fade. */
-function showRaise(teamName, amount) {
-  const feed = $("#raiseFeed");
-  if (!feed) return;
-  const chip = document.createElement("div");
-  chip.className = "raise-chip";
-  chip.innerHTML = `🔥 <b>${esc(teamName)}</b> raised paddle <span class="amt">${money(amount)}</span>`;
-  feed.appendChild(chip);
-  requestAnimationFrame(() => chip.classList.add("show"));
-  setTimeout(() => { chip.classList.add("out"); setTimeout(() => chip.remove(), 420); }, 2600);
-  while (feed.children.length > 4) feed.firstChild.remove();
-}
-
-/* Detect a brand-new bid between renders and announce it (+ sound). bidLog resets to []
-   on a new player, so we only celebrate when the count grows. */
-let auLastBidCount = null;
-function detectRaise(a) {
-  const count = (a.bidLog || []).length;
-  if (auLastBidCount === null) { auLastBidCount = count; return; } // first paint: stay quiet
-  if (count > auLastBidCount && a.currentBidderId) {
-    const t = getTeam(a.currentBidderId);
-    if (t) showRaise(t.name, a.currentBid);
-  }
-  auLastBidCount = count;
-}
 
 /* Fire a one-time confetti + sound the moment the auction finishes (every player
    resolved). Resets if the auction is re-opened. Stays quiet on initial page load. */
@@ -701,9 +630,8 @@ function resetBidState() {
 }
 
 /* Pure bid rule. Returns the new auction object, or null if the bid isn't allowed.
-   `source` ("presenter" | "captain") is stamped on the bid-log entry. Enforces the
-   hard 5-player squad cap and the Safe Bid budget guard (see squadInfo). */
-function computeBidResult(s, teamId, source = "presenter") {
+   Enforces the hard 5-player squad cap and the Safe Bid budget guard (see squadInfo). */
+function computeBidResult(s, teamId) {
   const a = s.auction;
   if (!a || a.lastResult) return null;                 // not while a SOLD/UNSOLD result is showing
   if (a.currentBidderId === teamId) return null;       // can't out-bid yourself
@@ -719,45 +647,18 @@ function computeBidResult(s, teamId, source = "presenter") {
   return {
     currentPlayerId: a.currentPlayerId,
     currentBid: amount, currentBidderId: teamId, soldStage: 0,
-    bidLog: [...(a.bidLog || []), { teamId, amount, by: source }],
+    bidLog: [...(a.bidLog || []), { teamId, amount }],
     lastResult: null,
   };
 }
 
-/* Place a bid. In cloud mode bids commit through a Firestore transaction so multiple
-   captains tapping at once can't clobber each other; offline we mutate locally. */
-function placeBid(teamId, source = "presenter") {
-  if (auUsingFirestore && auApi() && auApi().runTransaction) { commitBid(teamId, source); return; }
-  const res = computeBidResult(state, teamId, source);
+/* Place a bid (auctioneer-driven). Mutates local state; save() syncs it to the cloud. */
+function placeBid(teamId) {
+  const res = computeBidResult(state, teamId);
   if (!res) { const t = getTeam(teamId); if (t) toast(`${t.name} can't place that bid`, "bad"); return; }
   state.auction = res;
   save();
   renderAuction();
-}
-
-/* Transaction-safe bid: read the SERVER live doc, apply the same pure rule against it,
-   write it back atomically. The live onSnapshot then re-renders every device. */
-async function commitBid(teamId, source = "presenter") {
-  const api = auApi(), db = auDb(), liveRef = auStateRef("live");
-  try {
-    await api.runTransaction(db, async (tx) => {
-      const snap = await tx.get(liveRef);
-      const live = snap.exists() ? snap.data() : null;
-      const auction = { ...defaultState().auction, ...((live && live.auction) || {}) };
-      // Cold start: if no presenter has written the live doc yet, seed the player on the
-      // block from this device's own pick so the very first bid still works.
-      if (!auction.currentPlayerId) auction.currentPlayerId = state.auction.currentPlayerId || null;
-      if (!Array.isArray(auction.bidLog)) auction.bidLog = [];
-      const s = { players: state.players, teams: state.teams, settings: state.settings, auction };
-      const res = computeBidResult(s, teamId, source);
-      if (!res) throw new Error("BID_REJECTED");
-      tx.set(liveRef, { auction: res, lastAction: (live && live.lastAction) || null });
-    });
-  } catch (e) {
-    if (e && e.message === "BID_REJECTED") {
-      const t = getTeam(teamId); if (t) toast(`${t.name} can't place that bid`, "bad");
-    } else { console.error("bid transaction failed:", e); toast("Couldn't place bid — try again", "bad"); }
-  }
 }
 
 function advanceSold() {  const a = state.auction;

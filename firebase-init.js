@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp,
-  collection, getDocs, writeBatch, runTransaction,
+  collection, getDocs, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const listeners = new Set();
@@ -28,18 +28,13 @@ window.HCCL = {
   configured: false,
   ready: false,
   user: null,            // { uid, email, displayName, photoURL }
-  role: "none",          // none | viewer | captain | moderator | admin
-  teamId: null,          // for captains: the one team they bid for (set by an admin)
+  role: "none",          // none | viewer | moderator | admin
   canEdit() { return this.role === "admin" || this.role === "moderator"; },
   isAdmin() { return this.role === "admin"; },
-  isCaptain() { return this.role === "captain"; },
-  canBid() { return this.canEdit() || this.isCaptain(); }, // who may raise auction bids
   onChange(cb) { listeners.add(cb); if (this.ready) cb(this); return () => listeners.delete(cb); },
   signIn() {}, signOut() {},
   listMembers() { return Promise.resolve([]); },     // admin: read all users/{uid}
   setMemberRole() { return Promise.resolve(); },     // admin: change a user's role
-  setMemberTeam() { return Promise.resolve(); },     // admin: assign a captain's team
-  listAuctionTeams() { return Promise.resolve([]); },// teams for the captain assignment UI
   db: null,
   fs: null,              // Firestore fns for later phases (doc, getDoc, onSnapshot, …)
 };
@@ -74,9 +69,8 @@ function renderAuthBox() {
 }
 
 /* ---------- admin: Members & Roles screen ---------- */
-const ROLES = ["admin", "moderator", "captain", "viewer"]; // hierarchy order
+const ROLES = ["admin", "moderator", "viewer"]; // hierarchy order
 let membersBackdrop = null;
-let auctionTeams = []; // [{ id, name }] — loaded when the modal opens, for captain assignment
 
 function buildMembersModal() {
   membersBackdrop = document.createElement("div");
@@ -95,48 +89,26 @@ function buildMembersModal() {
     if (e.target === membersBackdrop || e.target.id === "membersClose") membersBackdrop.classList.add("hidden");
   });
   membersBackdrop.addEventListener("change", async (e) => {
-    const roleSel = e.target.closest(".member-role-select");
-    if (roleSel) {
-      const uid = roleSel.getAttribute("data-uid");
-      const role = roleSel.value;
-      const prev = roleSel.getAttribute("data-prev") || "viewer";
-      roleSel.disabled = true;
-      try {
-        await window.HCCL.setMemberRole(uid, role);
-        roleSel.setAttribute("data-prev", role);
-        notify(`Role updated to ${role}`, "good");
-        if (window.HCCL.user && window.HCCL.user.uid === uid) {
-          // Changed my own role — reflect it immediately.
-          window.HCCL.role = role; applyRoleAttr(); renderAuthBox();
-        }
-        refreshMembers(); // show/hide the captain team picker for the new role
-      } catch (err) {
-        console.error(err);
-        roleSel.value = prev; // revert the dropdown
-        notify("Couldn't update role (need admin + published rules)", "bad");
-      } finally {
-        roleSel.disabled = false;
+    const sel = e.target.closest(".member-role-select");
+    if (!sel) return;
+    const uid = sel.getAttribute("data-uid");
+    const role = sel.value;
+    const prev = sel.getAttribute("data-prev") || "viewer";
+    sel.disabled = true;
+    try {
+      await window.HCCL.setMemberRole(uid, role);
+      sel.setAttribute("data-prev", role);
+      notify(`Role updated to ${role}`, "good");
+      if (window.HCCL.user && window.HCCL.user.uid === uid) {
+        // Changed my own role — reflect it immediately.
+        window.HCCL.role = role; applyRoleAttr(); renderAuthBox();
       }
-      return;
-    }
-    const teamSel = e.target.closest(".member-team-select");
-    if (teamSel) {
-      const uid = teamSel.getAttribute("data-uid");
-      const teamId = teamSel.value;
-      const prev = teamSel.getAttribute("data-prev") || "";
-      teamSel.disabled = true;
-      try {
-        await window.HCCL.setMemberTeam(uid, teamId);
-        teamSel.setAttribute("data-prev", teamId);
-        notify("Captain team updated", "good");
-        if (window.HCCL.user && window.HCCL.user.uid === uid) window.HCCL.teamId = teamId || null;
-      } catch (err) {
-        console.error(err);
-        teamSel.value = prev;
-        notify("Couldn't assign team (need admin + published rules)", "bad");
-      } finally {
-        teamSel.disabled = false;
-      }
+    } catch (err) {
+      console.error(err);
+      sel.value = prev; // revert the dropdown
+      notify("Couldn't update role (need admin + published rules)", "bad");
+    } finally {
+      sel.disabled = false;
     }
   });
 }
@@ -147,20 +119,12 @@ function memberRowHtml(m) {
   const avatar = m.photoURL
     ? `<img src="${esc(m.photoURL)}" alt="" referrerpolicy="no-referrer"/>`
     : `<div class="member-avatar">${initial}</div>`;
-  // Captains are tied to a single team; show a team picker on captain rows only.
-  const teamPicker = m.role === "captain"
-    ? `<select class="member-team-select" data-uid="${esc(m.uid)}" data-prev="${esc(m.teamId || "")}" title="Captain's team">
-        <option value="">— team —</option>
-        ${auctionTeams.map(t => `<option value="${esc(t.id)}" ${m.teamId === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("")}
-      </select>`
-    : "";
   return `<div class="member-row">
       ${avatar}
       <div class="member-meta">
         <span class="member-name">${esc(m.displayName || "(no name)")}${isSelf ? " · you" : ""}</span>
         <span class="member-email">${esc(m.email || "")}</span>
       </div>
-      ${teamPicker}
       <select class="member-role-select" data-uid="${esc(m.uid)}" data-prev="${esc(m.role || "viewer")}">
         ${ROLES.map(r => `<option value="${r}" ${m.role === r ? "selected" : ""}>${r}</option>`).join("")}
       </select>
@@ -172,11 +136,7 @@ async function refreshMembers() {
   if (!list) return;
   list.innerHTML = `<p class="members-hint">Loading…</p>`;
   try {
-    const [members, teams] = await Promise.all([
-      window.HCCL.listMembers(),
-      window.HCCL.listAuctionTeams().catch(() => []),
-    ]);
-    auctionTeams = teams || [];
+    const members = await window.HCCL.listMembers();
     members.sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || (a.email || "").localeCompare(b.email || ""));
     list.innerHTML = members.map(memberRowHtml).join("") || `<p class="members-hint">No members yet.</p>`;
   } catch (e) {
@@ -256,7 +216,7 @@ try {
 
     window.HCCL.configured = true;
     window.HCCL.db = db;
-    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection, getDocs, writeBatch, runTransaction };
+    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection, getDocs, writeBatch };
     window.HCCL.listMembers = async () => {
       const snap = await getDocs(collection(db, "users"));
       return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
@@ -264,15 +224,6 @@ try {
     window.HCCL.setMemberRole = async (uid, role) => {
       if (!ROLES.includes(role)) throw new Error("invalid role");
       await updateDoc(doc(db, "users", uid), { role });
-    };
-    window.HCCL.setMemberTeam = async (uid, teamId) => {
-      await updateDoc(doc(db, "users", uid), { teamId: teamId || "" });
-    };
-    window.HCCL.listAuctionTeams = async () => {
-      const snap = await getDocs(collection(db, "auction", "league", "teams"));
-      return snap.docs
-        .map(d => ({ id: d.id, name: d.data().name || "(team)", order: d.data().order || 0 }))
-        .sort((a, b) => a.order - b.order);
     };
     // Popup first (nicer UX); if the browser blocks it, fall back to a
     // full-page redirect, which popup blockers can't stop.
@@ -293,7 +244,6 @@ try {
       if (user) {
         const owner = (window.HCCL_ADMIN_EMAILS || []).includes(user.email);
         let role = "viewer";
-        let teamId = null;
         try {
           const ref = doc(db, "users", user.uid);
           let snap = await getDoc(ref);
@@ -313,7 +263,6 @@ try {
             snap = await getDoc(ref);
           }
           role = (snap.exists() && snap.data().role) || "viewer";
-          teamId = (snap.exists() && snap.data().teamId) || null;
         } catch (e) {
           console.error("role provisioning failed (did you publish firestore.rules?)", e);
         }
@@ -323,11 +272,9 @@ try {
         if (owner) role = "admin";
         window.HCCL.user = { uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL };
         window.HCCL.role = role;
-        window.HCCL.teamId = role === "captain" ? teamId : null;
       } else {
         window.HCCL.user = null;
         window.HCCL.role = "none";
-        window.HCCL.teamId = null;
       }
       window.HCCL.ready = true;
       applyRoleAttr();
