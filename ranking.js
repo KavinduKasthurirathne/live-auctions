@@ -1,31 +1,27 @@
 /* ============================================================
-   HCCL Player Ranking  (UI scaffold — placeholder data only)
+   HCCL Player Ranking — UI layer
 
-   Self-contained module that renders into #view-ranking. It has
-   NO real ranking logic yet: every row comes from placeholderRows().
-   To wire real rankings in later, replace placeholderRows(cat) with
-   a function that returns [{ pos, name, rating }] for the category —
-   nothing else in this file needs to change.
+   Renders into #view-ranking. All data and math live in
+   ranking-engine.js (window.HCCLRanking); this file only draws.
 
    UX note: Player Ranking is a *dedicated ranking view* — a calm,
-   read-only "who's on top" board that is deliberately kept separate
-   from the Auctions and Fantasy flows (different mental model: season
-   standings, not live bidding or fantasy points). It still lives in the
-   main navbar so it feels like a first-class destination, and reuses the
-   app's tab/card/table styling so it fits in naturally. Each category is
-   a sub-tab, the table shows the top 10 by default, and an expand arrow
-   reveals the rest — keeping the default view focused and uncluttered.
+   read-only "who's on top" board kept separate from the Auctions and
+   Fantasy flows (different mental model: season standings, not live
+   bidding or fantasy points). It still lives in the main navbar so it
+   feels like a first-class destination, and reuses the app's tab/card/
+   table styling so it fits in naturally. Each category is a sub-tab,
+   the table shows the top 10 by default, and an expand arrow reveals
+   the rest — keeping the default view focused and uncluttered.
    ============================================================ */
 (function () {
   "use strict";
 
-  const LAST_UPDATED = "2026-07-03"; // placeholder "as of" date — wire to real data later
-  const TOP_N = 10;                  // rows visible before expanding
+  const TOP_N = 10; // rows visible before expanding
 
   const CATS = [
-    { key: "batting",    label: "🏏 Batting",     noun: "Batter" },
-    { key: "bowling",    label: "🎯 Bowling",     noun: "Bowler" },
-    { key: "allrounder", label: "⭐ All-Rounder", noun: "All-Rounder" },
+    { key: "batting",    label: "🏏 Batting" },
+    { key: "bowling",    label: "🎯 Bowling" },
+    { key: "allrounder", label: "⭐ All-Rounder" },
   ];
 
   // View state (persists while the page is open).
@@ -36,16 +32,7 @@
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  /* PLACEHOLDER DATA — replace this with real ranking data later.
-     Returns a ranked list [{ pos, name, rating }] for a category. */
-  function placeholderRows(cat) {
-    const meta = CATS.find(c => c.key === cat) || CATS[0];
-    const rows = [];
-    for (let i = 1; i <= 16; i++) {
-      rows.push({ pos: i, name: `${meta.noun} ${i}`, rating: 950 - (i - 1) * 11 });
-    }
-    return rows;
-  }
+  const engine = () => window.HCCLRanking || null;
 
   function posCell(pos) {
     const medal = pos === 1 ? "🥇" : pos === 2 ? "🥈" : pos === 3 ? "🥉" : "";
@@ -53,7 +40,18 @@
   }
 
   function tableFor(cat) {
-    const rows = placeholderRows(cat);
+    const eng = engine();
+    const data = eng ? eng.getRanking(cat) : { loading: false, available: false, rows: [], updated: null };
+
+    if (data.loading) {
+      return `<div class="rank-card"><p class="rank-empty">Computing rankings…</p></div>`;
+    }
+    if (!data.available) {
+      return `<div class="rank-card"><p class="rank-empty">No ranking data yet.<br/>
+        Add the season CSV exports to the <b>HCCL Player Stats</b> folder and reload.</p></div>`;
+    }
+
+    const rows = data.rows;
     const expanded = !!ui.expanded[cat];
     const shown = expanded ? rows : rows.slice(0, TOP_N);
     const hasMore = rows.length > TOP_N;
@@ -80,7 +78,7 @@
           <tbody>${body}</tbody>
         </table>
         ${expander}
-        <p class="rank-foot">* as of ${esc(LAST_UPDATED)}</p>
+        <p class="rank-foot">* as of ${esc(data.updated || "—")}</p>
       </div>`;
   }
 
@@ -113,6 +111,9 @@
     if (tabs) tabs.addEventListener("click", e => {
       if (e.target.closest('[data-tab="ranking"]')) { ui.cat = "batting"; render(); }
     });
+    // Re-draw whenever the engine finishes (re)computing.
+    const eng = engine();
+    if (eng) eng.onChange(render);
     render();
   }
 

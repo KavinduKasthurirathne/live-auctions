@@ -561,6 +561,7 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .rank-chevron { display: inline-block; transition: transform .2s ease; }
 .rank-expand[aria-expanded="true"] .rank-chevron { transform: rotate(180deg); }
 .rank-foot { color: var(--muted); font-size: 12px; font-style: italic; padding: 8px 16px 6px; }
+.rank-empty { color: var(--muted); font-size: 14px; text-align: center; padding: 34px 18px; line-height: 1.6; }
 @media (max-width: 560px) {
   .rank-card { max-width: 100%; }
   .rank-table th, .rank-table td { padding: 10px 12px; }
