@@ -19,9 +19,14 @@
    3. Rankings are recalculated from the FULL history every load and
       the latest result is saved as a dated snapshot.
 
-   WEEKLY UPDATES: overwrite the current season's CSV (e.g. S6.csv)
-   with the new export — or add S7.csv plus one line in SEASONS —
-   commit, deploy. Next page load re-imports and re-ranks.
+   WEEKLY UPDATES — two ways:
+   a) In-app: an admin/moderator uses the "Weekly Stats Import" card on
+      the Player Ranking page (importSeasonCSV). Instant, but local to
+      that device until the CSV is also committed.
+   b) Repo: overwrite the current season's CSV (e.g. S6.csv) — or add
+      S7.csv plus one line in SEASONS — commit, deploy. Every device
+      re-imports and re-ranks on next load. A manual in-app import for
+      a season takes precedence over the fetched baseline on that device.
 
    RATING MODEL — based on the "HCCL Batting Rankings Explanation" PDF:
      Rating = 100 + 5×Career + 3×RecentForm + 1×Achievements + 1×Experience
@@ -190,9 +195,19 @@
     try { localStorage.setItem(KEY_HISTORY, JSON.stringify(h)); } catch (e) { /* full — history is rebuilt from CSVs anyway */ }
   }
   // Append/update one season snapshot; the rest of history is untouched.
-  function mergeSeason(history, id, order, players, importedAt) {
-    history.seasons[id] = { id, order, importedAt, players };
+  // `source` is "file" (baseline CSV fetched from the repo) or "import"
+  // (weekly CSV uploaded by an admin/moderator on this device).
+  function mergeSeason(history, id, order, players, importedAt, source) {
+    history.seasons[id] = { id, order, importedAt, source: source || "file", players };
     return history;
+  }
+
+  // Manifest ∪ history, sorted oldest → newest (for the import season picker).
+  function knownSeasons(history) {
+    const map = new Map();
+    SEASONS.forEach(s => map.set(s.id, { id: s.id, order: s.order }));
+    Object.values((history || loadHistory()).seasons || {}).forEach(s => map.set(s.id, { id: s.id, order: s.order }));
+    return [...map.values()].sort((a, b) => a.order - b.order);
   }
 
   /* ------------------------- rating engine ------------------------- */
@@ -377,11 +392,16 @@
     let fetched = 0;
     if (typeof fetch === "function") {
       await Promise.all(SEASONS.map(async se => {
+        // A manual weekly import is fresher than the committed baseline CSV —
+        // don't clobber it on reload. (Committing the new CSV replaces it for
+        // everyone; a newer manual import replaces it on this device.)
+        const cur = history.seasons[se.id];
+        if (cur && cur.source === "import") return;
         try {
           const res = await fetch(encodeURI(se.file), { cache: "no-store" });
           if (!res.ok) return;
           const players = parseSeasonCSV(await res.text());
-          if (players.length) { mergeSeason(history, se.id, se.order, players, today()); fetched++; }
+          if (players.length) { mergeSeason(history, se.id, se.order, players, today(), "file"); fetched++; }
         } catch (e) { /* offline / file:// — stored history covers us */ }
       }));
     }
@@ -405,6 +425,32 @@
       return { loading: state.status === "loading", available: rows.length > 0, updated: snap ? snap.date : null, rows };
     },
     refresh() { state.status = "loading"; emit(); return importAndCompute(); },
+
+    // Seasons for the import picker: known ones plus the next new id.
+    getSeasons() {
+      const seasons = knownSeasons();
+      const nextOrder = seasons.length ? seasons[seasons.length - 1].order + 1 : 1;
+      return { seasons, next: { id: "S" + nextOrder, order: nextOrder } };
+    },
+
+    // Admin/moderator weekly import: one season's cumulative CSV export.
+    // Updates that season in the local history (never touches the others),
+    // recalculates from full history, and notifies the UI. Synchronous.
+    importSeasonCSV(seasonId, csvText) {
+      const players = parseSeasonCSV(String(csvText || ""));
+      if (!players.length) return { ok: false, error: "No player rows found in that CSV" };
+      const history = loadHistory();
+      const known = knownSeasons(history);
+      const existing = known.find(s => s.id === seasonId);
+      const order = existing ? existing.order : (known.length ? known[known.length - 1].order + 1 : 1);
+      mergeSeason(history, seasonId, order, players, today(), "import");
+      saveHistory(history);
+      state.snapshot = computeAll(history, today());
+      saveSnapshot(state.snapshot);
+      state.status = "ready";
+      emit();
+      return { ok: true, count: players.length, seasonId };
+    },
   };
 
   if (typeof window !== "undefined") {
