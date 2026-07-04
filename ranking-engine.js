@@ -28,16 +28,27 @@
       re-imports and re-ranks on next load. A manual in-app import for
       a season takes precedence over the fetched baseline on that device.
 
-   RATING MODEL - based on the "HCCL Batting Rankings Explanation" PDF:
-     Rating = 100 + 5×Career + 3×RecentForm + 1×Achievements + 1×Experience
-     (each component 0–100, rating clamped to the 0–1000 scale)
-   Career/achievements are normalized against the best QUALIFIED player
-   (score = player ÷ best × 100). The PDF's "last 5 matches" form is
-   season-based here (the CSVs are per-season), using recency weights:
-   latest 1.00, then 0.80, 0.60, 0.40, 0.20 for older seasons - plus an
-   inactivity decay so players who stopped playing fade over time.
-   A confidence factor shrinks ratings toward the 100 base when a
-   player has too few innings to judge reliably.
+   RATING MODEL - structure from the "HCCL Batting Rankings Explanation"
+   PDF (career + form + achievements + experience, 0-1000 scale), made
+   recency-first:
+     Rating = 100 + 4.5×Career + 3.5×Form + 1×Achievements + 1×Experience
+     (each component 0-100, rating clamped to 0-1000)
+   - EVERYTHING decays. Career totals, rates and achievement points are
+     recency-weighted sums with an exponential half-life (a season played
+     H seasons ago counts 50%, 2H ago 25%, ...) - history still counts,
+     but an old great can't sit on a rating forever.
+   - Form uses a much shorter half-life, so the latest season carries
+     about as much weight as all older ones combined, and it decays
+     further with how long ago the player last appeared - a player in
+     hot current form rises fast; an absent one slides.
+   - Components are normalized against an ADAPTIVE benchmark - the mean
+     of the top-k qualified values - not the single all-time best, so one
+     historical outlier can't permanently deflate everyone else.
+   - Experience and confidence use smooth continuous curves (no step
+     tiers); confidence shrinks ratings toward the 100 base when a
+     player has too few innings to judge reliably.
+   Qualification still uses RAW career totals (history is never erased,
+   it just stops dominating). All tuning lives in the MODEL block below.
    ============================================================ */
 (function () {
   "use strict";
@@ -55,25 +66,36 @@
     { id: "S6", order: 6, file: "HCCL Player Stats/S6.csv" },
   ];
 
-  // Recency weights by "seasons ago" from the league's latest season
-  // (index 0 = latest). Anything older uses the last entry.
-  const RECENCY = [1.0, 0.8, 0.6, 0.4, 0.2];
+  // ---- rating model tuning (every dial in one place) ----
+  const MODEL = {
+    // Exponential decay half-lives, in seasons: weight = 0.5^(ago/H).
+    // A season H seasons ago counts 50% of the current one, 2H ago 25%...
+    HALF_LIFE_FORM: 1.0,    // form reacts fast - latest season dominates
+    HALF_LIFE_CAREER: 2.5,  // career + achievements fade slower, but DO fade
+    // Adaptive normalization benchmark: the mean of the top-k qualified
+    // values (k = max(MIN, PCT of the pool)) instead of the single
+    // all-time best, so one historical outlier can't deflate everyone.
+    TOP_K_MIN: 3, TOP_K_PCT: 0.10,
+    // Smooth confidence (Hill curve): inns² / (inns² + H²).
+    // H innings = 50% trust; ~30 innings ≈ 90%. No hard step anywhere.
+    CONF_HALF_INNINGS: 10,
+    // Smooth experience: 100 × min(1, (inns/FULL)^GAMMA). Tracks the old
+    // PDF tier table closely but with no jumps between tiers.
+    EXP_FULL_INNINGS: 50, EXP_GAMMA: 1.3,
+    // Final blend (sums to 10 → 0-1000 with the 100 base). Form is up
+    // vs the PDF (3 → 3.5) and career down (5 → 4.5): career itself is
+    // already recency-decayed, so current impact leads the rating.
+    WEIGHTS: { career: 4.5, form: 3.5, ach: 1, exp: 1 },
+  };
 
   // Qualification for the official lists (per the PDF for batting;
-  // bowling mirrors it). Unqualified players still accumulate ratings
+  // bowling mirrors it) - based on RAW career totals, so nobody is
+  // disqualified by decay. Unqualified players still accumulate ratings
   // internally but are not shown.
   const QUAL = {
     batting: { innings: 10, runs: 100 },
     bowling: { innings: 10, wickets: 10 },
   };
-
-  // Confidence: full trust at this many career innings; below it the
-  // rating shrinks toward the 100 base (rating = 100 + conf×(raw−100)).
-  const CONF_FULL_INNINGS = 20;
-
-  // Experience score from career innings (PDF table), linearly
-  // interpolated between the anchor points.
-  const EXP_CURVE = [[0, 0], [10, 10], [20, 20], [30, 40], [40, 70], [50, 100]];
 
   // Career achievement points (PDF: Thirty +15, Fifty +35, POM +50;
   // hundreds are an extension of the same ladder).
@@ -101,13 +123,18 @@
   const nameKey = s => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
   const displayName = s => String(s || "").trim().replace(/\s+/g, " ");
 
-  function interp(curve, x) {
-    if (x <= curve[0][0]) return curve[0][1];
-    for (let i = 1; i < curve.length; i++) {
-      const [x1, y1] = curve[i - 1], [x2, y2] = curve[i];
-      if (x <= x2) return y1 + (y2 - y1) * ((x - x1) / (x2 - x1));
-    }
-    return curve[curve.length - 1][1];
+  // Exponential recency decay: 1.0 now, 0.5 one half-life ago, 0.25 two...
+  const decay = (seasonsAgo, halfLife) => Math.pow(0.5, Math.max(0, seasonsAgo) / halfLife);
+
+  // Adaptive benchmarks: the mean of the k best values in the pool.
+  const topK = poolSize => Math.max(MODEL.TOP_K_MIN, Math.round(poolSize * MODEL.TOP_K_PCT));
+  function benchHi(values, k) {
+    const v = values.filter(x => isFinite(x)).sort((a, b) => b - a).slice(0, k);
+    return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0;
+  }
+  function benchLo(values, k) { // "lower is better" pools (avg, economy)
+    const v = values.filter(x => isFinite(x) && x > 0).sort((a, b) => a - b).slice(0, k);
+    return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0;
   }
 
   /* -------------------------- CSV parsing -------------------------- */
@@ -246,56 +273,81 @@
   const batQualified = c => c.bat.inns >= QUAL.batting.innings && c.bat.runs >= QUAL.batting.runs;
   const bowlQualified = c => c.bowl.inns >= QUAL.bowling.innings && c.bowl.wkts >= QUAL.bowling.wickets;
 
-  // Career score (PDF): 50% volume + 30% average + 20% strike-rate/economy
-  // shape, each normalized against the best qualified career.
-  function careerBatScore(c, P) {
-    return 100 * (0.5 * ratioHi(c.bat.runs, P.maxRuns)
-                + 0.3 * ratioHi(batAvg(c.bat), P.maxAvg)
-                + 0.2 * ratioHi(batSR(c.bat), P.maxSR));
+  // Recency-decayed career aggregates: every season's counting stats are
+  // scaled by the career half-life before summing, and the rates (average,
+  // strike rate, economy, dot%) are then computed from the DECAYED
+  // numerators and denominators. Recent seasons dominate the career view;
+  // old ones fade smoothly instead of propping a rating up forever.
+  // Achievement points decay the same way - a 2019 fifty is worth less
+  // than last week's. (Raw totals still drive qualification + experience.)
+  function decayedCareer(c, latestOrder) {
+    const bat = { runs: 0, inns: 0, notOuts: 0, balls: 0 };
+    const bowl = { wkts: 0, inns: 0, conceded: 0, balls: 0, dots: 0 };
+    let achBat = 0, achBowl = 0;
+    c.seasons.forEach(({ order, snap }) => {
+      const w = decay(latestOrder - order, MODEL.HALF_LIFE_CAREER);
+      bat.runs += w * snap.bat.runs; bat.inns += w * snap.bat.inns;
+      bat.notOuts += w * snap.bat.notOuts; bat.balls += w * snap.bat.balls;
+      bowl.wkts += w * snap.bowl.wkts; bowl.inns += w * snap.bowl.inns;
+      bowl.conceded += w * snap.bowl.conceded; bowl.balls += w * snap.bowl.balls;
+      bowl.dots += w * snap.bowl.dots;
+      achBat += w * (ACH_BAT.t30 * snap.bat.t30 + ACH_BAT.t50 * snap.bat.t50 + ACH_BAT.t100 * snap.bat.t100 + ACH_BAT.pom * snap.pom);
+      achBowl += w * (ACH_BOWL.w3 * snap.bowl.w3 + ACH_BOWL.w5 * snap.bowl.w5 + ACH_BOWL.maiden * snap.bowl.maidens + ACH_BOWL.pom * snap.pom);
+    });
+    return { bat, bowl, achBat, achBowl };
+  }
+
+  // Career score: 50% volume + 30% average + 20% strike rate (PDF shape),
+  // on DECAYED aggregates, normalized vs the adaptive top-k benchmark.
+  function careerBatScore(b, P) {
+    return 100 * (0.5 * ratioHi(b.runs, P.benchRuns)
+                + 0.3 * ratioHi(batAvg(b), P.benchAvg)
+                + 0.2 * ratioHi(batSR(b), P.benchSR));
   }
   // Bowling mirrors it: 50% wickets + 25% average + 15% economy + 10% dot%.
   // (Bowling SR is implicit: avg = economy × SR ÷ 6.)
-  function careerBowlScore(c, P) {
-    return 100 * (0.5 * ratioHi(c.bowl.wkts, P.maxWkts)
-                + 0.25 * ratioLo(P.minAvg, bowlAvg(c.bowl))
-                + 0.15 * ratioLo(P.minEco, bowlEco(c.bowl))
-                + 0.10 * ratioHi(dotPct(c.bowl), P.maxDot));
+  function careerBowlScore(b, P) {
+    return 100 * (0.5 * ratioHi(b.wkts, P.benchWkts)
+                + 0.25 * ratioLo(P.benchAvg, bowlAvg(b))
+                + 0.15 * ratioLo(P.benchEco, bowlEco(b))
+                + 0.10 * ratioHi(dotPct(b), P.benchDot));
   }
 
-  // Same shapes applied to a single season row (vs per-season pools) -
-  // these feed the recency-weighted form component.
-  const seasonBatScore = (s, P) => 100 * (0.5 * ratioHi(s.bat.runs, P.maxRuns)
-    + 0.3 * ratioHi(batAvg(s.bat), P.maxAvg) + 0.2 * ratioHi(batSR(s.bat), P.maxSR));
-  const seasonBowlScore = (s, P) => 100 * (0.5 * ratioHi(s.bowl.wkts, P.maxWkts)
-    + 0.25 * ratioLo(P.minAvg, bowlAvg(s.bowl)) + 0.15 * ratioLo(P.minEco, bowlEco(s.bowl))
-    + 0.10 * ratioHi(dotPct(s.bowl), P.maxDot));
+  // Same shapes applied to a single season row (vs per-season benchmarks) -
+  // these feed the rolling form component.
+  const seasonBatScore = (s, P) => 100 * (0.5 * ratioHi(s.bat.runs, P.benchRuns)
+    + 0.3 * ratioHi(batAvg(s.bat), P.benchAvg) + 0.2 * ratioHi(batSR(s.bat), P.benchSR));
+  const seasonBowlScore = (s, P) => 100 * (0.5 * ratioHi(s.bowl.wkts, P.benchWkts)
+    + 0.25 * ratioLo(P.benchAvg, bowlAvg(s.bowl)) + 0.15 * ratioLo(P.benchEco, bowlEco(s.bowl))
+    + 0.10 * ratioHi(dotPct(s.bowl), P.benchDot));
 
-  const recencyWeight = seasonsAgo => RECENCY[Math.min(Math.max(seasonsAgo, 0), RECENCY.length - 1)];
-
-  // Recency-weighted form: weighted mean of season scores (weights by how
-  // long ago the season was), then decayed by the weight of the player's
-  // most recent season - so inactive players fade instead of freezing.
+  // Rolling recent form: exponential decay by seasons-ago (short half-life
+  // → the latest season carries roughly as much weight as ALL older ones
+  // combined, so hot current form rises fast). The weighted mean is then
+  // decayed again by how long ago the player last appeared, so inactive
+  // players slide instead of freezing at their peak.
   function formScore(c, latestOrder, played, score) {
     const rows = c.seasons.filter(x => played(x.snap));
     if (!rows.length) return 0;
     let sum = 0, wsum = 0, lastOrder = 0;
     rows.forEach(x => {
-      const w = recencyWeight(latestOrder - x.order);
+      const w = decay(latestOrder - x.order, MODEL.HALF_LIFE_FORM);
       sum += w * score(x.snap); wsum += w;
       lastOrder = Math.max(lastOrder, x.order);
     });
-    return (sum / wsum) * recencyWeight(latestOrder - lastOrder);
+    return (sum / wsum) * decay(latestOrder - lastOrder, MODEL.HALF_LIFE_FORM);
   }
 
-  const achBatPoints = c => ACH_BAT.t30 * c.bat.t30 + ACH_BAT.t50 * c.bat.t50 + ACH_BAT.t100 * c.bat.t100 + ACH_BAT.pom * c.pom;
-  const achBowlPoints = c => ACH_BOWL.w3 * c.bowl.w3 + ACH_BOWL.w5 * c.bowl.w5 + ACH_BOWL.maiden * c.bowl.maidens + ACH_BOWL.pom * c.pom;
+  // Smooth curves - no tier steps.
+  const expScore = inns => 100 * Math.min(1, Math.pow(Math.max(0, inns) / MODEL.EXP_FULL_INNINGS, MODEL.EXP_GAMMA));
+  const confidence = inns => (inns * inns) / (inns * inns + MODEL.CONF_HALF_INNINGS * MODEL.CONF_HALF_INNINGS);
 
-  // PDF final formula, shrunk toward the 100 base by the confidence
-  // factor and clamped to the 0–1000 scale.
+  // Final blend, shrunk toward the 100 base by the smooth confidence
+  // factor and clamped to the 0-1000 scale.
   function finalRating(career, form, ach, exp, inns) {
-    const raw = 100 + 5 * career + 3 * form + 1 * ach + 1 * exp;
-    const conf = clamp(inns / CONF_FULL_INNINGS, 0, 1);
-    return clamp(Math.round(100 + conf * (raw - 100)), 0, 1000);
+    const W = MODEL.WEIGHTS;
+    const raw = 100 + W.career * career + W.form * form + W.ach * ach + W.exp * exp;
+    return clamp(Math.round(100 + confidence(inns) * (raw - 100)), 0, 1000);
   }
 
   // Full recalculation from history → dated ranking snapshot.
@@ -306,50 +358,57 @@
     const batQ = careers.filter(batQualified);
     const bowlQ = careers.filter(bowlQualified);
 
-    // Normalization pools - "best qualified player" per the PDF.
+    // Decayed (recency-weighted) aggregates, once per career.
+    const D = new Map(careers.map(c => [c.key, decayedCareer(c, latestOrder)]));
+
+    // Adaptive career benchmarks: mean of the top-k DECAYED values among
+    // qualified players (top-k, not the single all-time best).
+    const kBat = topK(batQ.length), kBowl = topK(bowlQ.length);
     const batPool = {
-      maxRuns: Math.max(0, ...batQ.map(c => c.bat.runs)),
-      maxAvg: Math.max(0, ...batQ.map(c => batAvg(c.bat))),
-      maxSR: Math.max(0, ...batQ.map(c => batSR(c.bat))),
-      maxAch: Math.max(0, ...batQ.map(achBatPoints)),
+      benchRuns: benchHi(batQ.map(c => D.get(c.key).bat.runs), kBat),
+      benchAvg: benchHi(batQ.map(c => batAvg(D.get(c.key).bat)), kBat),
+      benchSR: benchHi(batQ.map(c => batSR(D.get(c.key).bat)), kBat),
+      benchAch: benchHi(batQ.map(c => D.get(c.key).achBat), kBat),
     };
-    const finiteMin = arr => { const v = arr.filter(x => isFinite(x) && x > 0); return v.length ? Math.min(...v) : 0; };
     const bowlPool = {
-      maxWkts: Math.max(0, ...bowlQ.map(c => c.bowl.wkts)),
-      minAvg: finiteMin(bowlQ.map(c => bowlAvg(c.bowl))),
-      minEco: finiteMin(bowlQ.map(c => bowlEco(c.bowl))),
-      maxDot: Math.max(0, ...bowlQ.map(c => dotPct(c.bowl))),
-      maxAch: Math.max(0, ...bowlQ.map(achBowlPoints)),
+      benchWkts: benchHi(bowlQ.map(c => D.get(c.key).bowl.wkts), kBowl),
+      benchAvg: benchLo(bowlQ.map(c => bowlAvg(D.get(c.key).bowl)), kBowl),
+      benchEco: benchLo(bowlQ.map(c => bowlEco(D.get(c.key).bowl)), kBowl),
+      benchDot: benchHi(bowlQ.map(c => dotPct(D.get(c.key).bowl)), kBowl),
+      benchAch: benchHi(bowlQ.map(c => D.get(c.key).achBowl), kBowl),
     };
-    // Season pools: best single-season figures across all played rows.
+    // Season benchmarks for the form component: top-k single-season
+    // figures across all played rows (any era - form is era-relative).
     const allSeasonRows = careers.flatMap(c => c.seasons.map(x => x.snap));
     const batRows = allSeasonRows.filter(s => s.bat.inns > 0);
     const bowlRows = allSeasonRows.filter(s => s.bowl.inns > 0);
+    const kBatS = topK(batRows.length), kBowlS = topK(bowlRows.length);
     const seasonBatPool = {
-      maxRuns: Math.max(0, ...batRows.map(s => s.bat.runs)),
-      maxAvg: Math.max(0, ...batRows.map(s => batAvg(s.bat))),
-      maxSR: Math.max(0, ...batRows.map(s => batSR(s.bat))),
+      benchRuns: benchHi(batRows.map(s => s.bat.runs), kBatS),
+      benchAvg: benchHi(batRows.map(s => batAvg(s.bat)), kBatS),
+      benchSR: benchHi(batRows.map(s => batSR(s.bat)), kBatS),
     };
     const seasonBowlPool = {
-      maxWkts: Math.max(0, ...bowlRows.map(s => s.bowl.wkts)),
-      minAvg: finiteMin(bowlRows.map(s => bowlAvg(s.bowl))),
-      minEco: finiteMin(bowlRows.map(s => bowlEco(s.bowl))),
-      maxDot: Math.max(0, ...bowlRows.map(s => dotPct(s.bowl))),
+      benchWkts: benchHi(bowlRows.map(s => s.bowl.wkts), kBowlS),
+      benchAvg: benchLo(bowlRows.map(s => bowlAvg(s.bowl)), kBowlS),
+      benchEco: benchLo(bowlRows.map(s => bowlEco(s.bowl)), kBowlS),
+      benchDot: benchHi(bowlRows.map(s => dotPct(s.bowl)), kBowlS),
     };
 
     const ratings = new Map(); // key → { bat, bowl }
     careers.forEach(c => {
+      const d = D.get(c.key);
       const bat = finalRating(
-        careerBatScore(c, batPool),
+        careerBatScore(d.bat, batPool),
         formScore(c, latestOrder, s => s.bat.inns > 0, s => seasonBatScore(s, seasonBatPool)),
-        100 * ratioHi(achBatPoints(c), batPool.maxAch),
-        interp(EXP_CURVE, c.bat.inns),
+        100 * ratioHi(d.achBat, batPool.benchAch),
+        expScore(c.bat.inns),
         c.bat.inns);
       const bowl = finalRating(
-        careerBowlScore(c, bowlPool),
+        careerBowlScore(d.bowl, bowlPool),
         formScore(c, latestOrder, s => s.bowl.inns > 0, s => seasonBowlScore(s, seasonBowlPool)),
-        100 * ratioHi(achBowlPoints(c), bowlPool.maxAch),
-        interp(EXP_CURVE, c.bowl.inns),
+        100 * ratioHi(d.achBowl, bowlPool.benchAch),
+        expScore(c.bowl.inns),
         c.bowl.inns);
       ratings.set(c.key, { bat, bowl });
     });
