@@ -551,6 +551,14 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .rank-table th.rk-pos, .rank-table td.rk-pos { width: 62px; text-align: center; }
 .rank-table td.rk-pos { font-family: "Heading Pro", sans-serif; font-weight: 700; font-size: 16px; color: var(--yellow); }
 .rank-table td.rk-name { color: var(--text); font-weight: 600; }
+.rank-table .rk-team { width: 70px; text-align: center; }
+.team-ico {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 8px; vertical-align: middle;
+  background-size: cover; background-position: center;
+  color: #fff; font-size: 13px; font-weight: 800;
+  border: 1px solid rgba(255,255,255,0.12);
+}
 .rank-table .rk-rating { text-align: right; }
 .rank-table td.rk-rating { font-weight: 800; color: var(--yellow); font-variant-numeric: tabular-nums; }
 .rank-expand {
