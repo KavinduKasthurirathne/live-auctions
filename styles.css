@@ -442,7 +442,6 @@ body:not(.can-edit) .auctioneer-bar,           /* SOLD / Unsold / Undo / Reset *
 body:not(.can-edit) #teamsBidGrid,             /* per-team bid buttons */
 body:not(.can-edit) .tab[data-tab="setup"],    /* auction Setup tab */
 body:not(.can-edit) [data-auction],            /* "Auction now" buttons */
-body:not(.can-edit) .rank-import,              /* Player Ranking CSV import */
 body:not(.can-edit) .fan-tab[data-fan-sub="matchday"],  /* fantasy Match Day */
 body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
   display: none !important;
@@ -542,8 +541,6 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .rank-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; align-items: start; }
 .rank-section { animation: fade 0.25s ease; }
 .rank-sec-title { font-size: 16px; margin-bottom: 10px; letter-spacing: .5px; }
-.rank-import { margin-bottom: 22px; max-width: 620px; }
-.rank-import select { min-width: 150px; }
 .rank-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 6px 6px 4px; }
 .rank-table { width: 100%; border-collapse: collapse; }
 .rank-table th, .rank-table td { padding: 12px 16px; text-align: left; }
@@ -567,6 +564,11 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .rank-expand[aria-expanded="true"] .rank-chevron { transform: rotate(180deg); }
 .rank-foot { color: var(--muted); font-size: 12px; font-style: italic; padding: 8px 16px 6px; }
 .rank-empty { color: var(--muted); font-size: 14px; text-align: center; padding: 34px 18px; line-height: 1.6; }
+.rank-soon {
+  display: block; margin-bottom: 6px;
+  font-family: "Heading Pro", sans-serif; font-weight: 700;
+  font-size: 22px; letter-spacing: 1px; color: var(--yellow);
+}
 @media (max-width: 560px) {
   .rank-card { max-width: 100%; }
   .rank-table th, .rank-table td { padding: 10px 12px; }
