@@ -2,66 +2,59 @@
    HCCL Player Ranking ENGINE  (data + math only - no UI)
 
    Consumed by ranking.js (the UI). Exposes window.HCCLRanking:
-     onChange(cb)      - subscribe; called (immediately if ready) when
-                         rankings are (re)computed
-     getRanking(cat)   - "batting" | "bowling" | "allrounder" →
-                         { available, updated, rows:[{pos,name,rating}] }
-     refresh()         - re-fetch the CSVs and recompute
+     onChange(cb)         - subscribe; called (immediately if ready)
+                            when rankings are (re)computed
+     getRanking(cat)      - "batting" | "bowling" | "allrounder" →
+                            { available, updated, rows:[{pos,name,rating}] }
+     getStatus()          - { baselineDate, seasonDate, seasonSource }
+     importSeasonCSV(txt) - admin/mod: ongoing season's cumulative CSV
+     refresh()            - re-fetch the CSVs and recompute
 
-   DATA FLOW
-   1. On load, fetch every season CSV listed in SEASONS (the folder is
-      served as a static asset). Each file is one season's cumulative
-      player stats - a weekly export mid-season simply REPLACES that
-      season's snapshot; older seasons are never touched.
-   2. Parsed snapshots are merged into a history store in localStorage
-      (keyed by season id → append/update, never overwrite the rest),
-      so the last good data still ranks if a fetch fails offline.
-   3. Rankings are recalculated from the FULL history every load and
-      the latest result is saved as a dated snapshot.
+   DATA MODEL - two inputs, two roles:
+   1. BASELINE - "HCCL Player Stats/HCCL Statistics.csv" (committed).
+      The combined ALL-TIME sheet: one career row per player, S1 → now.
+      Drives Career, Achievements, Experience, qualification, confidence.
+   2. ONGOING SEASON (optional) - the current season's cumulative sheet,
+      same column layout. Drives the FORM component only. Two paths:
+        - in-app import (admin/moderator card) → instant on that device;
+        - committed as "HCCL Player Stats/Current Season.csv" → fetched
+          for everyone (commit the same file you imported to publish it).
+      Each update REPLACES the previous one (the sheet is cumulative).
+      A manual import takes precedence over the fetched file on that
+      device (source: "import").
 
-   WEEKLY UPDATES - two ways:
-   a) In-app: an admin/moderator uses the "Weekly Stats Import" card on
-      the Player Ranking page (importSeasonCSV). Instant, but local to
-      that device until the CSV is also committed.
-   b) Repo: overwrite the current season's CSV (e.g. S6.csv) - or add
-      S7.csv plus one line in SEASONS - commit, deploy. Every device
-      re-imports and re-ranks on next load. A manual in-app import for
-      a season takes precedence over the fetched baseline on that device.
+   WEEKLY FLOW: play match → export ongoing season sheet → import it on
+   the Player Ranking page (and/or commit as Current Season.csv). Form
+   updates instantly; career moves whenever the combined sheet itself is
+   refreshed. SEASON ROLLOVER: regenerate the combined all-time sheet,
+   replace HCCL Statistics.csv (and delete/empty Current Season.csv),
+   commit. The engine fingerprints the baseline text - when it changes,
+   any stored season data is considered folded-in and is cleared
+   automatically.
 
-   RATING MODEL - based on the "HCCL Batting Rankings Explanation" PDF:
-     Rating = 100 + 5×Career + 3×RecentForm + 1×Achievements + 1×Experience
-     (each component 0–100, rating clamped to the 0–1000 scale)
-   Career/achievements are normalized against the best QUALIFIED player
-   (score = player ÷ best × 100). The PDF's "last 5 matches" form is
-   season-based here (the CSVs are per-season), using recency weights:
-   latest 1.00, then 0.80, 0.60, 0.40, 0.20 for older seasons - plus an
-   inactivity decay so players who stopped playing fade over time.
-   A confidence factor shrinks ratings toward the 100 base when a
-   player has too few innings to judge reliably.
+   RATING MODEL - per the "HCCL Batting Rankings Explanation" PDF:
+     Rating = 100 + 0.9 × (5×Career + 3×Form + 1×Ach + 1×Exp)
+     (each component 0–100; the 0.9 rescale keeps the PDF's 5:3:1:1
+     proportions while making the TRUE maximum exactly 1000)
+   Career/achievements are normalized against the best QUALIFIED player.
+   Form comes from the ongoing season sheet (normalized within it):
+     - no season data yet     → form = career score (all-time board)
+     - played this season     → form = this season's score
+     - absent this season     → form = career score × 0.6 (slides gently)
+   A confidence factor shrinks ratings toward the 100 base when a player
+   has too few career innings to judge reliably.
    ============================================================ */
 (function () {
   "use strict";
 
   /* ------------------------- configuration ------------------------- */
 
-  // Season manifest, oldest → newest. Weekly update = replace the newest
-  // file; new season = add a row here.
-  const SEASONS = [
-    { id: "S1", order: 1, file: "HCCL Player Stats/S1.csv" },
-    { id: "S2", order: 2, file: "HCCL Player Stats/S2.csv" },
-    { id: "S3", order: 3, file: "HCCL Player Stats/S3.csv" },
-    { id: "S4", order: 4, file: "HCCL Player Stats/S4.csv" },
-    { id: "S5", order: 5, file: "HCCL Player Stats/S5.csv" },
-    { id: "S6", order: 6, file: "HCCL Player Stats/S6.csv" },
-  ];
-
-  // Recency weights by "seasons ago" from the league's latest season
-  // (index 0 = latest). Anything older uses the last entry.
-  const RECENCY = [1.0, 0.8, 0.6, 0.4, 0.2];
+  const BASELINE_FILE = "HCCL Player Stats/HCCL Statistics.csv"; // all-time combined sheet
+  const SEASON_FILE = "HCCL Player Stats/Current Season.csv";    // optional weekly export
 
   // Qualification for the official lists (per the PDF for batting;
-  // bowling mirrors it). Unqualified players still accumulate ratings
-  // internally but are not shown.
+  // bowling mirrors it) - judged on the all-time career totals.
+  // Unqualified players still accumulate ratings but are not shown.
   const QUAL = {
     batting: { innings: 10, runs: 100 },
     bowling: { innings: 10, wickets: 10 },
@@ -80,8 +73,13 @@
   const ACH_BAT = { t30: 15, t50: 35, t100: 75, pom: 50 };
   const ACH_BOWL = { w3: 35, w5: 75, maiden: 15, pom: 50 };
 
-  const KEY_HISTORY = "hccl_ranking_history_v1";
-  const KEY_SNAPSHOT = "hccl_ranking_latest_v1";
+  // Form for a player who is absent from the ongoing season sheet:
+  // their career score scaled by this factor (active players overtake).
+  const FORM_FALLBACK_ABSENT = 0.6;
+
+  const KEY_DATA = "hccl_ranking_data_v2";
+  const KEY_SNAPSHOT = "hccl_ranking_latest_v2";
+  const OLD_KEYS = ["hccl_ranking_history_v1", "hccl_ranking_latest_v1"]; // pre-combined-sheet era
 
   /* --------------------------- utilities --------------------------- */
 
@@ -108,6 +106,13 @@
       if (x <= x2) return y1 + (y2 - y1) * ((x - x1) / (x2 - x1));
     }
     return curve[curve.length - 1][1];
+  }
+
+  // Cheap text fingerprint (djb2) - detects a replaced baseline sheet.
+  function hash(s) {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return String(h);
   }
 
   /* -------------------------- CSV parsing -------------------------- */
@@ -141,13 +146,13 @@
     });
   }
 
-  // One CSV row → a normalized per-season player snapshot. Missing
-  // columns/values just become 0 - a thinner weekly export still works.
+  // One CSV row → a normalized player stat line. Works for both the
+  // combined all-time sheet and a season sheet (same columns; extras
+  // like "Seasons Played" are ignored, missing values become 0).
   function normalizeRow(r) {
     return {
       name: displayName(r["Player Name"]),
       key: nameKey(r["Player Name"]),
-      team: displayName(r["Team Name"]),
       matches: num(r["Matches"]),
       pom: num(r["POM Awards"]),
       bat: {
@@ -165,78 +170,48 @@
     };
   }
 
-  function parseSeasonCSV(text) {
+  function parsePlayersCSV(text) {
     const byKey = new Map();
     parseCSV(text).forEach(raw => {
       const s = normalizeRow(raw);
       if (!s.key) return;
       const prev = byKey.get(s.key);
       if (!prev) { byKey.set(s.key, s); return; }
-      // Duplicate row for the same player (e.g. mid-season team move):
-      // merge by summing counting stats, keep maxima where relevant.
+      // Duplicate row for the same player: merge by summing counting
+      // stats, keep maxima where relevant.
       ["matches", "pom"].forEach(k => prev[k] += s[k]);
       Object.keys(prev.bat).forEach(k => { k === "high" ? prev.bat.high = Math.max(prev.bat.high, s.bat.high) : prev.bat[k] += s.bat[k]; });
       Object.keys(prev.bowl).forEach(k => prev.bowl[k] += s.bowl[k]);
-      prev.team = s.team || prev.team;
     });
     return [...byKey.values()];
   }
 
-  /* ----------------- history store (localStorage) ------------------ */
+  /* ------------------- data store (localStorage) ------------------- */
 
   const hasStorage = typeof localStorage !== "undefined";
-  function loadHistory() {
-    if (!hasStorage) return { seasons: {} };
-    try { return JSON.parse(localStorage.getItem(KEY_HISTORY)) || { seasons: {} }; }
-    catch (e) { return { seasons: {} }; }
+  function loadData() {
+    if (!hasStorage) return { baseline: null, season: null };
+    try {
+      const d = JSON.parse(localStorage.getItem(KEY_DATA));
+      return d && typeof d === "object" ? { baseline: d.baseline || null, season: d.season || null } : { baseline: null, season: null };
+    } catch (e) { return { baseline: null, season: null }; }
   }
-  function saveHistory(h) {
+  function saveData(d) {
     if (!hasStorage) return;
-    try { localStorage.setItem(KEY_HISTORY, JSON.stringify(h)); } catch (e) { /* full - history is rebuilt from CSVs anyway */ }
+    try { localStorage.setItem(KEY_DATA, JSON.stringify(d)); } catch (e) { /* full - data is refetched anyway */ }
   }
-  // Append/update one season snapshot; the rest of history is untouched.
-  // `source` is "file" (baseline CSV fetched from the repo) or "import"
-  // (weekly CSV uploaded by an admin/moderator on this device).
-  function mergeSeason(history, id, order, players, importedAt, source) {
-    history.seasons[id] = { id, order, importedAt, source: source || "file", players };
-    return history;
+  function loadSnapshot() {
+    if (!hasStorage) return null;
+    try { return JSON.parse(localStorage.getItem(KEY_SNAPSHOT)); } catch (e) { return null; }
   }
-
-  // Manifest ∪ history, sorted oldest → newest (for the import season picker).
-  function knownSeasons(history) {
-    const map = new Map();
-    SEASONS.forEach(s => map.set(s.id, { id: s.id, order: s.order }));
-    Object.values((history || loadHistory()).seasons || {}).forEach(s => map.set(s.id, { id: s.id, order: s.order }));
-    return [...map.values()].sort((a, b) => a.order - b.order);
+  function saveSnapshot(snap) {
+    if (!hasStorage) return;
+    try { localStorage.setItem(KEY_SNAPSHOT, JSON.stringify(snap)); } catch (e) {}
   }
 
   /* ------------------------- rating engine ------------------------- */
 
-  // Collapse history into one career record per player.
-  function buildCareers(history) {
-    const careers = new Map();
-    const seasons = Object.values(history.seasons || {}).sort((a, b) => a.order - b.order);
-    seasons.forEach(se => {
-      se.players.forEach(p => {
-        let c = careers.get(p.key);
-        if (!c) {
-          c = { key: p.key, name: p.name, seasons: [],
-            bat: { inns: 0, runs: 0, notOuts: 0, balls: 0, t30: 0, t50: 0, t100: 0, high: 0 },
-            bowl: { inns: 0, wkts: 0, conceded: 0, balls: 0, maidens: 0, dots: 0, w3: 0, w5: 0 },
-            pom: 0, matches: 0 };
-          careers.set(p.key, c);
-        }
-        c.name = p.name; // latest spelling wins
-        c.matches += p.matches; c.pom += p.pom;
-        Object.keys(c.bat).forEach(k => { k === "high" ? c.bat.high = Math.max(c.bat.high, p.bat.high) : c.bat[k] += p.bat[k]; });
-        Object.keys(c.bowl).forEach(k => c.bowl[k] += p.bowl[k]);
-        c.seasons.push({ order: se.order, snap: p });
-      });
-    });
-    return { careers: [...careers.values()], latestOrder: seasons.length ? seasons[seasons.length - 1].order : 0 };
-  }
-
-  // Derived career figures (computed from raw totals, not averaged averages).
+  // Derived figures (computed from raw totals, not averaged averages).
   const batAvg = b => b.runs / Math.max(1, b.inns - b.notOuts);
   const batSR = b => (b.balls > 0 ? (b.runs / b.balls) * 100 : 0);
   const bowlAvg = b => (b.wkts > 0 ? b.conceded / b.wkts : Infinity);
@@ -246,8 +221,8 @@
   const batQualified = c => c.bat.inns >= QUAL.batting.innings && c.bat.runs >= QUAL.batting.runs;
   const bowlQualified = c => c.bowl.inns >= QUAL.bowling.innings && c.bowl.wkts >= QUAL.bowling.wickets;
 
-  // Career score (PDF): 50% volume + 30% average + 20% strike-rate/economy
-  // shape, each normalized against the best qualified career.
+  // Career score (PDF): 50% volume + 30% average + 20% strike rate,
+  // each normalized against the best qualified career.
   function careerBatScore(c, P) {
     return 100 * (0.5 * ratioHi(c.bat.runs, P.maxRuns)
                 + 0.3 * ratioHi(batAvg(c.bat), P.maxAvg)
@@ -262,51 +237,46 @@
                 + 0.10 * ratioHi(dotPct(c.bowl), P.maxDot));
   }
 
-  // Same shapes applied to a single season row (vs per-season pools) -
-  // these feed the recency-weighted form component.
+  // Same shapes applied to an ongoing-season line, normalized within the
+  // season sheet itself - this is the live Form component.
   const seasonBatScore = (s, P) => 100 * (0.5 * ratioHi(s.bat.runs, P.maxRuns)
     + 0.3 * ratioHi(batAvg(s.bat), P.maxAvg) + 0.2 * ratioHi(batSR(s.bat), P.maxSR));
   const seasonBowlScore = (s, P) => 100 * (0.5 * ratioHi(s.bowl.wkts, P.maxWkts)
     + 0.25 * ratioLo(P.minAvg, bowlAvg(s.bowl)) + 0.15 * ratioLo(P.minEco, bowlEco(s.bowl))
     + 0.10 * ratioHi(dotPct(s.bowl), P.maxDot));
 
-  const recencyWeight = seasonsAgo => RECENCY[Math.min(Math.max(seasonsAgo, 0), RECENCY.length - 1)];
-
-  // Recency-weighted form: weighted mean of season scores (weights by how
-  // long ago the season was), then decayed by the weight of the player's
-  // most recent season - so inactive players fade instead of freezing.
-  function formScore(c, latestOrder, played, score) {
-    const rows = c.seasons.filter(x => played(x.snap));
-    if (!rows.length) return 0;
-    let sum = 0, wsum = 0, lastOrder = 0;
-    rows.forEach(x => {
-      const w = recencyWeight(latestOrder - x.order);
-      sum += w * score(x.snap); wsum += w;
-      lastOrder = Math.max(lastOrder, x.order);
-    });
-    return (sum / wsum) * recencyWeight(latestOrder - lastOrder);
-  }
-
   const achBatPoints = c => ACH_BAT.t30 * c.bat.t30 + ACH_BAT.t50 * c.bat.t50 + ACH_BAT.t100 * c.bat.t100 + ACH_BAT.pom * c.pom;
   const achBowlPoints = c => ACH_BOWL.w3 * c.bowl.w3 + ACH_BOWL.w5 * c.bowl.w5 + ACH_BOWL.maiden * c.bowl.maidens + ACH_BOWL.pom * c.pom;
 
-  // PDF final formula, shrunk toward the 100 base by the confidence
-  // factor and clamped to the 0–1000 scale.
+  // PDF final formula, rescaled to a TRUE 0-1000 ceiling: the PDF's
+  // 100 + 5C + 3F + A + E sums to 1100 at the theoretical max, so the
+  // weighted part is scaled by 0.9 (keeping the 5:3:1:1 proportions).
+  // A perfect 1000 now needs being the best at literally everything -
+  // no player sits on a clamped plateau. The confidence factor shrinks
+  // the rating toward the 100 base for thin careers.
   function finalRating(career, form, ach, exp, inns) {
-    const raw = 100 + 5 * career + 3 * form + 1 * ach + 1 * exp;
+    const raw = 100 + 0.9 * (5 * career + 3 * form + 1 * ach + 1 * exp);
     const conf = clamp(inns / CONF_FULL_INNINGS, 0, 1);
     return clamp(Math.round(100 + conf * (raw - 100)), 0, 1000);
   }
 
-  // Full recalculation from history → dated ranking snapshot.
-  function computeAll(history, dateStr) {
-    const { careers, latestOrder } = buildCareers(history);
+  // Full recalculation → dated ranking snapshot.
+  // data = { baseline: { players } | null, season: { players } | null }
+  function computeAll(data, dateStr) {
+    // Careers come from the combined all-time sheet; if only a season
+    // sheet exists (bootstrap edge case), it doubles as the career view.
+    const careers = (data.baseline && data.baseline.players && data.baseline.players.length)
+      ? data.baseline.players
+      : ((data.season && data.season.players) || []);
     if (!careers.length) return { date: dateStr, batting: [], bowling: [], allrounder: [] };
+
+    const seasonPlayers = (data.season && data.season.players) || [];
+    const seasonMap = new Map(seasonPlayers.map(p => [p.key, p]));
 
     const batQ = careers.filter(batQualified);
     const bowlQ = careers.filter(bowlQualified);
 
-    // Normalization pools - "best qualified player" per the PDF.
+    // Career pools - "best qualified player" per the PDF.
     const batPool = {
       maxRuns: Math.max(0, ...batQ.map(c => c.bat.runs)),
       maxAvg: Math.max(0, ...batQ.map(c => batAvg(c.bat))),
@@ -321,33 +291,47 @@
       maxDot: Math.max(0, ...bowlQ.map(c => dotPct(c.bowl))),
       maxAch: Math.max(0, ...bowlQ.map(achBowlPoints)),
     };
-    // Season pools: best single-season figures across all played rows.
-    const allSeasonRows = careers.flatMap(c => c.seasons.map(x => x.snap));
-    const batRows = allSeasonRows.filter(s => s.bat.inns > 0);
-    const bowlRows = allSeasonRows.filter(s => s.bowl.inns > 0);
+    // Season pools: best figures within the ongoing season sheet.
+    const sBatRows = seasonPlayers.filter(s => s.bat.inns > 0);
+    const sBowlRows = seasonPlayers.filter(s => s.bowl.inns > 0);
     const seasonBatPool = {
-      maxRuns: Math.max(0, ...batRows.map(s => s.bat.runs)),
-      maxAvg: Math.max(0, ...batRows.map(s => batAvg(s.bat))),
-      maxSR: Math.max(0, ...batRows.map(s => batSR(s.bat))),
+      maxRuns: Math.max(0, ...sBatRows.map(s => s.bat.runs)),
+      maxAvg: Math.max(0, ...sBatRows.map(s => batAvg(s.bat))),
+      maxSR: Math.max(0, ...sBatRows.map(s => batSR(s.bat))),
     };
     const seasonBowlPool = {
-      maxWkts: Math.max(0, ...bowlRows.map(s => s.bowl.wkts)),
-      minAvg: finiteMin(bowlRows.map(s => bowlAvg(s.bowl))),
-      minEco: finiteMin(bowlRows.map(s => bowlEco(s.bowl))),
-      maxDot: Math.max(0, ...bowlRows.map(s => dotPct(s.bowl))),
+      maxWkts: Math.max(0, ...sBowlRows.map(s => s.bowl.wkts)),
+      minAvg: finiteMin(sBowlRows.map(s => bowlAvg(s.bowl))),
+      minEco: finiteMin(sBowlRows.map(s => bowlEco(s.bowl))),
+      maxDot: Math.max(0, ...sBowlRows.map(s => dotPct(s.bowl))),
+    };
+
+    // Form: season score when the player has played this season; career
+    // score when no season data exists yet; a scaled-down career score
+    // when the season is under way without them.
+    const hasSeason = seasonPlayers.length > 0;
+    const formBat = (c, career) => {
+      if (!hasSeason) return career;
+      const s = seasonMap.get(c.key);
+      return (s && s.bat.inns > 0) ? seasonBatScore(s, seasonBatPool) : FORM_FALLBACK_ABSENT * career;
+    };
+    const formBowl = (c, career) => {
+      if (!hasSeason) return career;
+      const s = seasonMap.get(c.key);
+      return (s && s.bowl.inns > 0) ? seasonBowlScore(s, seasonBowlPool) : FORM_FALLBACK_ABSENT * career;
     };
 
     const ratings = new Map(); // key → { bat, bowl }
     careers.forEach(c => {
+      const batCareer = careerBatScore(c, batPool);
+      const bowlCareer = careerBowlScore(c, bowlPool);
       const bat = finalRating(
-        careerBatScore(c, batPool),
-        formScore(c, latestOrder, s => s.bat.inns > 0, s => seasonBatScore(s, seasonBatPool)),
+        batCareer, formBat(c, batCareer),
         100 * ratioHi(achBatPoints(c), batPool.maxAch),
         interp(EXP_CURVE, c.bat.inns),
         c.bat.inns);
       const bowl = finalRating(
-        careerBowlScore(c, bowlPool),
-        formScore(c, latestOrder, s => s.bowl.inns > 0, s => seasonBowlScore(s, seasonBowlPool)),
+        bowlCareer, formBowl(c, bowlCareer),
         100 * ratioHi(achBowlPoints(c), bowlPool.maxAch),
         interp(EXP_CURVE, c.bowl.inns),
         c.bowl.inns);
@@ -364,8 +348,7 @@
       batting: list(batQ, c => ratings.get(c.key).bat),
       bowling: list(bowlQ, c => ratings.get(c.key).bowl),
       // All-rounder: balanced 50/50 combination via the geometric mean -
-      // a player must contribute with BOTH bat and ball to rank highly
-      // (one-dimensional stars can't ride a single skill to the top).
+      // a player must contribute with BOTH bat and ball to rank highly.
       allrounder: list(careers.filter(c => batQualified(c) && bowlQualified(c)),
         c => Math.round(Math.sqrt(ratings.get(c.key).bat * ratings.get(c.key).bowl))),
     };
@@ -378,43 +361,70 @@
   const emit = () => listeners.forEach(cb => { try { cb(); } catch (e) { console.error(e); } });
   const today = () => new Date().toISOString().slice(0, 10);
 
-  function loadSnapshot() {
-    if (!hasStorage) return null;
-    try { return JSON.parse(localStorage.getItem(KEY_SNAPSHOT)); } catch (e) { return null; }
+  function snapshotDate(data) {
+    if (data.season && data.season.importedAt) return data.season.importedAt;
+    if (data.baseline && data.baseline.importedAt) return data.baseline.importedAt;
+    return today();
   }
-  function saveSnapshot(snap) {
-    if (!hasStorage) return;
-    try { localStorage.setItem(KEY_SNAPSHOT, JSON.stringify(snap)); } catch (e) {}
+  function recompute(data) {
+    state.snapshot = computeAll(data, snapshotDate(data));
+    saveSnapshot(state.snapshot);
+    state.status = "ready";
+    emit();
+  }
+
+  async function fetchText(file) {
+    try {
+      const res = await fetch(encodeURI(file), { cache: "no-store" });
+      return res.ok ? await res.text() : null;
+    } catch (e) { return null; } // offline / file:// - stored data covers us
   }
 
   async function importAndCompute() {
-    const history = loadHistory();
-    let fetched = 0;
-    if (typeof fetch === "function") {
-      await Promise.all(SEASONS.map(async se => {
-        // A manual weekly import is fresher than the committed baseline CSV -
-        // don't clobber it on reload. (Committing the new CSV replaces it for
-        // everyone; a newer manual import replaces it on this device.)
-        const cur = history.seasons[se.id];
-        if (cur && cur.source === "import") return;
-        try {
-          const res = await fetch(encodeURI(se.file), { cache: "no-store" });
-          if (!res.ok) return;
-          const players = parseSeasonCSV(await res.text());
-          if (players.length) { mergeSeason(history, se.id, se.order, players, today(), "file"); fetched++; }
-        } catch (e) { /* offline / file:// - stored history covers us */ }
-      }));
-    }
-    if (fetched) saveHistory(history);
+    if (hasStorage) OLD_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+    const data = loadData();
+    let changed = false;
 
-    if (Object.keys(history.seasons || {}).length) {
-      state.snapshot = computeAll(history, today());
-      saveSnapshot(state.snapshot);
+    if (typeof fetch === "function") {
+      // 1. Baseline (all-time combined sheet).
+      const baseText = await fetchText(BASELINE_FILE);
+      if (baseText) {
+        const players = parsePlayersCSV(baseText);
+        if (players.length) {
+          const fp = hash(baseText);
+          if (!data.baseline || data.baseline.fingerprint !== fp) {
+            // SEASON ROLLOVER: a replaced combined sheet already contains
+            // the season we were tracking - drop the stored season data.
+            if (data.baseline && data.season) data.season = null;
+            data.baseline = { fingerprint: fp, importedAt: today(), players };
+            changed = true;
+          }
+        }
+      }
+      // 2. Ongoing season sheet (optional; manual import wins on this device).
+      if (!data.season || data.season.source !== "import") {
+        const seasonText = await fetchText(SEASON_FILE);
+        if (seasonText) {
+          const players = parsePlayersCSV(seasonText);
+          if (players.length) {
+            const fp = hash(seasonText);
+            if (!data.season || data.season.fingerprint !== fp) {
+              data.season = { fingerprint: fp, importedAt: today(), source: "file", players };
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+
+    if (changed) saveData(data);
+    if ((data.baseline && data.baseline.players.length) || (data.season && data.season.players.length)) {
+      recompute(data);
     } else {
       state.snapshot = loadSnapshot(); // last resort: previous computed snapshot
+      state.status = "ready";
+      emit();
     }
-    state.status = "ready";
-    emit();
   }
 
   const api = {
@@ -424,32 +434,27 @@
       const rows = (snap && snap[cat]) || [];
       return { loading: state.status === "loading", available: rows.length > 0, updated: snap ? snap.date : null, rows };
     },
+    getStatus() {
+      const d = loadData();
+      return {
+        baselineDate: d.baseline ? d.baseline.importedAt : null,
+        seasonDate: d.season ? d.season.importedAt : null,
+        seasonSource: d.season ? d.season.source : null,
+      };
+    },
     refresh() { state.status = "loading"; emit(); return importAndCompute(); },
 
-    // Seasons for the import picker: known ones plus the next new id.
-    getSeasons() {
-      const seasons = knownSeasons();
-      const nextOrder = seasons.length ? seasons[seasons.length - 1].order + 1 : 1;
-      return { seasons, next: { id: "S" + nextOrder, order: nextOrder } };
-    },
-
-    // Admin/moderator weekly import: one season's cumulative CSV export.
-    // Updates that season in the local history (never touches the others),
-    // recalculates from full history, and notifies the UI. Synchronous.
-    importSeasonCSV(seasonId, csvText) {
-      const players = parseSeasonCSV(String(csvText || ""));
+    // Admin/moderator weekly import: the ongoing season's cumulative CSV.
+    // Replaces the previous season data, recalculates, notifies the UI.
+    importSeasonCSV(csvText) {
+      const text = String(csvText || "");
+      const players = parsePlayersCSV(text);
       if (!players.length) return { ok: false, error: "No player rows found in that CSV" };
-      const history = loadHistory();
-      const known = knownSeasons(history);
-      const existing = known.find(s => s.id === seasonId);
-      const order = existing ? existing.order : (known.length ? known[known.length - 1].order + 1 : 1);
-      mergeSeason(history, seasonId, order, players, today(), "import");
-      saveHistory(history);
-      state.snapshot = computeAll(history, today());
-      saveSnapshot(state.snapshot);
-      state.status = "ready";
-      emit();
-      return { ok: true, count: players.length, seasonId };
+      const data = loadData();
+      data.season = { fingerprint: hash(text), importedAt: today(), source: "import", players };
+      saveData(data);
+      recompute(data);
+      return { ok: true, count: players.length };
     },
   };
 
@@ -461,11 +466,12 @@
   // Node test hook (inert in the browser).
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {
-      parseCSV, parseSeasonCSV, mergeSeason, computeAll,
-      buildHistoryFromTexts(texts) {
-        const h = { seasons: {} };
-        SEASONS.forEach(se => { if (texts[se.id]) mergeSeason(h, se.id, se.order, parseSeasonCSV(texts[se.id]), "test"); });
-        return h;
+      parseCSV, parsePlayersCSV, computeAll,
+      makeData(baselineText, seasonText) {
+        return {
+          baseline: baselineText ? { fingerprint: hash(baselineText), importedAt: "test", players: parsePlayersCSV(baselineText) } : null,
+          season: seasonText ? { fingerprint: hash(seasonText), importedAt: "test", source: "import", players: parsePlayersCSV(seasonText) } : null,
+        };
       },
     };
   }

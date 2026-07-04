@@ -23,6 +23,7 @@ Two ways to run, automatically chosen:
 - [Sign-in & roles](#sign-in--roles)
 - [The Auction](#-the-auction)
 - [The Fantasy League](#-the-fantasy-league)
+- [Player Ranking](#-player-ranking)
 - [Cloud sync (how live mode works)](#️-cloud-sync-how-live-mode-works)
 - [Data, backup & reset](#-data-backup--reset)
 - [Running it](#-running-it)
@@ -194,6 +195,30 @@ chat. Built with the `html-to-image` library (loaded from a CDN).
 
 ---
 
+## 📈 Player Ranking
+
+A dedicated **Player Ranking** tab shows three boards on one page - **Batting**,
+**Bowling** and **All-Rounder** - each a Pos / Player / Rating table (top 10, expandable)
+with an `* as of {date}` footer. Ratings are 0-1000, per the HCCL rating model:
+`100 + 0.9 × (5×Career + 3×Form + 1×Achievements + 1×Experience)`, with qualification
+(10 innings + 100 runs batting; 10 innings + 10 wickets bowling), a confidence factor for
+thin careers, and All-Rounder = the geometric mean of the batting and bowling ratings.
+
+**Data files** (in `HCCL Player Stats/`):
+- `HCCL Statistics.csv` - the combined **all-time** sheet (one career row per player).
+  Drives Career, Achievements, Experience and qualification.
+- `Current Season.csv` *(optional)* - the ongoing season's cumulative export. Drives the
+  **Form** component, normalized within the season.
+
+**Weekly flow:** after a match (or weekly), export the ongoing season's sheet and either
+import it on the Player Ranking page (**⬆ Ongoing Season Update** card, admins/moderators
+only - instant on that device) or commit it as `Current Season.csv` to publish to
+everyone. Each update replaces the previous one. **Season rollover:** regenerate the
+combined all-time sheet, replace `HCCL Statistics.csv`, delete `Current Season.csv`,
+commit - the engine detects the new baseline and clears the old season data automatically.
+
+---
+
 ## ☁️ Cloud sync (how live mode works)
 
 When Firebase is configured and you're signed in, the app switches from local storage to
@@ -308,6 +333,9 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 | `index.html` | Page structure (header, auction tabs, Insights view, fantasy mount, overlays) |
 | `app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, confetti, Firestore sync |
 | `fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
+| `ranking-engine.js` | Player Ranking data + rating math (combined sheet + season updates) |
+| `ranking.js` | Player Ranking UI (three boards + admin import card) |
+| `HCCL Player Stats/` | `HCCL Statistics.csv` (all-time) + optional `Current Season.csv` |
 | `firebase-init.js` | Google auth, roles, members screen, sign-in wall, `window.HCCL` API |
 | `firebase-config.js` | Public Firebase web config + admin email list |
 | `firestore.rules` | Security rules (roles, read/write gating) |

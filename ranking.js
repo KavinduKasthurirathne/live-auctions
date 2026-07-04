@@ -8,12 +8,13 @@
    each with its own title, Pos/Player/Rating table (top 10, expandable)
    and an "* as of {date}" footer.
 
-   Import: admins/moderators get a "Weekly Stats Import" card (season
-   picker + CSV file button). Viewers never see it - hidden both here
-   (not rendered) and by the body:not(.can-edit) CSS gate, the same
-   two-layer convention the rest of the app uses. Importing parses the
-   CSV, updates that season in the local history and recalculates; the
-   tables below refresh instantly via the engine's onChange event.
+   Data: rankings are computed from the committed all-time combined
+   sheet (HCCL Statistics.csv = career) plus an optional ongoing-season
+   sheet (= current form). Admins/moderators get an import card to load
+   the ongoing season's CSV after each match/week. Viewers never see it -
+   hidden both here (not rendered) and by the body:not(.can-edit) CSS
+   gate, the same two-layer convention the rest of the app uses. The
+   tables refresh instantly via the engine's onChange event.
    ============================================================ */
 (function () {
   "use strict";
@@ -53,38 +54,35 @@
   /* ---------- weekly import card (admins/moderators only) ---------- */
   function importCardHtml() {
     const eng = engine();
-    if (!canEditApp() || !eng || typeof eng.getSeasons !== "function") return "";
-    const { seasons, next } = eng.getSeasons();
-    const latest = seasons.length ? seasons[seasons.length - 1].id : next.id;
-    const opts = seasons.map(s =>
-      `<option value="${esc(s.id)}" ${s.id === latest ? "selected" : ""}>${esc(s.id)} - update</option>`)
-      .concat(`<option value="${esc(next.id)}">${esc(next.id)} - new season</option>`)
-      .join("");
+    if (!canEditApp() || !eng || typeof eng.importSeasonCSV !== "function") return "";
+    const st = typeof eng.getStatus === "function" ? eng.getStatus() : {};
+    const status = `All-time sheet: <b>${esc(st.baselineDate || "not loaded")}</b>
+      · Season update: <b>${esc(st.seasonDate || "none yet")}</b>`;
     return `
       <div class="card rank-import">
-        <h3>⬆ Weekly Stats Import</h3>
-        <p class="hint">Pick the season, then choose the weekly CSV export from the stats system.
-          Rankings recalculate instantly on this device commit the same CSV to the repo to publish it for everyone.</p>
+        <h3>⬆ Ongoing Season Update</h3>
+        <p class="hint">After a match (or weekly), import the ongoing season's CSV export -
+          rankings recalculate instantly on this device. To publish it for everyone, commit the
+          same file as <b>HCCL Player Stats/Current Season.csv</b>. Career numbers come from the
+          committed all-time sheet (<b>HCCL Statistics.csv</b>); replace it at season end.</p>
         <div class="form-row">
-          <select id="rankSeasonSel" title="Season this CSV belongs to">${opts}</select>
-          <label class="btn btn-dark file-btn">⬆ Import CSV
+          <label class="btn btn-dark file-btn">⬆ Import season CSV
             <input type="file" id="rankCsvFile" accept=".csv,text/csv" hidden />
           </label>
         </div>
+        <p class="hint">${status}</p>
       </div>`;
   }
 
   function onImportFile(e) {
     const file = e.target.files && e.target.files[0];
-    const sel = document.getElementById("rankSeasonSel");
-    e.target.value = ""; // allow re-picking the same filename next week
-    if (!file || !sel) return;
-    const seasonId = sel.value;
+    e.target.value = ""; // allow re-picking the same filename next time
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const res = engine().importSeasonCSV(seasonId, String(reader.result));
-        if (res.ok) notify(`Imported ${res.count} players into ${res.seasonId} - rankings updated`, "good");
+        const res = engine().importSeasonCSV(String(reader.result));
+        if (res.ok) notify(`Imported ${res.count} players - rankings updated`, "good");
         else notify(res.error || "Import failed", "bad");
       } catch (err) {
         console.error("ranking import failed:", err);
@@ -105,7 +103,8 @@
     }
     if (!data.available) {
       return `<div class="rank-card"><p class="rank-empty">No ranking data yet.<br/>
-        Import a season CSV above, or add the exports to the <b>HCCL Player Stats</b> folder.</p></div>`;
+        Add the combined all-time sheet as <b>HCCL Player Stats/HCCL Statistics.csv</b>
+        (or import a season CSV above) and reload.</p></div>`;
     }
 
     const rows = data.rows;
