@@ -555,7 +555,7 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 /* Player name: always one line. Shrinks a touch to fit full names next
    to the team logo; ellipsis only as a last resort on the narrowest cards. */
 .rank-table .rk-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rank-table td.rk-name { color: var(--text); font-weight: 600; font-size: 15px; }
+.rank-table td.rk-name { color: var(--text); font-weight: 600; font-size: 16px; }
 .rank-table .rk-team { width: 48px; text-align: center; }
 .team-ico {
   display: inline-flex; align-items: center; justify-content: center;

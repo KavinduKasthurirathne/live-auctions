@@ -111,6 +111,26 @@
       });
   }
 
+  // Parse one "Recent 5 Matches" bowling cell into up to 5 match objects.
+  // Lines look like: "3 Wickets, 8 Eco, POTM YES" or "DNB, POTM NO".
+  function parseRecentBowling(cell) {
+    return String(cell || "")
+      .split("\n")
+      .map(l => l.trim())
+      .filter(Boolean)
+      .map(line => {
+        if (/\bDNB\b/i.test(line)) return { dnb: true };
+        const wM = line.match(/(-?\d+)\s*Wickets?/i);
+        const eM = line.match(/([\d.]+)\s*Eco/i);
+        return {
+          dnb: false,
+          wickets: wM ? parseInt(wM[1], 10) : 0,
+          eco: eM ? parseFloat(eM[1]) : 0,
+          potm: /POTM\s+Yes/i.test(line),
+        };
+      });
+  }
+
   // Raw CSV text -> array of player stat objects.
   function parsePlayers(csvText) {
     const rows = parseCsv(csvText);
@@ -122,12 +142,22 @@
         id: (r[COL.id] || "").trim(),
         name: (r[COL.name] || "").trim(),
         team: titleCase((r[COL.team] || "").trim()),
+        potms: Math.round(num(r[COL.potms])), // career Player-of-the-Match count (used by bowling achievements)
+        // batting
         innings: Math.round(num(r[COL.innings])),
         runs: Math.round(num(r[COL.runs])),
         avg: num(r[COL.avg]),
         sr: num(r[COL.sr]),
         rap: Math.round(num(r[COL.rap])),
         recentBat: parseRecentBatting(r[COL.recentBat]),
+        // bowling
+        wickets: Math.round(num(r[COL.wickets])),
+        bowlAvg: num(r[COL.bowlAvg]),
+        eco: num(r[COL.eco]),
+        threeFers: Math.round(num(r[COL.threeFers])),
+        fourFers: Math.round(num(r[COL.fourFers])),
+        bsr: num(r[COL.bsr]), // bowling strike rate (balls per wicket, lower better)
+        recentBowl: parseRecentBowling(r[COL.recentBowl]),
       });
     }
     return players;
@@ -233,10 +263,117 @@
     return computeBatting(parsePlayers(csvText));
   }
 
+  /* ---------------------- bowling rating math ---------------------- */
+  // Bowling is documented in the "HCCL Bowling Rankings System". Unlike
+  // batting, the base 100 is applied literally (no remap) - the spec's
+  // stated range is "approximately 100 to 1000", and the weights make
+  // hitting all four career benchmarks at once impossible, so ratings
+  // stay comfortably under 1000 in practice.
+  //
+  //   Rating = 100 + Career*5 + RecentForm*3 + Achievement*2
+  //   Career (<=100) = 0.6*WicketsScore + 0.2*AvgScore + 0.1*EcoScore + 0.1*SrScore
+  //     WicketsScore = wickets / (most wickets among qualified) * 100
+  //     AvgScore/EcoScore/SrScore = (best among qualified) / player * 100  (lower is better)
+  //   RecentForm (<=100) = clamp( avg of last-5 match scores, 0, 100 )
+  //     match = WicketPts(0/25/50/75/100 for 0/1/2/3/4+ wkts)
+  //           + EcoBonus(<6:+20 | <9:+10 | <12:+5 | >15:-10 | else 0)
+  //           + POTM(+20); DNB -> 0
+  //   Achievement (<=100) = AchPoints / (highest among qualified) * 100
+  //     AchPoints = 3Fers*15 + 4Fers*35 + POTMs*50   (== the sheet's BAP column)
+  //
+  // Qualification (spec left this open, so we mirror batting's structure):
+  //   >= 10 innings AND >= 10 career wickets.
+  const BOWL_ELIGIBLE = { innings: 10, wickets: 10 };
+  const BOWL_BASE = 100;
+
+  function bowlingMatchPoints(m) {
+    if (!m || m.dnb) return 0;
+    const w = m.wickets;
+    const wp = w <= 0 ? 0 : w === 1 ? 25 : w === 2 ? 50 : w === 3 ? 75 : 100;
+    const e = m.eco;
+    let eb;
+    if (e < 6) eb = 20;
+    else if (e < 9) eb = 10;
+    else if (e < 12) eb = 5;
+    else if (e > 15) eb = -10;
+    else eb = 0;
+    return wp + eb + (m.potm ? 20 : 0);
+  }
+
+  function bowlingRecentFormScore(recentBowl) {
+    const sum = (recentBowl || []).reduce((a, m) => a + bowlingMatchPoints(m), 0);
+    return clamp(sum / 5, 0, 100); // always over 5 matches; clamp to 0-100
+  }
+
+  function bowlingAchievementPoints(p) {
+    return (p.threeFers || 0) * 15 + (p.fourFers || 0) * 35 + (p.potms || 0) * 50;
+  }
+
+  function isBowlingEligible(p) {
+    return p.innings >= BOWL_ELIGIBLE.innings && p.wickets >= BOWL_ELIGIBLE.wickets;
+  }
+
+  // players -> { rows, meta }. rows are eligible bowlers, best-first, with
+  // positions (ties share a position). Each row keeps its breakdown.
+  function computeBowling(players) {
+    const eligible = (players || []).filter(isBowlingEligible);
+    const maxOf = key => eligible.reduce((m, p) => Math.max(m, p[key] || 0), 0);
+    // "best" for the lower-is-better metrics = minimum positive value.
+    const minPos = key => eligible.reduce((m, p) => (p[key] > 0 && p[key] < m ? p[key] : m), Infinity);
+    const bench = {
+      wickets: maxOf("wickets"),
+      avg: minPos("bowlAvg"),
+      eco: minPos("eco"),
+      bsr: minPos("bsr"),
+      ap: eligible.reduce((m, p) => Math.max(m, bowlingAchievementPoints(p)), 0),
+    };
+
+    const rows = eligible.map(p => {
+      const wicketsScore = bench.wickets ? (p.wickets / bench.wickets) * 100 : 0;
+      const avgScore = p.bowlAvg > 0 && isFinite(bench.avg) ? (bench.avg / p.bowlAvg) * 100 : 0;
+      const ecoScore = p.eco > 0 && isFinite(bench.eco) ? (bench.eco / p.eco) * 100 : 0;
+      const srScore = p.bsr > 0 && isFinite(bench.bsr) ? (bench.bsr / p.bsr) * 100 : 0;
+      const career = clamp(0.6 * wicketsScore + 0.2 * avgScore + 0.1 * ecoScore + 0.1 * srScore, 0, 100);
+      const recent = bowlingRecentFormScore(p.recentBowl);
+      const ap = bowlingAchievementPoints(p);
+      const achievement = bench.ap ? clamp((ap / bench.ap) * 100, 0, 100) : 0;
+
+      const rating = clamp(BOWL_BASE + 5 * career + 3 * recent + 2 * achievement, BOWL_BASE, 1000);
+      return {
+        id: p.id, name: p.name, team: p.team,
+        rating: Math.round(rating), ratingRaw: rating,
+        breakdown: {
+          career: +career.toFixed(1), recent: +recent.toFixed(1), achievement: +achievement.toFixed(1),
+        },
+        stats: { wickets: p.wickets, bowlAvg: p.bowlAvg, eco: p.eco, bsr: p.bsr, ap },
+      };
+    });
+
+    rows.sort((a, b) =>
+      b.rating - a.rating ||
+      b.ratingRaw - a.ratingRaw ||
+      b.stats.wickets - a.stats.wickets ||
+      a.name.localeCompare(b.name));
+
+    let prev = null, prevPos = 0;
+    rows.forEach((row, idx) => {
+      if (prev !== null && row.rating === prev) row.pos = prevPos;
+      else { row.pos = idx + 1; prevPos = row.pos; prev = row.rating; }
+    });
+
+    return { rows, meta: { bench, eligibleCount: eligible.length, totalPlayers: (players || []).length } };
+  }
+
+  function bowlingFromCsv(csvText) {
+    return computeBowling(parsePlayers(csvText));
+  }
+
   window.HCCLRanking = {
     parseCsv, parsePlayers,
     battingMatchPoints, recentFormScore, isBattingEligible,
     computeBatting, battingFromCsv,
-    BAT_ELIGIBLE, BAT_BASE,
+    bowlingMatchPoints, bowlingRecentFormScore, bowlingAchievementPoints, isBowlingEligible,
+    computeBowling, bowlingFromCsv,
+    BAT_ELIGIBLE, BAT_BASE, BOWL_ELIGIBLE, BOWL_BASE,
   };
 })();

@@ -4,12 +4,11 @@
    Renders into #view-ranking: three boards - Batting, Bowling,
    All-Rounder - with columns Pos / Player Name / Team / Rating.
 
-   Batting is COMPUTED live by the ranking engine from the bundled
-   stats sheet: ranking-data.js (raw CSV) -> ranking-engine.js
-   (window.HCCLRanking) -> rows here. Bowling still uses the
-   hardcoded RANKINGS.bowling array (its engine is coming next);
-   All-Rounder has no data yet and shows the "Coming Soon..."
-   placeholder. Top 10 visible, expandable to the full list.
+   Batting and Bowling are COMPUTED live by the ranking engine from
+   the bundled stats sheet: ranking-data.js (raw CSV) ->
+   ranking-engine.js (window.HCCLRanking) -> rows here. All-Rounder
+   has no data yet and shows the "Coming Soon..." placeholder.
+   Top 10 visible, expandable to the full list.
 
    Team icons: if the auction app has a team whose name contains the
    ranking team's keyword (e.g. "Lords" → "INVINCIBLE LORDS"), its
@@ -25,57 +24,35 @@
 
   const TOP_N = 10; // rows visible before expanding
 
-  /* --------------------- computed batting rows --------------------- */
-  // Built once from the bundled CSV via the engine; cached because the
-  // result is independent of when auction team logos finish syncing.
-  let battingCache;
-  function battingRows() {
-    if (battingCache !== undefined) return battingCache;
-    battingCache = null;
+  /* ------------------ computed rows (batting + bowling) ------------ */
+  // Both boards are computed from the bundled CSV via the engine, and
+  // cached because the result is independent of when auction team logos
+  // finish syncing. Map key -> the engine's "<board>FromCsv" fn name.
+  const ENGINE_FN = { batting: "battingFromCsv", bowling: "bowlingFromCsv" };
+  const boardCache = {};
+  function computedRows(key) {
+    if (key in boardCache) return boardCache[key];
+    let out = null;
     try {
       const R = window.HCCLRanking;
       const csv = window.HCCL_STATS_CSV;
-      if (R && typeof R.battingFromCsv === "function" && csv) {
-        const rows = R.battingFromCsv(csv).rows;
-        // Map engine rows to the { pos, name, team, rating } shape the
-        // table renderer expects (extra fields are harmless).
-        battingCache = rows.map(r => ({ pos: r.pos, name: r.name, team: r.team, rating: r.rating }));
+      const fn = ENGINE_FN[key];
+      if (R && fn && typeof R[fn] === "function" && csv) {
+        // Keep only the { pos, name, team, rating } the table needs.
+        out = R[fn](csv).rows.map(r => ({ pos: r.pos, name: r.name, team: r.team, rating: r.rating }));
       }
-    } catch (e) { console.error("batting ranking compute failed:", e); battingCache = null; }
-    return battingCache;
+    } catch (e) { console.error(key + " ranking compute failed:", e); out = null; }
+    boardCache[key] = out;
+    return out;
   }
 
-  // Rows for a board: batting is computed, the rest are hardcoded below.
+  // Rows for a board: batting/bowling are computed; all-rounder has no
+  // data yet, so it falls through to RANKINGS (null -> Coming Soon).
   function rowsFor(key) {
-    return key === "batting" ? battingRows() : RANKINGS[key];
+    return ENGINE_FN[key] ? computedRows(key) : RANKINGS[key];
   }
 
-  /* ------------------ hardcoded rankings (interim) ------------------ */
-  // { pos, name, team, rating } - pos is explicit so ties keep the
-  // official numbering (e.g. two players at 24, then 26).
   const RANKINGS = {
-    bowling: [
-      { pos: 1,  name: "Udara",    team: "Tearz",   rating: 869 },
-      { pos: 2,  name: "Chathuka", team: "Tearz",   rating: 787 },
-      { pos: 3,  name: "Sasindu",  team: "Matrix",  rating: 785 },
-      { pos: 4,  name: "Wenura",   team: "Lords",   rating: 709 },
-      { pos: 5,  name: "Yasitha",  team: "Titans",  rating: 707 },
-      { pos: 6,  name: "Kalana",   team: "Lords",   rating: 668 },
-      { pos: 7,  name: "Kaushila", team: "Reapers", rating: 656 },
-      { pos: 8,  name: "Rasindu",  team: "Gamers",  rating: 639 },
-      { pos: 9,  name: "Kavishka", team: "Gamers",  rating: 636 },
-      { pos: 10, name: "Yathish",  team: "Titans",  rating: 607 },
-      { pos: 11, name: "Umesh",    team: "Reapers", rating: 568 },
-      { pos: 12, name: "Nehan",    team: "Aura",    rating: 564 },
-      { pos: 13, name: "Kasun",    team: "Aura",    rating: 564 },
-      { pos: 14, name: "Sasiru",   team: "Titans",  rating: 561 },
-      { pos: 15, name: "Pabeesha", team: "Lords",   rating: 549 },
-      { pos: 16, name: "Chamindu", team: "Dragons", rating: 530 },
-      { pos: 17, name: "Pasindu",  team: "Matrix",  rating: 509 },
-      { pos: 18, name: "Sameera",  team: "Gamers",  rating: 503 },
-      { pos: 19, name: "Shenal",   team: "Aura",    rating: 492 },
-      { pos: 20, name: "Kanishka", team: "Reapers", rating: 489 },
-    ],
     allrounder: null, // no data yet - shows the Coming Soon placeholder
   };
 
