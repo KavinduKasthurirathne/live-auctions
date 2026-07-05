@@ -34,7 +34,12 @@
     allrounder: "allRounderFromCsv",
   };
   const boardCache = {};
-  function rowsFor(key) {
+  // Boards read from Firestore (ranking/league). When present these win over
+  // the local compute so every signed-in device shows the same published data.
+  let cloudBoards = null; // { batting:[], bowling:[], allrounder:[] } | null
+
+  // Local compute from the bundled CSV (offline fallback + the seed source).
+  function computeBoard(key) {
     if (key in boardCache) return boardCache[key];
     let out = null;
     try {
@@ -48,6 +53,47 @@
     } catch (e) { console.error(key + " ranking compute failed:", e); out = null; }
     boardCache[key] = out;
     return out;
+  }
+  function rowsFor(key) {
+    if (cloudBoards && Array.isArray(cloudBoards[key])) return cloudBoards[key];
+    return computeBoard(key);
+  }
+
+  /* ---------------- Firestore: read cloud boards + editor seed --------------- */
+  // "Seed once, read-only": everyone reads ranking/league; an editor whose
+  // bundled data is newer than the stored doc (re)publishes it. Viewers never
+  // write (Firestore rules enforce it) and fall back to the local compute.
+  let rankingSyncStarted = false;
+  function startRankingSync() {
+    const H = window.HCCL;
+    if (rankingSyncStarted || !H || !H.configured || !H.user || !H.db || !H.fs) return;
+    const fs = H.fs;
+    if (!fs.doc || !fs.onSnapshot) return;
+    rankingSyncStarted = true;
+    const ref = fs.doc(H.db, "ranking", "league");
+    fs.onSnapshot(ref, snap => {
+      const data = snap.exists() ? snap.data() : null;
+      const version = window.HCCL_STATS_VERSION || "";
+      const fresh = !!(data && data.version === version);
+      if (fresh) {
+        cloudBoards = {
+          batting: data.batting || [], bowling: data.bowling || [], allrounder: data.allrounder || [],
+        };
+        render();
+      }
+      // Missing or stale -> an editor publishes the current bundled boards.
+      if (!fresh && H.canEdit && H.canEdit() && fs.setDoc) {
+        const boards = {};
+        CATS.forEach(c => { boards[c.key] = computeBoard(c.key) || []; });
+        if (boards.batting && boards.batting.length) {
+          fs.setDoc(ref, {
+            version,
+            updatedAt: fs.serverTimestamp ? fs.serverTimestamp() : Date.now(),
+            batting: boards.batting, bowling: boards.bowling, allrounder: boards.allrounder,
+          }).catch(err => console.error("ranking cloud seed failed:", err));
+        }
+      }
+    }, err => console.error("ranking snapshot error:", err));
   }
 
   const CATS = [
@@ -177,6 +223,10 @@
     // logos once the cloud sync has delivered them.
     const tabs = document.getElementById("tabs");
     if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="ranking"]')) render(); });
+    // Read cloud boards (and seed them, if an editor) once signed in.
+    if (window.HCCL && typeof window.HCCL.onChange === "function") {
+      window.HCCL.onChange(() => startRankingSync());
+    }
     render();
   }
 

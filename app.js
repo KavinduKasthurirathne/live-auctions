@@ -1493,12 +1493,16 @@ function init() {
   save();
   renderAll();
   // Real-time auction (Phase D): start syncing once SIGNED IN (reads require auth).
+  let wasSignedIn = false;
   if (window.HCCL && typeof window.HCCL.onChange === "function") {
     window.HCCL.onChange(H => {
       if (H.configured && H.user && !auUsingFirestore && !auFellBack && auDb() && auApi()) {
         auUsingFirestore = true;
         startAuctionSync();
       }
+      // On the just-signed-in edge, land the user on the Home page.
+      if (H.configured && H.user && !wasSignedIn) switchTab("home");
+      wasSignedIn = !!(H.configured && H.user);
       renderAll(); updateCloudUploadBtn(); // re-render so gating applies live
     });
   }

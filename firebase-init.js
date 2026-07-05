@@ -176,16 +176,20 @@ function renderAuthGate() {
     document.body.appendChild(authGateEl);
   }
   authGateEl.classList.remove("hidden");
-  const seasonEl = document.getElementById("seasonTitle");
-  const season = (seasonEl && seasonEl.textContent.trim()) || "HCCL";
-  authGateEl.innerHTML = !H.ready
-    ? `<div class="auth-gate-card">${gateLogoHtml()}<h2>${esc(season)}</h2><p class="auth-gate-sub">Connecting…</p></div>`
-    : `<div class="auth-gate-card">
-        ${gateLogoHtml()}
-        <h2>${esc(season)}</h2>
-        <p class="auth-gate-sub">Live Auction & Fantasy Platform</p>
-        <button class="auth-btn" id="authGateBtn">Sign in with Google</button>
-       </div>`;
+  // Split landing: branded hero on the left, Google sign-in on the right.
+  const panel = !H.ready
+    ? `<p class="gate-welcome">Connecting…</p><span class="gate-panel-sub">One moment</span>`
+    : `<p class="gate-welcome">Welcome</p>
+       <p class="gate-panel-sub">Sign in to enter the league</p>
+       <button class="auth-btn" id="authGateBtn">Sign in with Google</button>`;
+  authGateEl.innerHTML = `
+    <div class="gate-hero">
+      ${gateLogoHtml()}
+      <h1 class="gate-title">HC CHAMPIONS LEAGUE</h1>
+      <p class="gate-tagline">The home of hand cricket champions</p>
+      <p class="gate-tags">Live Auctions · Fantasy League · Player Rankings</p>
+    </div>
+    <div class="gate-panel"><div class="gate-panel-card">${panel}</div></div>`;
   const b = document.getElementById("authGateBtn"); if (b) b.onclick = () => H.signIn();
 }
 

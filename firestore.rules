@@ -53,5 +53,12 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if canEdit();
     }
+
+    // Player ranking boards: ranking/league = { version, batting, bowling,
+    // allrounder }. Seeded/updated by editors; everyone signed in reads.
+    match /ranking/{document=**} {
+      allow read: if signedIn();
+      allow write: if canEdit();
+    }
   }
 }

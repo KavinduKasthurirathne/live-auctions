@@ -9,6 +9,10 @@
 
    Consumed by ranking-engine.js -> ranking.js.
    ============================================================ */
+// Bump this whenever the CSV below is regenerated. The Player Ranking
+// cloud seed (ranking.js) re-publishes the boards to Firestore when an
+// editor loads a version newer than the stored ranking/league doc.
+window.HCCL_STATS_VERSION = "2026-07-05";
 window.HCCL_STATS_CSV = `ID,NAME,TEAM,Innings,RUNS,AVG,SR,30s,50s,0s,POTMs,RAP,Recent 5 Matches,WICKETS,AVG,ECO,3Fers,4Fers,BSR,BAP,Recent 5 Matches
 P001,Sasindu Madushan,MATRIX,73,1107,16.3,245.5,7,4,14,15,995,"1. 11 runs, 275 SR, Highest scorer No, Not out No, POTM No
 2. 4 runs, 133.3 SR, Highest scorer No, Not out No, POTM No

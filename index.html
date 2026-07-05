@@ -24,7 +24,8 @@
       </div>
     </div>
     <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="auctions">🔨 Auctions</button>
+      <button class="tab active" data-tab="home">🏠 Home</button>
+      <button class="tab" data-tab="auctions">🔨 Auctions</button>
       <button class="tab" data-tab="squads">🏆 Squads</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
       <button class="tab" data-tab="ranking">📈 Player Ranking</button>
@@ -35,8 +36,11 @@
 
   <main class="app-main">
 
+    <!-- ===================== HOME (built by home.js) ===================== -->
+    <section class="view active" id="view-home"></section>
+
     <!-- ============ AUCTIONS: Auction Room / Players / Teams & Purse / Dashboard ============ -->
-    <section class="view active" id="view-auctions">
+    <section class="view" id="view-auctions">
       <nav class="subtabs" id="auctionSubtabs">
         <button class="subtab active" data-subtab="auction">🔨 Auction Room</button>
         <button class="subtab" data-subtab="players">👥 Players</button>
@@ -308,6 +312,8 @@
   <!-- Firebase config must load before the modules that read it -->
   <script src="firebase-config.js"></script>
   <script src="app.js"></script>
+  <!-- Home page (hero + season carousel) -->
+  <script src="home.js"></script>
   <!-- DOM-to-PNG for the leaderboard share cards (exposes window.htmlToImage) -->
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js"></script>
   <!-- Charts for the 📊 Insights tab (exposes window.Chart). Degrades gracefully if blocked. -->

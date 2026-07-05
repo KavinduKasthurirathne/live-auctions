@@ -413,26 +413,56 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .member-role-select { width: auto; flex: none; padding: 6px 8px; font-size: 13px; }
 .members-hint { color: var(--muted); font-size: 12px; margin-top: 12px; }
 
-/* ===================== SIGN-IN WALL ===================== */
+/* ===================== SIGN-IN WALL / LANDING ===================== */
 .app-locked { overflow: hidden; }
 .auth-gate {
   position: fixed; inset: 0; z-index: 2000;
-  background:
-    radial-gradient(1200px 600px at 50% -10%, rgba(225, 6, 0, 0.18), transparent 60%),
-    var(--black);
-  display: flex; align-items: center; justify-content: center; padding: 24px;
+  display: grid; grid-template-columns: 1fr 1fr; background: var(--black);
 }
 .auth-gate.hidden { display: none; }
-.auth-gate-card { text-align: center; max-width: 360px; }
-.auth-gate-logo {
-  width: 88px; height: 88px; margin: 0 auto 20px; border-radius: 22px;
-  background: linear-gradient(135deg, var(--red), var(--gold));
-  display: flex; align-items: center; justify-content: center;
-  font-family: "Heading Pro", sans-serif; font-weight: 700; font-size: 30px; color: #1a1300; box-shadow: var(--shadow);
+
+/* Left pane: branded hero. To use a photo later, add a background-image
+   layer to the `background` below (the gradient becomes the overlay). */
+.gate-hero {
+  position: relative; text-align: center; padding: 40px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-right: 1px solid var(--border);
+  background:
+    radial-gradient(900px 500px at 30% -10%, rgba(225, 6, 0, 0.30), transparent 60%),
+    radial-gradient(700px 500px at 80% 120%, rgba(255, 204, 0, 0.14), transparent 55%),
+    linear-gradient(160deg, #171012, var(--black));
 }
-.auth-gate-card h2 { font-size: 26px; margin-bottom: 8px; }
-.auth-gate-sub { color: var(--muted); margin-bottom: 22px; }
-.auth-gate .auth-btn { font-size: 15px; padding: 12px 22px; }
+.gate-hero .auth-gate-logo {
+  width: 120px; height: 120px; margin-bottom: 26px; border-radius: 28px;
+  background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat;
+  box-shadow: var(--shadow);
+}
+.gate-title {
+  font-family: "Heading Pro", sans-serif; font-weight: 700;
+  font-size: clamp(34px, 6vw, 68px); line-height: 1.02; letter-spacing: 2px;
+  background: linear-gradient(90deg, #fff, var(--yellow));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.gate-tagline { color: var(--text); font-size: clamp(15px, 2vw, 20px); margin-top: 14px; }
+.gate-tags { color: var(--muted); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; margin-top: 10px; }
+
+/* Right pane: sign-in card. */
+.gate-panel { display: flex; align-items: center; justify-content: center; padding: 40px; }
+.gate-panel-card {
+  width: 100%; max-width: 340px; text-align: center;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 20px;
+  padding: 40px 30px; box-shadow: var(--shadow);
+}
+.gate-welcome { font-family: "Heading Pro", sans-serif; font-weight: 700; font-size: 30px; margin-bottom: 6px; }
+.gate-panel-sub { color: var(--muted); margin-bottom: 26px; display: block; }
+.auth-gate .auth-btn { font-size: 15px; padding: 13px 24px; width: 100%; }
+
+@media (max-width: 760px) {
+  .auth-gate { grid-template-columns: 1fr; grid-template-rows: 1fr auto; overflow: auto; }
+  .gate-hero { border-right: none; border-bottom: 1px solid var(--border); padding: 48px 24px; }
+  .gate-hero .auth-gate-logo { width: 90px; height: 90px; margin-bottom: 18px; }
+  .gate-panel { padding: 28px 24px 40px; }
+}
 
 /* ===================== ROLE GATING ===================== */
 /* Viewers (and signed-out users, when Firebase is configured) get a read-only
@@ -585,4 +615,69 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 @media (max-width: 560px) {
   .rank-card { max-width: 100%; }
   .rank-table th, .rank-table td { padding: 10px 12px; }
+}
+
+/* ===================== HOME PAGE ===================== */
+.home-hero {
+  text-align: center; padding: 32px 20px 34px; margin-bottom: 26px;
+  border-radius: 20px; border: 1px solid var(--border);
+  background:
+    radial-gradient(700px 320px at 50% -20%, rgba(225,6,0,0.22), transparent 60%),
+    linear-gradient(160deg, var(--panel-2), var(--panel));
+}
+.home-hero-logo {
+  width: 92px; height: 92px; margin: 0 auto 16px; border-radius: 22px;
+  background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat;
+  box-shadow: var(--shadow);
+}
+.home-hero-title {
+  font-family: "Heading Pro", sans-serif; font-weight: 700;
+  font-size: clamp(30px, 5vw, 52px); letter-spacing: 2px; line-height: 1.05;
+  background: linear-gradient(90deg, #fff, var(--yellow));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.home-hero-sub { color: var(--text); font-size: 15px; margin-top: 10px; }
+.home-hero-tags { color: var(--muted); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-top: 8px; }
+
+.home-seasons-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.home-seasons-head h2 { font-family: "Heading Pro", sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 1px; }
+.carousel-nav { display: flex; gap: 8px; }
+.carousel-btn {
+  width: 38px; height: 38px; border-radius: 50%; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  font-size: 22px; line-height: 1; transition: all .15s ease;
+}
+.carousel-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+.season-carousel { overflow: hidden; border-radius: 18px; }
+.season-track { display: flex; transition: transform .45s cubic-bezier(.4,0,.2,1); }
+.season-card {
+  flex: 0 0 100%; box-sizing: border-box;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 22px;
+}
+.season-card-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.season-no {
+  flex: none; width: 60px; height: 60px; border-radius: 14px; display: grid; place-items: center;
+  font-family: "Heading Pro", sans-serif; font-weight: 700; font-size: 20px; color: #1a1300;
+  background: linear-gradient(135deg, var(--yellow), var(--gold));
+}
+.season-meta h3 { font-family: "Heading Pro", sans-serif; font-weight: 700; font-size: 22px; }
+.season-year { color: var(--muted); font-size: 13px; }
+.season-live { color: var(--green); font-weight: 700; letter-spacing: 1px; }
+.season-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 22px; }
+.ss-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.ss-ico { width: 22px; text-align: center; }
+.ss-label { color: var(--muted); font-size: 13px; flex: 1; }
+.ss-value { font-weight: 700; font-size: 14px; }
+.ss-row.gold .ss-value { color: var(--yellow); }
+
+.carousel-dots { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+.carousel-dots .dot {
+  width: 9px; height: 9px; border-radius: 50%; cursor: pointer; padding: 0;
+  background: var(--panel-3); border: 1px solid var(--border); transition: all .15s ease;
+}
+.carousel-dots .dot.on { background: var(--yellow); border-color: var(--yellow); width: 22px; border-radius: 6px; }
+
+@media (max-width: 560px) {
+  .season-stats { grid-template-columns: 1fr; }
 }

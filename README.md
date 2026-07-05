@@ -58,8 +58,10 @@ Two ways to run, automatically chosen:
 
 ## Sign-in & roles
 
-When Firebase is configured, the app shows a **sign-in wall** - you must sign in with
-Google before you can see anything. Each user has one of three roles:
+When Firebase is configured, a new visitor lands on a **split landing page** (branded
+**HC CHAMPIONS LEAGUE** hero on the left, Google sign-in on the right) - you must sign in
+before you can see anything. After signing in you land on the **🏠 Home** tab (league
+hero + a sliding carousel of past seasons). Each user has one of three roles:
 
 | Role | Can do |
 |------|--------|
@@ -198,10 +200,16 @@ chat. Built with the `html-to-image` library (loaded from a CDN).
 ## 📈 Player Ranking
 
 A dedicated **Player Ranking** tab with three boards on one page - **Batting**,
-**Bowling** and **All-Rounder** - each a Pos / Player Name / Rating table. The rating
-engine is being redesigned, so for now the boards show a **"Coming Soon..."** placeholder
-("Till that try to improve your stats 💪"). The table structure is already in place, so
-the real ranking logic can be wired in later without changing the layout.
+**Bowling** and **All-Rounder** - each a Pos / Player Name / Team / Rating table (top 10,
+expandable). Ratings are computed by `ranking-engine.js` from the bundled stats sheet
+(`ranking-data.js`).
+
+**Cloud-backed (seed once, read-only):** the computed boards are stored in Firestore at
+`ranking/league`. Everyone signed in reads that doc; the first **admin/moderator** whose
+bundled `HCCL_STATS_VERSION` is newer than the stored doc **auto-publishes** the boards
+(no upload UI). Viewers never write (Firestore rules). If Firestore is unreachable, the
+boards fall back to the local compute. To refresh: regenerate `ranking-data.js`, bump
+`HCCL_STATS_VERSION`, redeploy - the next editor load re-seeds the cloud doc.
 
 ---
 
@@ -319,11 +327,14 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 | `index.html` | Page structure (header, auction tabs, Insights view, fantasy mount, overlays) |
 | `app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, confetti, Firestore sync |
 | `fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
-| `ranking.js` | Player Ranking boards (placeholder - engine coming later) |
-| `HCCL Player Stats/` | Raw stats exports (kept for the upcoming ranking engine) |
-| `firebase-init.js` | Google auth, roles, members screen, sign-in wall, `window.HCCL` API |
+| `home.js` | Home page: HC CHAMPIONS LEAGUE hero + past-seasons carousel |
+| `ranking.js` | Player Ranking boards UI + Firestore read/seed of `ranking/league` |
+| `ranking-engine.js` | Rating math (batting/bowling/all-rounder) from the stats CSV |
+| `ranking-data.js` | Bundled stats CSV + `HCCL_STATS_VERSION` (ranking source/fallback) |
+| `HCCL Player Stats/` | Raw stats exports (source for regenerating `ranking-data.js`) |
+| `firebase-init.js` | Google auth, roles, members, split landing page, `window.HCCL` API |
 | `firebase-config.js` | Public Firebase web config + admin email list |
-| `firestore.rules` | Security rules (roles, read/write gating) |
+| `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` read/write gating) |
 | `styles.css` | Theme + auction UI + Squad Tracker / insights / role gating |
 | `fantasy.css` | Fantasy tab styling |
 | `brand-logo.jpg` | League logo for the sign-in wall and default favicon |
