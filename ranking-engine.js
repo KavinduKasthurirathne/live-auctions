@@ -368,12 +368,54 @@
     return computeBowling(parsePlayers(csvText));
   }
 
+  /* --------------------- all-rounder rating math ------------------- */
+  // AR Rating = sqrt(Batting Rating * Bowling Rating) - the geometric
+  // mean of a player's two published ratings. A player must therefore be
+  // ranked in BOTH boards (i.e. qualified as batter AND bowler); anyone
+  // ranked in only one has no all-rounder rating.
+  function computeAllRounder(players) {
+    const bat = computeBatting(players);
+    const bowl = computeBowling(players);
+    const bowlById = {};
+    bowl.rows.forEach(r => { bowlById[r.id] = r; });
+
+    const rows = [];
+    bat.rows.forEach(b => {
+      const w = bowlById[b.id];
+      if (!w) return; // needs a rating in both boards
+      const ratingRaw = Math.sqrt(b.rating * w.rating);
+      rows.push({
+        id: b.id, name: b.name, team: b.team,
+        rating: Math.round(ratingRaw), ratingRaw,
+        breakdown: { batting: b.rating, bowling: w.rating },
+      });
+    });
+
+    rows.sort((a, b) =>
+      b.rating - a.rating ||
+      b.ratingRaw - a.ratingRaw ||
+      a.name.localeCompare(b.name));
+
+    let prev = null, prevPos = 0;
+    rows.forEach((row, idx) => {
+      if (prev !== null && row.rating === prev) row.pos = prevPos;
+      else { row.pos = idx + 1; prevPos = row.pos; prev = row.rating; }
+    });
+
+    return { rows, meta: { eligibleCount: rows.length, totalPlayers: (players || []).length } };
+  }
+
+  function allRounderFromCsv(csvText) {
+    return computeAllRounder(parsePlayers(csvText));
+  }
+
   window.HCCLRanking = {
     parseCsv, parsePlayers,
     battingMatchPoints, recentFormScore, isBattingEligible,
     computeBatting, battingFromCsv,
     bowlingMatchPoints, bowlingRecentFormScore, bowlingAchievementPoints, isBowlingEligible,
     computeBowling, bowlingFromCsv,
+    computeAllRounder, allRounderFromCsv,
     BAT_ELIGIBLE, BAT_BASE, BOWL_ELIGIBLE, BOWL_BASE,
   };
 })();

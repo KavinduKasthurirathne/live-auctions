@@ -4,10 +4,10 @@
    Renders into #view-ranking: three boards - Batting, Bowling,
    All-Rounder - with columns Pos / Player Name / Team / Rating.
 
-   Batting and Bowling are COMPUTED live by the ranking engine from
-   the bundled stats sheet: ranking-data.js (raw CSV) ->
-   ranking-engine.js (window.HCCLRanking) -> rows here. All-Rounder
-   has no data yet and shows the "Coming Soon..." placeholder.
+   All three boards are COMPUTED live by the ranking engine from the
+   bundled stats sheet: ranking-data.js (raw CSV) -> ranking-engine.js
+   (window.HCCLRanking) -> rows here. All-Rounder is the geometric mean
+   sqrt(batting * bowling) for players ranked in both boards.
    Top 10 visible, expandable to the full list.
 
    Team icons: if the auction app has a team whose name contains the
@@ -24,13 +24,17 @@
 
   const TOP_N = 10; // rows visible before expanding
 
-  /* ------------------ computed rows (batting + bowling) ------------ */
-  // Both boards are computed from the bundled CSV via the engine, and
+  /* ---------------------- computed rows (all boards) --------------- */
+  // Every board is computed from the bundled CSV via the engine, and
   // cached because the result is independent of when auction team logos
   // finish syncing. Map key -> the engine's "<board>FromCsv" fn name.
-  const ENGINE_FN = { batting: "battingFromCsv", bowling: "bowlingFromCsv" };
+  const ENGINE_FN = {
+    batting: "battingFromCsv",
+    bowling: "bowlingFromCsv",
+    allrounder: "allRounderFromCsv",
+  };
   const boardCache = {};
-  function computedRows(key) {
+  function rowsFor(key) {
     if (key in boardCache) return boardCache[key];
     let out = null;
     try {
@@ -45,16 +49,6 @@
     boardCache[key] = out;
     return out;
   }
-
-  // Rows for a board: batting/bowling are computed; all-rounder has no
-  // data yet, so it falls through to RANKINGS (null -> Coming Soon).
-  function rowsFor(key) {
-    return ENGINE_FN[key] ? computedRows(key) : RANKINGS[key];
-  }
-
-  const RANKINGS = {
-    allrounder: null, // no data yet - shows the Coming Soon placeholder
-  };
 
   const CATS = [
     { key: "batting",    label: "🏏 Batting" },
