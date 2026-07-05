@@ -11,13 +11,14 @@
    "HCCL Batting Rankings Explanation.pdf", with the two points the
    PDF left open resolved per the league owner:
 
-     Final rating (100-1000, base 100):
+     Final rating (base 100, literal - same shape as bowling):
        perf   = 5*Career + 3*RecentForm + Achievement + Experience   (0..1000)
-       Rating = 100 + 0.9*perf                                        (100..1000)
+       Rating = 100 + perf                                           (clamped 100..1000)
        (Career<=100, RecentForm<=100, Achievement<=100, Experience<=100)
-       A 100-point base floors every eligible batter at 100; the
-       performance sum fills the remaining 900 in the confirmed
-       50/30/10/10 proportion, so the ceiling stays exactly 1000.
+       A 100-point base floors every eligible batter at 100. The perf
+       sum is added directly (no scaling) so batting is on the same
+       100+perf scale as bowling; the 1000 clamp is a safety cap that
+       is not reached on current data (top batter ~881).
 
      Career Score (<=100) = 0.5*RunsScore + 0.3*AvgScore + 0.2*SrScore
        each XScore = player.X / (highest X among QUALIFIED batters) * 100
@@ -226,9 +227,10 @@
       const achievement = max.rap ? clamp((p.rap / max.rap) * 100, 0, 100) : 0;
       const experience = max.innings ? clamp((p.innings / max.innings) * 100, 0, 100) : 0;
 
-      // 100 base + performance (0..1000) scaled into the remaining 900.
+      // 100 base + performance, added literally (same 100+perf scale as
+      // bowling). Clamp is a safety cap; not reached on current data.
       const perf = 5 * career + 3 * recent + achievement + experience; // 0..1000
-      const rating = clamp(BAT_BASE + (1000 - BAT_BASE) / 1000 * perf, BAT_BASE, 1000);
+      const rating = clamp(BAT_BASE + perf, BAT_BASE, 1000);
       return {
         id: p.id, name: p.name, team: p.team,
         rating: Math.round(rating), ratingRaw: rating,
