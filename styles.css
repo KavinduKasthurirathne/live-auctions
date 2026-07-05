@@ -542,16 +542,21 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .rank-section { animation: fade 0.25s ease; }
 .rank-sec-title { font-size: 16px; margin-bottom: 10px; letter-spacing: .5px; }
 .rank-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 6px 6px 4px; }
-.rank-table { width: 100%; border-collapse: collapse; }
-.rank-table th, .rank-table td { padding: 12px 16px; text-align: left; }
+/* Fixed layout so the four columns keep their widths and long player
+   names stay on one line (see .rk-name) regardless of board. */
+.rank-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.rank-table th, .rank-table td { padding: 11px 8px; text-align: left; }
 .rank-table thead th { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
 .rank-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.05); transition: background .15s ease; }
 .rank-table tbody tr:last-child { border-bottom: none; }
 .rank-table tbody tr:hover { background: rgba(255,255,255,0.03); }
-.rank-table th.rk-pos, .rank-table td.rk-pos { width: 62px; text-align: center; }
+.rank-table th.rk-pos, .rank-table td.rk-pos { width: 42px; text-align: center; padding-left: 4px; padding-right: 4px; }
 .rank-table td.rk-pos { font-family: "Heading Pro", sans-serif; font-weight: 700; font-size: 16px; color: var(--yellow); }
-.rank-table td.rk-name { color: var(--text); font-weight: 600; }
-.rank-table .rk-team { width: 70px; text-align: center; }
+/* Player name: always one line. Shrinks a touch to fit full names next
+   to the team logo; ellipsis only as a last resort on the narrowest cards. */
+.rank-table .rk-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-table td.rk-name { color: var(--text); font-weight: 600; font-size: 13px; }
+.rank-table .rk-team { width: 48px; text-align: center; }
 .team-ico {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: 8px; vertical-align: middle;
@@ -559,7 +564,7 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
   color: #fff; font-size: 13px; font-weight: 800;
   border: 1px solid rgba(255,255,255,0.12);
 }
-.rank-table .rk-rating { text-align: right; }
+.rank-table .rk-rating { width: 54px; text-align: right; }
 .rank-table td.rk-rating { font-weight: 800; color: var(--yellow); font-variant-numeric: tabular-nums; }
 .rank-expand {
   display: flex; align-items: center; justify-content: center; gap: 8px;
