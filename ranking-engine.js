@@ -216,9 +216,11 @@
     };
 
     const rows = eligible.map(p => {
-      const runsScore = max.runs ? (p.runs / max.runs) * 100 : 0;
-      const avgScore = max.avg ? (p.avg / max.avg) * 100 : 0;
-      const srScore = max.sr ? (p.sr / max.sr) * 100 : 0;
+      // Career sub-scores are rounded UP (ceiling) before weighting - the
+      // agreed HCCL convention (matches the reference spreadsheet).
+      const runsScore = Math.ceil(max.runs ? (p.runs / max.runs) * 100 : 0);
+      const avgScore = Math.ceil(max.avg ? (p.avg / max.avg) * 100 : 0);
+      const srScore = Math.ceil(max.sr ? (p.sr / max.sr) * 100 : 0);
       const career = 0.5 * runsScore + 0.3 * avgScore + 0.2 * srScore; // <=100
       const recent = recentFormScore(p.recentBat);                     // <=100
       const achievement = max.rap ? clamp((p.rap / max.rap) * 100, 0, 100) : 0;
@@ -329,10 +331,12 @@
     };
 
     const rows = eligible.map(p => {
-      const wicketsScore = bench.wickets ? (p.wickets / bench.wickets) * 100 : 0;
-      const avgScore = p.bowlAvg > 0 && isFinite(bench.avg) ? (bench.avg / p.bowlAvg) * 100 : 0;
-      const ecoScore = p.eco > 0 && isFinite(bench.eco) ? (bench.eco / p.eco) * 100 : 0;
-      const srScore = p.bsr > 0 && isFinite(bench.bsr) ? (bench.bsr / p.bsr) * 100 : 0;
+      // Career sub-scores are rounded UP (ceiling) before weighting - the
+      // agreed HCCL convention (matches the reference spreadsheet).
+      const wicketsScore = Math.ceil(bench.wickets ? (p.wickets / bench.wickets) * 100 : 0);
+      const avgScore = Math.ceil(p.bowlAvg > 0 && isFinite(bench.avg) ? (bench.avg / p.bowlAvg) * 100 : 0);
+      const ecoScore = Math.ceil(p.eco > 0 && isFinite(bench.eco) ? (bench.eco / p.eco) * 100 : 0);
+      const srScore = Math.ceil(p.bsr > 0 && isFinite(bench.bsr) ? (bench.bsr / p.bsr) * 100 : 0);
       const career = clamp(0.6 * wicketsScore + 0.2 * avgScore + 0.1 * ecoScore + 0.1 * srScore, 0, 100);
       const recent = bowlingRecentFormScore(p.recentBowl);
       const ap = bowlingAchievementPoints(p);
