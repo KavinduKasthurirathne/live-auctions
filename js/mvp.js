@@ -19,7 +19,7 @@
   "use strict";
 
   const TOP_N = 10;
-  const PARSER_VERSION = "2026-07-06";
+  const PARSER_VERSION = "2026-07-06-1";
   const PDFJS_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
   let matches = [];        // parsed match docs from Firestore, sorted oldest->newest

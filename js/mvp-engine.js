@@ -41,8 +41,8 @@
    *    Match  -  Winning team +5 (EVERY winning-team player);  POTM +15  *
    *                                                                      *
    *  IMPACT (30%), each contribution as a percentage number (ratio x100):*
-   *    battingC  = runs / teamTotal        x 100   (e.g. 25/45 -> 55.6)  *
-   *    bowlingC  = wickets / oppWicketsLost x 100   (e.g. 3/5  -> 60)    *
+   *    battingC  = runs / teamTotal        x 100  *
+   *    bowlingC  = wickets / oppWicketsLost x 100)    *
    *    matchResult = 100 if the player's team won, else 0                *
    *    Impact   = 0.45*battingC + 0.45*bowlingC + 0.10*matchResult       *
    *                                                                      *
@@ -120,10 +120,11 @@
   }
 
   /* =====================  1. PARSE  ===================== */
-  // Regexes tuned to the STUMPS "Match Report" export. A batting row ends in
-  // 5 numbers (R B 4s 6s SR); a bowling row ends in 10 (O M R W Eco 0s 4s 6s Wd NB).
-  const RE_BAT_HEAD = /^(.+?)\s+R\s+B\s+4s\s+6s\s+SR$/i;
-  const RE_BOWL_HEAD = /^Bowler\s+O\s+M\s+R\s+W\s+Eco/i;
+  // Regexes tuned to the STUMPS "Match Report" export. The headers can vary
+  // slightly between exports, so we accept optional "Batting" / "Bowling"
+  // prefixes and still parse the same scorecard rows.
+  const RE_BAT_HEAD = /^(.+?)\s+(?:Batting\s+)?R\s+B\s+4s\s+6s\s+SR$/i;
+  const RE_BOWL_HEAD = /^(?:Bowler|.+?)\s+(?:Bowling\s+)?O\s+M\s+R\s+W\s+Eco/i;
   const RE_BAT_ROW = /^(.+?)\s+(-?\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)$/;
   const RE_BOWL_ROW = /^(.+?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$/;
   const RE_TOTAL = /\bTotal\s+(\d+)\s*\/\s*(\d+)/i;
