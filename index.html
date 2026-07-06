@@ -28,6 +28,7 @@
       <button class="tab" data-tab="auctions">🔨 Auctions</button>
       <button class="tab" data-tab="squads">🏆 Squads</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
+      <button class="tab" data-tab="mvp">🏅 MVP</button>
       <button class="tab" data-tab="ranking">📈 Player Ranking</button>
       <button class="tab" data-tab="setup">⚙️ Setup</button>
     </nav>
@@ -292,6 +293,9 @@
     <!-- ===================== PLAYER RANKING (built by ranking.js) ===================== -->
     <section class="view" id="view-ranking"></section>
 
+    <!-- ===================== MVP RANKINGS (built by mvp.js) ===================== -->
+    <section class="view" id="view-mvp"></section>
+
   </main>
 
   <!-- ===================== RESULT OVERLAY ===================== -->
@@ -323,6 +327,10 @@
   <script src="js/ranking-data.js"></script>
   <script src="js/ranking-engine.js"></script>
   <script src="js/ranking.js"></script>
+  <!-- Season MVP: STUMPS match-report PDF parsing (pdf.js) -> engine -> boards -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script src="js/mvp-engine.js"></script>
+  <script src="js/mvp.js"></script>
   <!-- Auth + roles (Google sign-in); exposes window.HCCL -->
   <script type="module" src="firebase-init.js"></script>
 </body>

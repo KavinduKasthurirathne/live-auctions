@@ -67,5 +67,13 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if canEdit();
     }
+
+    // Season MVP: mvp/{matchId} = one parsed STUMPS match report.
+    // Editors upload/delete matches; everyone signed in reads (scores are
+    // computed client-side from these docs).
+    match /mvp/{document=**} {
+      allow read: if signedIn();
+      allow write: if canEdit();
+    }
   }
 }

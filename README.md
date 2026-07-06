@@ -24,6 +24,7 @@ Two ways to run, automatically chosen:
 - [The Auction](#-the-auction)
 - [The Fantasy League](#-the-fantasy-league)
 - [Player Ranking](#-player-ranking)
+- [Season MVP](#-season-mvp)
 - [Cloud sync (how live mode works)](#️-cloud-sync-how-live-mode-works)
 - [Data, backup & reset](#-data-backup--reset)
 - [Running it](#-running-it)
@@ -46,6 +47,8 @@ Two ways to run, automatically chosen:
 - 📈 **Optional player season stats** shown on the block; ✨ confetti, glow and pulse polish.
 - 🏏 **Fantasy league** with match days, captain/vice-captain multipliers, live points,
   season leaderboards and a Player of the Season board.
+- 🏅 **Season MVP** from a hybrid model - upload a STUMPS match-report PDF and the app
+  parses the scorecard in-browser to rank players match-by-match and across the season.
 - ☁️ **Real-time sync** via Firestore - auction and fantasy state mirror instantly to
   every signed-in device.
 - 🔐 **Google sign-in with Admin / Moderator / Viewer roles** and a members screen.
@@ -218,6 +221,38 @@ boards fall back to the local compute. To refresh: regenerate `ranking-data.js`,
 
 ---
 
+## 🏅 Season MVP
+
+A dedicated **MVP** tab with two live boards:
+
+- **Season MVP** - every player ranked by the sum of their Final Match MVP scores, with
+  matches played and an efficiency (MVP ÷ matches) column.
+- **Match-wise MVP** - pick a match from the chips to see that game's per-player breakdown
+  (**Fixed** / **Impact** / **Final**), plus the scoreline, result and Player of the Match.
+
+**How scores are calculated** - a hybrid model (`mvp-engine.js`, all constants in one
+`CONFIG` block):
+
+- **Fixed Points (70%)** - banded points for runs, strike rate, wickets, economy, dot balls
+  and maidens, plus bonuses (not-out, top scorer, best figures, winning team, POTM).
+- **Contribution Impact (30%)** - how much the player carried their team: batting share
+  (runs ÷ team total), bowling share (wickets ÷ opposition wickets), and the match result,
+  each scaled to 0-100 so the blend is meaningful, then weighted 0.45 / 0.45 / 0.10.
+- **Final Match MVP** = `0.70 × Fixed + 0.30 × Impact`; **Season MVP** = Σ Final across matches.
+
+**Uploading matches (admin / moderator):** the **⬆ Upload match PDF** button reads an
+exported **STUMPS "Match Report"** PDF entirely in the browser (`pdf.js`), extracts the two
+innings scorecards + result + POTM, and stores the **parsed** match at `mvp/{matchId}` in
+Firestore. Everyone signed in reads those docs and the boards are computed **client-side**,
+so tuning the model + redeploy updates every score without re-uploading. Editors can delete
+a match from its card. Realtime via `onSnapshot` (like fantasy).
+
+> Players are identified by the **name shown in the PDF** (STUMPS nicknames like "Sasi18").
+> To display roster names instead, add entries to `CONFIG.aliases` in `mvp-engine.js`
+> (e.g. `"Sasi18": "SASINDU MADUSHAN"`) - they aggregate correctly across matches either way.
+
+---
+
 ## ☁️ Cloud sync (how live mode works)
 
 When Firebase is configured and you're signed in, the app switches from local storage to
@@ -337,13 +372,15 @@ the HTML/JS are relative to it).
 | `vercel.json` | Static host config / optional auth rewrites |
 | `firebase-init.js` | Google auth, roles, members, split landing page, `window.HCCL` API |
 | `firebase-config.js` | Public Firebase web config + admin email list |
-| `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` `/home` read/write gating) |
+| `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` `/home` `/mvp` read/write gating) |
 | `js/app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, confetti, Firestore sync |
 | `js/fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
 | `js/home.js` | Home page: hero + past-seasons carousel + Firestore read/seed of `home/seasons` |
 | `js/ranking.js` | Player Ranking boards UI + Firestore read/seed of `ranking/league` |
 | `js/ranking-engine.js` | Rating math (batting/bowling/all-rounder) from the stats CSV |
 | `js/ranking-data.js` | Bundled stats CSV + `HCCL_STATS_VERSION` (ranking source/fallback) |
+| `js/mvp.js` | MVP boards UI + STUMPS PDF upload (pdf.js) + realtime `mvp/{matchId}` sync |
+| `js/mvp-engine.js` | Hybrid MVP model: PDF-scorecard parser + scoring + season aggregation |
 | `css/styles.css` | Theme + auction UI + Squad Tracker / insights / role gating |
 | `css/fantasy.css` | Fantasy tab styling |
 | `assets/brand-logo.jpg` | League logo for the sign-in wall and default favicon |
@@ -360,8 +397,8 @@ the HTML/JS are relative to it).
   local storage; Firestore takes over transparently in cloud mode.
 - **`window.HCCL`** is the bridge the auction/fantasy modules use for auth state, roles
   (`canEdit()`, `isAdmin()`), the `onChange` sign-in hook, and Firestore helpers.
-- **Image sharing** uses `html-to-image` and **charts** use `Chart.js` - both from a CDN, no
-  npm/build step.
+- **Image sharing** uses `html-to-image`, **charts** use `Chart.js`, and **MVP PDF parsing**
+  uses `pdf.js` - all from a CDN, no npm/build step.
 - **Resilient by design:** every cloud path has a local-storage fallback, so a blocked or
   offline Firestore never bricks the app.
 
