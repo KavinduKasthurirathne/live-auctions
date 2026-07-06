@@ -4,9 +4,9 @@
    Two live boards, backed by Firestore (realtime, like fantasy /
    ranking):
      • Season MVP   - every player ranked by Σ Final Match MVP score
-                      (with matches played + efficiency).
-     • Match-wise MVP - per-match breakdown (Fixed / Impact / Final),
-                      pick a match from the chips.
+                      (with matches played).
+     • Match-wise MVP - per-match Final MVP score per player; pick a
+                      match from the chips.
 
    Admins / moderators get an "⬆ Upload match PDF" button: it reads a
    STUMPS "Match Report" export in the browser (pdf.js), extracts the
@@ -42,6 +42,20 @@
   const sortKey = m => (m.ts || 0) || (m.uploadedAtMs || 0);
 
   /* --------------------------- team icons --------------------------- */
+  // Committed team-logo files (assets/Team Logos). The STUMPS team names are
+  // upper-cased ("SUPER FIRE DRAGONS"); we key the index by lowercased basename
+  // so they resolve regardless of case. Add a file here to introduce a team.
+  const TEAM_LOGO_FILES = [
+    "Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg", "Silentearz.jpeg",
+    "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg",
+  ];
+  const TEAM_LOGO_INDEX = {};
+  TEAM_LOGO_FILES.forEach(f => { TEAM_LOGO_INDEX[f.replace(/\.[^.]+$/, "").trim().toLowerCase()] = f; });
+  function teamLogo(team) {
+    const f = TEAM_LOGO_INDEX[String(team || "").trim().toLowerCase()];
+    return f ? encodeURI(`assets/Team Logos/${f}`) : "";
+  }
+
   const TEAM_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
   function teamColor(team) {
     let h = 0; team = String(team || "");
@@ -50,7 +64,10 @@
   }
   function teamIcon(team) {
     const t = String(team || "?");
-    return `<span class="team-ico" title="${esc(t)}" style="background:${teamColor(t)}">${esc(t[0] || "?")}</span>`;
+    const logo = teamLogo(t);
+    return logo
+      ? `<span class="team-ico" title="${esc(t)}" style="background-image:url('${logo}')"></span>`
+      : `<span class="team-ico" title="${esc(t)}" style="background:${teamColor(t)}">${esc(t[0] || "?")}</span>`;
   }
   function posCell(pos) {
     return pos === 1 ? "🥇" : pos === 2 ? "🥈" : pos === 3 ? "🥉" : pos;
@@ -176,7 +193,6 @@
       <td class="rk-team">${teamIcon(r.team)}</td>
       <td class="mvp-num">${r.matches}</td>
       <td class="mvp-num strong">${r.total}</td>
-      <td class="mvp-num muted">${r.efficiency}</td>
     </tr>`).join("");
     const expander = hasMore ? `<button class="rank-expand" type="button" data-mvp-expand="1" aria-expanded="${expanded}">
       <span>${expanded ? `Show top ${TOP_N}` : `Show all ${rows.length}`}</span>
@@ -186,7 +202,6 @@
         <th class="rk-pos">Pos</th><th class="rk-name">Player</th><th class="rk-team">Team</th>
         <th class="mvp-num" title="Matches played">M</th>
         <th class="mvp-num" title="Season MVP points">MVP</th>
-        <th class="mvp-num" title="MVP per match">Eff</th>
       </tr></thead>
       <tbody>${body}</tbody></table>${expander}</div>`;
   }
@@ -218,8 +233,6 @@
       <td class="rk-pos">${posCell(r.pos)}</td>
       <td class="rk-name">${esc(r.name)}${r.potm ? ` <span class="mvp-badge">POTM</span>` : ""}</td>
       <td class="rk-team">${teamIcon(r.team)}</td>
-      <td class="mvp-num muted">${r.fixed}</td>
-      <td class="mvp-num muted">${r.impact}</td>
       <td class="mvp-num strong">${r.final}</td>
     </tr>`).join("");
     const del = canEdit() ? `<div class="mvp-foot"><button class="btn btn-danger" type="button" data-mvp-del="${esc(m.matchId)}">Delete this match</button></div>` : "";
@@ -229,8 +242,6 @@
         <table class="rank-table mvp-table">
           <thead><tr>
             <th class="rk-pos">Pos</th><th class="rk-name">Player</th><th class="rk-team">Team</th>
-            <th class="mvp-num" title="Fixed points (70%)">Fixed</th>
-            <th class="mvp-num" title="Contribution impact (30%)">Impact</th>
             <th class="mvp-num" title="Final Match MVP">Final</th>
           </tr></thead>
           <tbody>${body}</tbody>
