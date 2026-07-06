@@ -11,14 +11,16 @@
   "use strict";
 
   // -------- sample season data (replace with real values later) --------
-  // Each: { no, year, ongoing?, winner, runnerUp, third, mostRuns, mostWickets, mvp }
+  // champion / runnerUp are TEAM names (rendered as team-logo bubbles);
+  // mvp / mostRuns / mostWickets are PLAYER names (rendered as photo bubbles).
+  // Each: { no, year, ongoing?, champion, runnerUp, mvp, mostRuns, mostWickets }
   const SEASONS = [
-    { no: 1, year: "2021", winner: "TBD", runnerUp: "TBD", third: "TBD", mostRuns: "TBD", mostWickets: "TBD", mvp: "TBD" },
-    { no: 2, year: "2022", winner: "TBD", runnerUp: "TBD", third: "TBD", mostRuns: "TBD", mostWickets: "TBD", mvp: "TBD" },
-    { no: 3, year: "2023", winner: "TBD", runnerUp: "TBD", third: "TBD", mostRuns: "TBD", mostWickets: "TBD", mvp: "TBD" },
-    { no: 4, year: "2024", winner: "TBD", runnerUp: "TBD", third: "TBD", mostRuns: "TBD", mostWickets: "TBD", mvp: "TBD" },
-    { no: 5, year: "2025", winner: "TBD", runnerUp: "TBD", third: "TBD", mostRuns: "TBD", mostWickets: "TBD", mvp: "TBD" },
-    { no: 6, year: "2026", ongoing: true, winner: "—", runnerUp: "—", third: "—", mostRuns: "TBD", mostWickets: "TBD", mvp: "TBD" },
+    { no: 1, year: "2021", champion: "TBD", runnerUp: "TBD", mvp: "TBD", mostRuns: "TBD", mostWickets: "TBD" },
+    { no: 2, year: "2022", champion: "TBD", runnerUp: "TBD", mvp: "TBD", mostRuns: "TBD", mostWickets: "TBD" },
+    { no: 3, year: "2023", champion: "TBD", runnerUp: "TBD", mvp: "TBD", mostRuns: "TBD", mostWickets: "TBD" },
+    { no: 4, year: "2024", champion: "TBD", runnerUp: "TBD", mvp: "TBD", mostRuns: "TBD", mostWickets: "TBD" },
+    { no: 5, year: "2025", champion: "TBD", runnerUp: "TBD", mvp: "TBD", mostRuns: "TBD", mostWickets: "TBD" },
+    { no: 6, year: "2026", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "TBD", mostWickets: "TBD" },
   ];
 
   const AUTOPLAY_MS = 6000;
@@ -32,11 +34,56 @@
   let index = 0;         // current slide
   let timer = null;      // autoplay handle
 
-  function statRow(icon, label, value, cls) {
-    return `<div class="ss-row${cls ? " " + cls : ""}">
-      <span class="ss-ico">${icon}</span>
-      <span class="ss-label">${label}</span>
-      <span class="ss-value">${esc(value)}</span>
+  /* ---------- bubble helpers (team logos / player photos) ---------- */
+  const BUBBLE_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
+  function bubbleColor(s) {
+    let h = 0; s = String(s || "");
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return BUBBLE_COLORS[Math.abs(h) % BUBBLE_COLORS.length];
+  }
+  const firstInitial = s => { const t = String(s || "").trim(); return t && t !== "—" ? t[0].toUpperCase() : "?"; };
+
+  // Look up a team logo / player photo from the auction data (app.js `state`,
+  // same global scope). Matching is by keyword contained in the full name,
+  // so "Lords" resolves "INVINCIBLE LORDS". Empty until data is filled in.
+  function teamLogo(team) {
+    try {
+      if (typeof state === "undefined" || !state || !Array.isArray(state.teams)) return "";
+      const kw = String(team || "").toLowerCase();
+      const t = state.teams.find(x => (x.name || "").toLowerCase().includes(kw));
+      return (t && t.logo) || "";
+    } catch (e) { return ""; }
+  }
+  function playerPhoto(name) {
+    try {
+      if (typeof state === "undefined" || !state || !Array.isArray(state.players)) return "";
+      const kw = String(name || "").toLowerCase();
+      const p = state.players.find(x => (x.name || "").toLowerCase().includes(kw));
+      return (p && p.photo) || "";
+    } catch (e) { return ""; }
+  }
+  // A round bubble: team logo / player photo if known, else a colored initial.
+  function bubble(kind, value) {
+    const img = kind === "team" ? teamLogo(value) : playerPhoto(value);
+    return img
+      ? `<span class="bubble" style="background-image:url('${img}')"></span>`
+      : `<span class="bubble fallback" style="background:${bubbleColor(value)}">${esc(firstInitial(value))}</span>`;
+  }
+
+  function podiumItem(cls, role, kind, value) {
+    return `<div class="podium-item ${cls}">
+      ${bubble(kind, value)}
+      <span class="podium-role">${role}</span>
+      <span class="podium-name">${esc(value)}</span>
+    </div>`;
+  }
+  function extraItem(icon, label, name) {
+    return `<div class="extra-item">
+      ${bubble("player", name)}
+      <div class="extra-meta">
+        <span class="extra-label">${icon} ${label}</span>
+        <span class="extra-name">${esc(name)}</span>
+      </div>
     </div>`;
   }
 
@@ -50,13 +97,14 @@
             <span class="season-year">${esc(s.year)}${s.ongoing ? ` · <span class="season-live">ONGOING</span>` : ""}</span>
           </div>
         </div>
-        <div class="season-stats">
-          ${statRow("🏆", "Champion", s.winner, "gold")}
-          ${statRow("🥈", "Runner-up", s.runnerUp)}
-          ${statRow("🥉", "Third place", s.third)}
-          ${statRow("🏏", "Most Runs", s.mostRuns)}
-          ${statRow("🎯", "Most Wickets", s.mostWickets)}
-          ${statRow("⭐", "MVP", s.mvp)}
+        <div class="podium">
+          ${podiumItem("mvp", "MVP", "player", s.mvp)}
+          ${podiumItem("champion", "Champion", "team", s.champion)}
+          ${podiumItem("runner", "Runner-up", "team", s.runnerUp)}
+        </div>
+        <div class="season-extra">
+          ${extraItem("🏏", "Most Runs", s.mostRuns)}
+          ${extraItem("🎯", "Most Wickets", s.mostWickets)}
         </div>
       </article>`;
   }

@@ -438,7 +438,7 @@
 
   /* ---------- share leaderboard as image ---------- */
   function shareRankBadge(i) {
-    const base = "width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Heading Pro',sans-serif;font-weight:700;font-size:24px;flex:none;";
+    const base = "width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Russo One',sans-serif;font-weight:700;font-size:24px;flex:none;";
     const grad = i === 0 ? "linear-gradient(135deg,#ffe066,#f5b301)"
       : i === 1 ? "linear-gradient(135deg,#dcdce4,#9a9aa4)"
       : i === 2 ? "linear-gradient(135deg,#e0975a,#a05a1e)" : "";
@@ -468,7 +468,7 @@
       "background:#0a0a0b;color:#f6f6f7;font-family:'Inter',system-ui,sans-serif;";
     card.innerHTML = `
       <div style="text-align:center;">
-        <div style="font-family:'Heading Pro',sans-serif;font-weight:700;font-size:56px;letter-spacing:1px;line-height:1;color:#ffcc00;">${esc(seasonTitle)} - Fantasy</div>
+        <div style="font-family:'Russo One',sans-serif;font-weight:700;font-size:56px;letter-spacing:1px;line-height:1;color:#ffcc00;">${esc(seasonTitle)} - Fantasy</div>
         <div style="font-size:23px;letter-spacing:4px;text-transform:uppercase;color:#f6f6f7;margin-top:14px;">${esc(subTitle)}</div>
         <div style="font-size:16px;color:#9b9ba3;margin-top:10px;">${esc(dateStr)}</div>
       </div>
