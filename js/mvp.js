@@ -238,7 +238,13 @@
       <td class="mvp-num strong">${r.final}</td>
     </tr>`).join("");
     const del = canEdit() ? `<div class="mvp-foot"><button class="btn btn-danger" type="button" data-mvp-del="${esc(m.matchId)}">Delete this match</button></div>` : "";
-    return `<div class="mvp-matchbar">${chips}</div>
+    const options = matches.map((mm, i) => {
+      const t = mm.teams || [];
+      const label = `Match ${pad2(i + 1)} - ${(t[0] && t[0].name) || "?"} vs ${(t[1] && t[1].name) || "?"}`;
+      return `<option value="${esc(mm.matchId)}"${mm.matchId === selectedId ? " selected" : ""}>${esc(label)}</option>`;
+    }).join("");
+    return `<select id="mvpMatchSelect" class="mvp-select" aria-label="Select a match">${options}</select>
+      <div class="mvp-matchbar">${chips}</div>
       <div class="rank-card">
         ${matchMeta(m)}
         <table class="rank-table mvp-table">
@@ -263,14 +269,16 @@
       </div>` : "";
     view.innerHTML = `
       <div class="view-head"><h2>MVP RANKINGS</h2>${uploader}</div>
-      <section class="mvp-block">
-        <h3 class="rank-sec-title">🏆 Season MVP</h3>
-        ${seasonCard()}
-      </section>
-      <section class="mvp-block">
-        <h3 class="rank-sec-title">📋 Match-wise MVP</h3>
-        ${matchSection()}
-      </section>`;
+      <div class="mvp-cols">
+        <section class="mvp-block">
+          <h3 class="rank-sec-title">📋 Match-wise MVP</h3>
+          ${matchSection()}
+        </section>
+        <section class="mvp-block">
+          <h3 class="rank-sec-title">🏆 Season MVP</h3>
+          ${seasonCard()}
+        </section>
+      </div>`;
   }
 
   /* ---------------------------- events ----------------------------- */
@@ -283,6 +291,8 @@
     if (del) { deleteMatch(del.getAttribute("data-mvp-del")); return; }
   }
   function onChange(e) {
+    const sel = e.target.closest("#mvpMatchSelect");
+    if (sel) { selectedId = sel.value; render(); return; }
     const inp = e.target.closest("#mvpPdf");
     if (inp && inp.files && inp.files[0]) {
       const f = inp.files[0];

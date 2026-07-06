@@ -630,6 +630,10 @@ body:not(.can-edit) .rank-import { display: none; }
 
 /* ===================== MVP RANKINGS ===================== */
 .mvp-block + .mvp-block { margin-top: 28px; }
+/* Match-wise (left) + Season MVP (right) side by side; stacks when narrow. */
+.mvp-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; align-items: start; }
+.mvp-cols .mvp-block + .mvp-block { margin-top: 0; } /* grid gap handles spacing */
+.mvp-select { width: 100%; margin-bottom: 12px; }
 .mvp-hint { color: var(--muted); font-size: 12.5px; margin: -2px 0 12px; }
 .file-btn.is-busy { opacity: .6; pointer-events: none; }
 
@@ -674,9 +678,13 @@ body:not(.can-edit) .rank-import { display: none; }
 .home-hero {
   text-align: center; padding: 32px 20px 34px; margin-bottom: 26px;
   border-radius: 20px; border: 1px solid var(--border);
+  overflow: hidden;
+  /* Layers (top -> bottom): red brand glow, dark overlay for text contrast,
+     the hero photo. Path is relative to this file in /css, hence ../assets. */
   background:
-    radial-gradient(700px 320px at 50% -20%, rgba(225,6,0,0.22), transparent 60%),
-    linear-gradient(160deg, var(--panel-2), var(--panel));
+    radial-gradient(700px 320px at 50% -20%, rgba(225,6,0,0.28), transparent 60%),
+    linear-gradient(160deg, rgba(12,12,14,0.70), rgba(10,10,11,0.82)),
+    url('../assets/home-hero bg image.webp') center/cover no-repeat;
 }
 .home-hero-logo {
   width: 92px; height: 92px; margin: 0 auto 16px; border-radius: 22px;

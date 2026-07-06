@@ -60,7 +60,7 @@ function renderAuthBox() {
           <span class="auth-name">${esc(H.user.displayName || H.user.email || "")}</span>
           <span class="auth-role role-${esc(H.role)}">${esc(H.role)}</span>
         </div>
-        ${H.isAdmin() ? `<button class="auth-btn ghost" id="authMembers">Members</button>` : ""}
+        ${H.isAdmin() ? `<button class="auth-btn ghost" id="authMembers">👤 Members</button>` : ""}
         <button class="auth-btn ghost" id="authSignOut">Sign out</button>
       </div>`;
     const mb = document.getElementById("authMembers"); if (mb) mb.onclick = openMembers;
