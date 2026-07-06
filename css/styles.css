@@ -567,6 +567,12 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 }
 
 /* ===================== PLAYER RANKING ===================== */
+/* Header tools: the moderator/admin "Import stats CSV" button + note. */
+.rank-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rank-updated { color: var(--muted); font-size: 12px; font-style: italic; }
+/* Import is an editor-only control (admin/moderator, or offline mode). */
+body:not(.can-edit) .rank-import { display: none; }
+
 /* Three panels on one page: side-by-side on desktop, stacked on mobile. */
 .rank-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; align-items: start; }
 .rank-section { animation: fade 0.25s ease; }

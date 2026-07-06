@@ -150,7 +150,7 @@
       <section class="home-hero">
         <div class="home-hero-logo" style="background-image:url('assets/brand-logo.jpg')"></div>
         <h1 class="home-hero-title">HC CHAMPIONS LEAGUE</h1>
-        <p class="home-hero-sub">The home of hand cricket champions</p>
+        <p class="home-hero-sub">THE HOME OF HAND CRICKET CHAMPIONS</p>
         <p class="home-hero-tags">Live Auctions · Fantasy League · Player Rankings</p>
       </section>
 

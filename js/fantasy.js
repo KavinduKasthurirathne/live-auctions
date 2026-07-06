@@ -416,7 +416,7 @@
     return `<div class="fan-board-grid">
       <div class="card"><div class="fan-card-head"><h3>🏆 Contestants</h3><button class="btn btn-dark fan-share-btn" data-share-board="contestant" title="Download as image">📷 Share</button></div>
         ${boardTable(cs.map(s => ({ name: s.contestant.name, avg: s.avg, days: s.days, total: s.total })), "Contestant", "contestant")}</div>
-      <div class="card"><div class="fan-card-head"><h3>⭐ Player of the Season</h3><button class="btn btn-dark fan-share-btn" data-share-board="player" title="Download as image">📷 Share</button></div>
+      <div class="card"><div class="fan-card-head"><h3>⭐ Fantasy Player of the Season</h3><button class="btn btn-dark fan-share-btn" data-share-board="player" title="Download as image">📷 Share</button></div>
         ${boardTable(ps.map(s => ({ name: s.player.name, sub: teamName(s.player.teamId), avg: s.avg, days: s.days, total: s.total })), "Player", "player")}</div>
     </div>`;
   }
