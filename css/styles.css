@@ -661,6 +661,11 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
   font-family: "Russo One", sans-serif; font-weight: 700; font-size: 20px; color: #1a1300;
   background: linear-gradient(135deg, var(--yellow), var(--gold));
 }
+/* When a real season logo exists, show it instead of the S## gradient badge. */
+.season-no.has-logo {
+  background: #0d0d0f center/cover no-repeat;
+  border: 1px solid var(--border);
+}
 .season-meta h3 { font-family: "Russo One", sans-serif; font-weight: 700; font-size: 22px; }
 .season-year { color: var(--muted); font-size: 13px; }
 .season-live { color: var(--green); font-weight: 700; letter-spacing: 1px; }

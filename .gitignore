@@ -23,6 +23,6 @@ build/
 *.csv
 # …EXCEPT the season stats: the Player Ranking engine fetches these at
 # runtime, so they must ship with the deployed site.
-!HCCL Player Stats/*.csv
+!docs/HCCL Player Stats/*.csv
 
 *.pdf

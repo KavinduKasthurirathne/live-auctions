@@ -1,6 +1,6 @@
 /* ============================================================
    HCCL bundled stats snapshot (auto-generated from
-   "HCCL Player Stats/HCCL Statistics.csv").
+   "docs/HCCL Player Stats/HCCL Statistics.csv").
 
    This is the CURRENT stats sheet, embedded as raw CSV so the
    ranking engine parses it with the exact same parser the future

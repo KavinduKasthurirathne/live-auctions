@@ -60,5 +60,12 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if canEdit();
     }
+
+    // Home page seasons: home/seasons = { version, seasons:[...] }.
+    // Seeded/updated by editors; everyone signed in reads.
+    match /home/{document=**} {
+      allow read: if signedIn();
+      allow write: if canEdit();
+    }
   }
 }

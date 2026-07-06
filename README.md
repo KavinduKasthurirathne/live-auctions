@@ -61,7 +61,12 @@ Two ways to run, automatically chosen:
 When Firebase is configured, a new visitor lands on a **split landing page** (branded
 **HC CHAMPIONS LEAGUE** hero on the left, Google sign-in on the right) - you must sign in
 before you can see anything. After signing in you land on the **🏠 Home** tab (league
-hero + a sliding carousel of past seasons). Each user has one of three roles:
+hero + a sliding carousel of past seasons). The season results are **cloud-backed** the
+same way rankings are: they live in Firestore at `home/seasons` (seed once, read-only) so
+every device shows the same champions/MVPs, with the bundled `SEASONS` array in
+`js/home.js` as the seed source and offline fallback. Season/team/player **images** ship
+as committed assets under `assets/` (served by Vercel), referenced by name. Each user has
+one of three roles:
 
 | Role | Can do |
 |------|--------|
@@ -314,7 +319,7 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 
 - **In-app:** set the season name/number and upload the league logo in
   **Setup → League Settings**. This drives the header, the tab title, and the favicon.
-- **Sign-in wall + default favicon:** swap the committed `brand-logo.jpg` (the league
+- **Sign-in wall + default favicon:** swap the committed `assets/brand-logo.jpg` (the league
   shield shown on the landing/sign-in screen and as the fallback tab icon) to rebrand for a
   new season.
 
@@ -322,23 +327,28 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 
 ## 📁 Project structure
 
-| File | Purpose |
+Files are grouped into folders; `index.html`, `vercel.json`, `.gitignore`, and the
+Firebase files stay in the root (Vercel serves `index.html` from the root, and paths in
+the HTML/JS are relative to it).
+
+| Path | Purpose |
 |------|---------|
 | `index.html` | Page structure (header, auction tabs, Insights view, fantasy mount, overlays) |
-| `app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, confetti, Firestore sync |
-| `fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
-| `home.js` | Home page: HC CHAMPIONS LEAGUE hero + past-seasons carousel |
-| `ranking.js` | Player Ranking boards UI + Firestore read/seed of `ranking/league` |
-| `ranking-engine.js` | Rating math (batting/bowling/all-rounder) from the stats CSV |
-| `ranking-data.js` | Bundled stats CSV + `HCCL_STATS_VERSION` (ranking source/fallback) |
-| `HCCL Player Stats/` | Raw stats exports (source for regenerating `ranking-data.js`) |
+| `vercel.json` | Static host config / optional auth rewrites |
 | `firebase-init.js` | Google auth, roles, members, split landing page, `window.HCCL` API |
 | `firebase-config.js` | Public Firebase web config + admin email list |
-| `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` read/write gating) |
-| `styles.css` | Theme + auction UI + Squad Tracker / insights / role gating |
-| `fantasy.css` | Fantasy tab styling |
-| `brand-logo.jpg` | League logo for the sign-in wall and default favicon |
-| `vercel.json` | Static host config / optional auth rewrites |
+| `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` `/home` read/write gating) |
+| `js/app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, confetti, Firestore sync |
+| `js/fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
+| `js/home.js` | Home page: hero + past-seasons carousel + Firestore read/seed of `home/seasons` |
+| `js/ranking.js` | Player Ranking boards UI + Firestore read/seed of `ranking/league` |
+| `js/ranking-engine.js` | Rating math (batting/bowling/all-rounder) from the stats CSV |
+| `js/ranking-data.js` | Bundled stats CSV + `HCCL_STATS_VERSION` (ranking source/fallback) |
+| `css/styles.css` | Theme + auction UI + Squad Tracker / insights / role gating |
+| `css/fantasy.css` | Fantasy tab styling |
+| `assets/brand-logo.jpg` | League logo for the sign-in wall and default favicon |
+| `docs/HCCL Player Stats/` | Raw stats exports (source for regenerating `js/ranking-data.js`) |
+| `docs/HCCL Batting Rankings Explanation.pdf` | Reference doc for the batting rating math |
 
 ---
 
