@@ -417,7 +417,12 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .app-locked { overflow: hidden; }
 .auth-gate {
   position: fixed; inset: 0; z-index: 2000;
-  display: grid; grid-template-columns: 1fr 1fr; background: var(--black);
+  display: grid; grid-template-columns: 1fr 1fr;
+  /* Full-page login photo, stretched to fill the whole page (100% 100%,
+     not cropped), under a dark scrim for text contrast. */
+  background:
+    linear-gradient(rgba(10, 10, 11, 0.55), rgba(10, 10, 11, 0.72)),
+    url('../assets/login-page  bg image.jpg') center/100% 100% no-repeat var(--black);
 }
 .auth-gate.hidden { display: none; }
 
@@ -427,10 +432,10 @@ input[type="file"] { padding: 8px; font-size: 13px; }
   position: relative; text-align: center; padding: 40px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   border-right: 1px solid var(--border);
+  /* Translucent glows only - the page photo on .auth-gate shows through. */
   background:
-    radial-gradient(900px 500px at 30% -10%, rgba(225, 6, 0, 0.30), transparent 60%),
-    radial-gradient(700px 500px at 80% 120%, rgba(255, 204, 0, 0.14), transparent 55%),
-    linear-gradient(160deg, #171012, var(--black));
+    radial-gradient(900px 500px at 30% -10%, rgba(225, 6, 0, 0.26), transparent 60%),
+    radial-gradient(700px 500px at 80% 120%, rgba(255, 204, 0, 0.12), transparent 55%);
 }
 .gate-hero .auth-gate-logo {
   width: 120px; height: 120px; margin-bottom: 26px; border-radius: 28px;
@@ -684,7 +689,7 @@ body:not(.can-edit) .rank-import { display: none; }
   background:
     radial-gradient(700px 320px at 50% -20%, rgba(225,6,0,0.28), transparent 60%),
     linear-gradient(160deg, rgba(12,12,14,0.70), rgba(10,10,11,0.82)),
-    url('../assets/home-hero bg image.jpg') center/cover no-repeat;
+    url('../assets/home-hero bg image.jpg') center/100% 100% no-repeat;
 }
 .home-hero-logo {
   width: 92px; height: 92px; margin: 0 auto 16px; border-radius: 22px;
@@ -714,7 +719,12 @@ body:not(.can-edit) .rank-import { display: none; }
 .season-track { display: flex; transition: transform .45s cubic-bezier(.4,0,.2,1); }
 .season-card {
   flex: 0 0 100%; box-sizing: border-box;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 22px;
+  border: 1px solid var(--border); border-radius: 18px; padding: 22px;
+  /* Seasons photo stretched to fill the card (100% 100%, not cropped),
+     under a dark scrim so the podium/text stay readable. */
+  background:
+    linear-gradient(rgba(16, 16, 18, 0.80), rgba(16, 16, 18, 0.88)),
+    url('../assets/seasons bg image.jpg') center/100% 100% no-repeat var(--panel);
 }
 .season-card-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
 .season-no {
