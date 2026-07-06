@@ -211,12 +211,11 @@
     const score = teams.map(x =>
       `<span class="mvp-team">${teamIcon(x.name)} <b>${esc(x.name)}</b> <span class="mvp-team-sc">${x.total}/${x.wickets}</span></span>`
     ).join(`<span class="mvp-vs">vs</span>`);
-    // Resolve winner/POTM through the engine so older docs self-heal (winner
-    // from totals; a stored POTM that is really a team name is dropped).
-    const info = eng() ? eng().matchInfo(m) : { winner: m.winner, potm: m.potm };
+    // Resolve winner through the engine so older docs self-heal (winner from
+    // totals, not the unreliable stored text).
+    const info = eng() ? eng().matchInfo(m) : { winner: m.winner };
     const res = [];
     if (info.winner) res.push(`<span class="mvp-win">🏆 ${esc(info.winner)} won</span>`);
-    if (info.potm) res.push(`<span class="mvp-potm">🏅 ${esc(info.potm)}</span>`);
     if (m.dateText) res.push(`<span class="mvp-date">${esc(m.dateText)}</span>`);
     return `<div class="mvp-matchmeta">
       <div class="mvp-score">${score}</div>
@@ -234,7 +233,7 @@
     const rows = eng().computeMatch(m);
     const body = rows.map(r => `<tr>
       <td class="rk-pos">${posCell(r.pos)}</td>
-      <td class="rk-name">${esc(r.name)}${r.potm ? ` <span class="mvp-badge">POTM</span>` : ""}</td>
+      <td class="rk-name">${esc(r.name)}</td>
       <td class="rk-team">${teamIcon(r.team)}</td>
       <td class="mvp-num strong">${r.final}</td>
     </tr>`).join("");
