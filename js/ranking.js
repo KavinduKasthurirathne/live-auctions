@@ -41,6 +41,7 @@
   const boardCache = {};
   let activeCsv = null;   // cloud-imported CSV; null -> bundled fallback
   let lastImport = null;  // { by } for the "last updated" note
+  let prevPositions = null; // per board { nameKey: pos } from the PREVIOUS sheet
   function currentCsv() { return activeCsv || window.HCCL_STATS_CSV || ""; }
   function resetBoards() { for (const k in boardCache) delete boardCache[k]; }
 
@@ -61,6 +62,22 @@
   }
   function rowsFor(key) { return computeBoard(key); }
 
+  // Player key for matching the same player across sheets.
+  const keyOf = s => String(s == null ? "" : s).trim().toLowerCase();
+  // { board: { nameKey: pos } } computed from a CSV, for rank-movement diffs.
+  function positionsFromCsv(csv) {
+    const out = {};
+    Object.keys(ENGINE_FN).forEach(key => {
+      const map = {};
+      try {
+        const R = window.HCCLRanking, fn = ENGINE_FN[key];
+        if (R && typeof R[fn] === "function" && csv) R[fn](csv).rows.forEach(r => { map[keyOf(r.name)] = r.pos; });
+      } catch (e) {}
+      out[key] = map;
+    });
+    return out;
+  }
+
   /* ------------- Firestore: shared imported stats CSV -------------- */
   // Everyone signed in reads ranking/stats; moderators/admins upload a new
   // CSV via the Import button. Firestore rules (ranking/**: write if editor)
@@ -79,6 +96,7 @@
       const csv = data && typeof data.csv === "string" && data.csv.trim() ? data.csv : null;
       activeCsv = csv;                  // null -> bundled fallback
       lastImport = data ? { by: data.updatedBy || "" } : null;
+      prevPositions = (data && data.prev) || null; // positions before this import
       resetBoards();
       render();
     }, err => console.error("ranking stats snapshot error:", err));
@@ -104,8 +122,11 @@
     if (H && H.configured && H.db && H.fs && H.fs.setDoc && H.canEdit && H.canEdit()) {
       try {
         const ref = H.fs.doc(H.db, "ranking", "stats");
+        // Snapshot the outgoing sheet's positions so the new one can show movement.
+        const prev = positionsFromCsv(currentCsv());
         await H.fs.setDoc(ref, {
           csv: text,
+          prev,
           updatedAt: H.fs.serverTimestamp ? H.fs.serverTimestamp() : Date.now(),
           updatedBy: (H.user && (H.user.displayName || H.user.email)) || "",
         });
@@ -121,6 +142,7 @@
     // viewers; this is a belt-and-braces guard - rules also block the write).
     if (H && H.configured) { notify("Only moderators/admins can import stats.", "bad"); return; }
     // Offline / open mode (no cloud): apply on this device only.
+    prevPositions = positionsFromCsv(currentCsv());
     activeCsv = text; resetBoards(); render();
     notify(`Stats imported - ${players.length} players (this device only).`, "good");
   }
@@ -169,6 +191,25 @@
       : `<span class="team-ico" title="${esc(team)}" style="background:${teamColor(team)}">${esc(team[0] || "?")}</span>`;
   }
 
+  /* ------------------- rank-movement indicator --------------------- */
+  // Shown before a player's name. Compares the current position with the
+  // previous sheet's (prevPositions, set at import). Climbed = green up arrow +
+  // places, dropped = red down arrow + places; otherwise a gray "=" when the
+  // player is tied on rating with a neighbour; nothing when simply unchanged.
+  function moveIndicator(boardKey, rows, i) {
+    const r = rows[i];
+    const prev = prevPositions && prevPositions[boardKey];
+    const prevPos = prev ? prev[keyOf(r.name)] : undefined;
+    if (prevPos != null) {
+      const delta = prevPos - r.pos;
+      if (delta > 0) return `<span class="rank-move up" title="Up ${delta}">▲${delta}</span>`;
+      if (delta < 0) return `<span class="rank-move down" title="Down ${-delta}">▼${-delta}</span>`;
+    }
+    const tie = (rows[i - 1] && rows[i - 1].rating === r.rating) ||
+                (rows[i + 1] && rows[i + 1].rating === r.rating);
+    return tie ? `<span class="rank-move same" title="Tied rating">=</span>` : "";
+  }
+
   /* ------------------------- board rendering ------------------------ */
   function tableFor(cat) {
     const rows = rowsFor(cat.key);
@@ -194,10 +235,10 @@
     const shown = expanded ? rows : rows.slice(0, TOP_N);
     const hasMore = rows.length > TOP_N;
 
-    const body = shown.map(r => `
+    const body = shown.map((r, i) => `
       <tr>
         <td class="rk-pos">${posCell(r.pos)}</td>
-        <td class="rk-name">${esc(r.name)}</td>
+        <td class="rk-name">${moveIndicator(cat.key, rows, i)}${esc(r.name)}</td>
         <td class="rk-team">${teamIcon(r.team)}</td>
         <td class="rk-rating">${esc(r.rating)}</td>
       </tr>`).join("");
