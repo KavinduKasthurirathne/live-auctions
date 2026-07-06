@@ -179,6 +179,27 @@
   const fDay = id => F.days.find(d => d.id === id);
   const pname = id => { const p = fPlayer(id); return p ? p.name : ""; };
   const teamName = id => { const t = fTeam(id); return t ? t.name : "-"; };
+  // Team logo for the Player of the Season board: resolve the committed
+  // assets/Team Logos file by team name (same set the MVP / home boards use),
+  // falling back to a colored initial when no file matches.
+  const FAN_TEAM_LOGOS = ["Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg",
+    "Silentearz.jpeg", "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg"];
+  const FAN_TEAM_LOGO_INDEX = {};
+  FAN_TEAM_LOGOS.forEach(f => { FAN_TEAM_LOGO_INDEX[f.replace(/\.[^.]+$/, "").trim().toLowerCase()] = f; });
+  const FAN_TEAM_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
+  function fanTeamColor(name) {
+    let h = 0; name = String(name || "");
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+    return FAN_TEAM_COLORS[Math.abs(h) % FAN_TEAM_COLORS.length];
+  }
+  function teamIcon(name) {
+    const t = String(name || "").trim();
+    if (!t || t === "-") return "";
+    const f = FAN_TEAM_LOGO_INDEX[t.toLowerCase()];
+    return f
+      ? `<span class="team-ico" title="${esc(t)}" style="background-image:url('${encodeURI("assets/Team Logos/" + f)}')"></span>`
+      : `<span class="team-ico" title="${esc(t)}" style="background:${fanTeamColor(t)}">${esc(t[0] ? t[0].toUpperCase() : "?")}</span>`;
+  }
   function fmtPts(n) { return String(Math.round((Number(n) || 0) * 100) / 100); }
   function today() { return new Date().toISOString().slice(0, 10); }
   function dayLabel(d) {
@@ -417,16 +438,16 @@
       <div class="card"><div class="fan-card-head"><h3>🏆 Contestants</h3><button class="btn btn-dark fan-share-btn" data-share-board="contestant" title="Download as image">📷 Share</button></div>
         ${boardTable(cs.map(s => ({ name: s.contestant.name, avg: s.avg, days: s.days, total: s.total })), "Contestant", "contestant")}</div>
       <div class="card"><div class="fan-card-head"><h3>⭐ Fantasy Player of the Season</h3><button class="btn btn-dark fan-share-btn" data-share-board="player" title="Download as image">📷 Share</button></div>
-        ${boardTable(ps.map(s => ({ name: s.player.name, sub: teamName(s.player.teamId), avg: s.avg, days: s.days, total: s.total })), "Player", "player")}</div>
+        ${boardTable(ps.map(s => ({ name: s.player.name, team: teamName(s.player.teamId), avg: s.avg, days: s.days, total: s.total })), "Player", "player")}</div>
     </div>`;
   }
   function boardTable(rows, label, kind) {
     if (!rows.length) return `<p class="hint">No results yet. Add entries and save match results.</p>`;
     const head = kind === "player"
-      ? `<th class="num" title="Matches played">Matches</th><th class="num" title="Total points">Total</th>`
+      ? `<th title="Team">Team</th><th class="num" title="Total points">Total</th>`
       : `<th class="num" title="Total points">Total</th>`;
     const cells = r => kind === "player"
-      ? `<td class="num">${r.days}</td><td class="num strong">${fmtPts(r.total)}</td>`
+      ? `<td>${teamIcon(r.team)}</td><td class="num strong">${fmtPts(r.total)}</td>`
       : `<td class="num strong">${fmtPts(r.total)}</td>`;
     return `<table class="fan-table">
       <thead><tr><th>#</th><th>${label}</th>${head}</tr></thead>
@@ -494,7 +515,7 @@
         <div style="display:flex;align-items:center;padding:0 24px 14px;color:#9b9ba3;font-size:14px;letter-spacing:2px;text-transform:uppercase;">
           <div style="width:56px;">#</div>
           <div style="flex:1;">${isPlayer ? "Player" : "Contestant"}</div>
-          ${isPlayer ? headCell("Matches") : ""}${headCell("Total")}
+          ${headCell("Total")}
         </div>
         ${rows.map(r => `
           <div style="display:flex;align-items:center;background:#161618;border:1px solid #34343a;border-radius:16px;padding:16px 24px;margin-bottom:10px;">
@@ -503,7 +524,7 @@
               <div style="font-size:27px;font-weight:700;line-height:1.15;">${esc(r.name)}</div>
               ${r.sub ? `<div style="font-size:16px;color:#9b9ba3;margin-top:3px;">${esc(r.sub)}</div>` : ""}
             </div>
-            ${isPlayer ? statCell(fmtPts(r.days)) : ""}${statCell(fmtPts(r.total), true)}
+            ${statCell(fmtPts(r.total), true)}
           </div>`).join("")}`;
     return buildShareShell(subTitle, shareDateStr(), body);
   }

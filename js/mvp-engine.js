@@ -19,9 +19,37 @@
   "use strict";
   const root = typeof window !== "undefined" ? window : globalThis;
 
-  /* ------------------------------------------------------------------ *
-   *  CONFIG - the entire scoring model lives here (easy to tune).      *
-   * ------------------------------------------------------------------ */
+  /* ==================================================================== *
+   *  SCORING METHOD - LOCKED (HCCL Season MVP, Hybrid Model)             *
+   *  The single source of truth. Every value below appears in CONFIG;    *
+   *  change a number here AND in CONFIG together - never one alone.       *
+   * -------------------------------------------------------------------- *
+   *  FINAL = 0.70 x Fixed  +  0.30 x Impact                              *
+   *  Season MVP = Sum(Final over matches);  Efficiency = Season / matches *
+   *                                                                      *
+   *  FIXED (70%) = Batting + Bowling + Match bonuses                     *
+   *    Batting - Runs:  0=-5  1-10=0  11-20=+5  21-30=+12  31-40=+20     *
+   *                     41-50=+30  51-60=+40  61+=+50                    *
+   *              SR:    <80=-5  80-100=0  101-120=+3  121-150=+6         *
+   *                     151-180=+10  181-220=+15  >220=+20               *
+   *              Not out +5;  Winning not out +10 (extra);              *
+   *              Highest scorer of team +5;  of match +10                *
+   *    Bowling - Wkts:  0=0  1=+10  2=+22  3=+38  4=+55  5(+)=+75         *
+   *              Econ:  >12=-5  10-12=0  8-10=+5  6-8=+10  4-6=+15  <4=+20 *
+   *              Dot balls: +0.5 each, capped +10;  Maiden +8 each;      *
+   *              Best bowling figures in match +5                        *
+   *    Match  -  Winning team +5 (EVERY winning-team player);  POTM +15  *
+   *                                                                      *
+   *  IMPACT (30%), each contribution as a percentage number (ratio x100):*
+   *    battingC  = runs / teamTotal        x 100   (e.g. 25/45 -> 55.6)  *
+   *    bowlingC  = wickets / oppWicketsLost x 100   (e.g. 3/5  -> 60)    *
+   *    matchResult = 100 if the player's team won, else 0                *
+   *    Impact   = 0.45*battingC + 0.45*bowlingC + 0.10*matchResult       *
+   *                                                                      *
+   *  EDGE RULES: a player who did NOT bat (0 balls) scores 0 batting; a  *
+   *  player who did NOT bowl (0 overs) scores 0 bowling; the +5 team-win  *
+   *  bonus is still awarded to every player on the winning team.          *
+   * ==================================================================== */
   const CONFIG = {
     // Final = fixed*0.70 + impact*0.30
     weights: { fixed: 0.70, impact: 0.30 },
@@ -57,8 +85,9 @@
     winningTeam: 5,
     playerOfTheMatch: 15,
 
-    // --- Impact (30%): each component scaled to 0-100 so the blend is
-    // meaningful against the fixed points, then weighted. ---
+    // --- Impact (30%): contributions as percentage numbers (ratio x100),
+    // matchResult = 100 for a win / 0 for a loss, then weighted 0.45/0.45/0.10.
+    // See the SCORING METHOD block above. ---
     impact: { batting: 0.45, bowling: 0.45, result: 0.10 },
 
     // Optional PDF-name -> display-name aliases (e.g. "Sasi18": "Sasindu

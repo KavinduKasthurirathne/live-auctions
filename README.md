@@ -234,11 +234,16 @@ A dedicated **MVP** tab with two live boards:
 `CONFIG` block):
 
 - **Fixed Points (70%)** - banded points for runs, strike rate, wickets, economy, dot balls
-  and maidens, plus bonuses (not-out, top scorer, best figures, winning team, POTM).
-- **Contribution Impact (30%)** - how much the player carried their team: batting share
-  (runs ÷ team total), bowling share (wickets ÷ opposition wickets), and the match result,
-  each scaled to 0-100 so the blend is meaningful, then weighted 0.45 / 0.45 / 0.10.
-- **Final Match MVP** = `0.70 × Fixed + 0.30 × Impact`; **Season MVP** = Σ Final across matches.
+  and maidens, plus bonuses (not-out, top scorer, best figures, winning team +5, POTM +15).
+- **Contribution Impact (30%)** - how much the player carried their team, each term as a
+  **percentage number** (ratio × 100): batting share `runs ÷ team total × 100`, bowling share
+  `wickets ÷ opposition wickets × 100`, and match result `100` if the team won else `0` -
+  weighted `0.45 × batting + 0.45 × bowling + 0.10 × result`.
+- **Final Match MVP** = `0.70 × Fixed + 0.30 × Impact`; **Season MVP** = Σ Final across matches;
+  **Efficiency** = Season ÷ matches played.
+- **Edge rules:** a player who didn't bat (0 balls) scores 0 on batting, and one who didn't
+  bowl (0 overs) scores 0 on bowling; the +5 team-win bonus still goes to every winning-team
+  player. The full method is documented in the locked comment block atop `js/mvp-engine.js`.
 
 **Uploading matches (admin / moderator):** the **⬆ Upload match PDF** button reads an
 exported **STUMPS "Match Report"** PDF entirely in the browser (`pdf.js`), extracts the two
