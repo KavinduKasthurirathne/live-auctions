@@ -21,8 +21,9 @@
          Runs:  0 -> -10 | 1-5 -> 0 | 6-9 -> +5 | 10-19 -> +10
                 20-29 -> +25 | 30-49 -> +35 | 50+ -> +50
          SR bonus:  <100 -> -10 | >200 -> +5 | >300 -> +10 (else 0)
+                    (strict "above": exactly 200/300 stay in the lower tier)
          + Highest scorer +20 | Not out +5 | POTM +20
-         DNB (did not bat) -> 0
+         DNB (did not bat) -> 0 points EXCEPT a POTM still counts +20
 
      Achievement Score = player.RAP / (highest RAP among eligible) * 100
      Experience Score  = fixed tier by career innings (NOT a benchmark):
@@ -111,8 +112,12 @@
       .split("\n")
       .map(l => l.trim())
       .filter(Boolean)
+      .slice(0, 5) // "Recent 5 Matches" - never count more than 5 lines
       .map(line => {
-        if (/\bDNB\b/i.test(line)) return { dnb: true };
+        const potm = /POTM\s+Yes/i.test(line);
+        // DNB = did not bat: no runs/SR/highest/not-out points, but a POTM
+        // (e.g. won for bowling) still counts +20, matching the reference engine.
+        if (/\bDNB\b/i.test(line)) return { dnb: true, potm };
         const runsM = line.match(/(-?\d+(?:\.\d+)?)\s*runs/i);
         const srM = line.match(/([\d.]+)\s*SR/i);
         return {
@@ -121,7 +126,7 @@
           sr: srM ? parseFloat(srM[1]) : 0,
           highest: /Highest scorer\s+Yes/i.test(line),
           notout: /Not out\s+Yes/i.test(line),
-          potm: /POTM\s+Yes/i.test(line),
+          potm,
         };
       });
   }
@@ -133,15 +138,18 @@
       .split("\n")
       .map(l => l.trim())
       .filter(Boolean)
+      .slice(0, 5) // "Recent 5 Matches" - never count more than 5 lines
       .map(line => {
-        if (/\bDNB\b/i.test(line)) return { dnb: true };
+        const potm = /POTM\s+Yes/i.test(line);
+        // DNB = did not bowl: no wicket/eco points, but a POTM still counts +20.
+        if (/\bDNB\b/i.test(line)) return { dnb: true, potm };
         const wM = line.match(/(-?\d+)\s*Wickets?/i);
         const eM = line.match(/([\d.]+)\s*Eco/i);
         return {
           dnb: false,
           wickets: wM ? parseInt(wM[1], 10) : 0,
           eco: eM ? parseFloat(eM[1]) : 0,
-          potm: /POTM\s+Yes/i.test(line),
+          potm,
         };
       });
   }
@@ -185,7 +193,11 @@
 
   // Points for a single recent batting innings (see header for the table).
   function battingMatchPoints(m) {
-    if (!m || m.dnb) return 0;
+    if (!m) return 0;
+    // POTM always counts +20, even on a DNB (did-not-bat) match.
+    let pts = m.potm ? 20 : 0;
+    if (m.dnb) return pts;
+
     const r = m.runs;
     let rp;
     if (r <= 0) rp = -10;
@@ -196,18 +208,19 @@
     else if (r <= 49) rp = 35;
     else rp = 50;
 
+    // SR bonus with strict "above" boundaries (SR must EXCEED 200 / 300):
+    //   >300 -> +10 | >200 -> +5 | <100 -> -10 | else 0.
+    // So an innings at EXACTLY 200 or 300 stays in the lower tier.
     const s = m.sr;
     let sb;
-    if (s < 100) sb = -10;
-    else if (s < 200) sb = 0;
-    else if (s < 300) sb = 5;
-    else sb = 10;
+    if (s > 300) sb = 10;
+    else if (s > 200) sb = 5;
+    else if (s < 100) sb = -10;
+    else sb = 0;
 
-    let extra = 0;
-    if (m.highest) extra += 20;
-    if (m.notout) extra += 5;
-    if (m.potm) extra += 20;
-    return rp + sb + extra;
+    if (m.highest) pts += 20;
+    if (m.notout) pts += 5;
+    return pts + rp + sb;
   }
 
   function recentFormScore(recentBat) {
@@ -309,7 +322,10 @@
   const BOWL_BASE = 100;
 
   function bowlingMatchPoints(m) {
-    if (!m || m.dnb) return 0;
+    if (!m) return 0;
+    // POTM always counts +20, even on a DNB (did-not-bowl) match.
+    let pts = m.potm ? 20 : 0;
+    if (m.dnb) return pts;
     const w = m.wickets;
     const wp = w <= 0 ? 0 : w === 1 ? 25 : w === 2 ? 50 : w === 3 ? 75 : 100;
     const e = m.eco;
@@ -319,7 +335,7 @@
     else if (e < 12) eb = 5;
     else if (e > 15) eb = -10;
     else eb = 0;
-    return wp + eb + (m.potm ? 20 : 0);
+    return pts + wp + eb;
   }
 
   function bowlingRecentFormScore(recentBowl) {
@@ -408,7 +424,9 @@
     bat.rows.forEach(b => {
       const w = bowlById[b.id];
       if (!w) return; // needs a rating in both boards
-      const ratingRaw = Math.sqrt(b.rating * w.rating);
+      // Geometric mean of the RAW (unrounded) batting & bowling ratings,
+      // rounded only for display - matches the reference engine.
+      const ratingRaw = Math.sqrt(b.ratingRaw * w.ratingRaw);
       rows.push({
         id: b.id, name: b.name, team: b.team,
         rating: Math.round(ratingRaw), ratingRaw,
