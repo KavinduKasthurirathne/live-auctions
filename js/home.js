@@ -200,7 +200,7 @@
       { label: "Mdns", num: true, cell: r => esc(r[COL.maiden]) },
       { label: "POTM", num: true, cell: r => esc(r[COL.pom]) },
     ];
-    return statTable("Overall Stats", cols, rows);
+    return statTable("Overall Stats", "All players", cols, rows);
   }
 
   function battingBoard(rows) {
@@ -216,7 +216,7 @@
       { label: "30s/50s", num: true, cell: r => slash(r[COL.s30], r[COL.s50]) },
       { label: "HS", num: true, cell: r => esc(r[COL.hs]) },
     ];
-    return statTable("Batting Stats", cols, sorted);
+    return statTable("Batting Stats", "Sorted by Runs", cols, sorted);
   }
 
   function bowlingBoard(rows) {
@@ -231,7 +231,7 @@
       { label: "Mdns", num: true, cell: r => esc(r[COL.maiden]) },
       { label: "BBF", num: true, cell: r => esc(bbf(r[COL.bestBowl])) },
     ];
-    return statTable("Bowling Stats", cols, sorted);
+    return statTable("Bowling Stats", "Sorted by Wickets", cols, sorted);
   }
 
   /* ------------------------- rendering ------------------------- */
