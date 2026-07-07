@@ -39,10 +39,26 @@
     allrounder: "allRounderFromCsv",
   };
   const boardCache = {};
-  let activeCsv = null;   // cloud-imported CSV; null -> bundled fallback
+  let activeCsv = null;   // cloud-imported CSV (ranking/stats); null -> none
   let lastImport = null;  // { by } for the "last updated" note
   let prevPositions = null; // per board { nameKey: pos } from the PREVIOUS sheet
-  function currentCsv() { return activeCsv || window.HCCL_STATS_CSV || ""; }
+
+  // Is this a cloud (Firebase) deployment? Inferred from the config even
+  // before firebase-init.js has created window.HCCL, so the first render
+  // doesn't flash the bundled sheet on a configured site.
+  function cloudConfigured() {
+    const H = window.HCCL;
+    if (H) return !!H.configured;
+    const cfg = window.FIREBASE_CONFIG;
+    return !!(cfg && cfg.apiKey && !String(cfg.apiKey).startsWith("PASTE") && cfg.projectId);
+  }
+  // Source of truth: on a cloud deployment it is STRICTLY the imported CSV
+  // in Firestore (ranking/stats) - if that is deleted/absent the boards show
+  // nothing. The bundled CSV is only used in fully-offline (no Firebase) mode.
+  function currentCsv() {
+    if (cloudConfigured()) return activeCsv || "";
+    return activeCsv || window.HCCL_STATS_CSV || "";
+  }
   function resetBoards() { for (const k in boardCache) delete boardCache[k]; }
 
   function computeBoard(key) {

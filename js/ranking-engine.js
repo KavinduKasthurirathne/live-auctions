@@ -7,39 +7,28 @@
    both the current bundled sheet and the future moderator
    "Import stats CSV" upload.
 
-   Implements the BATTING rating exactly as documented in
-   "HCCL Batting Rankings Explanation.pdf", with the two points the
-   PDF left open resolved per the league owner:
+   Implements the official "HCCL Rating System v1.0" EXACTLY - no
+   rounding of sub-scores and no clamping anywhere.
 
-     Final rating (base 100, literal - same shape as bowling):
-       perf   = 5*Career + 3*RecentForm + Achievement + Experience   (0..1000)
-       Rating = 100 + perf                                           (clamped 100..1000)
-       (Career<=100, RecentForm<=100, Achievement<=100, Experience<=100)
-       A 100-point base floors every eligible batter at 100. The perf
-       sum is added directly (no scaling) so batting is on the same
-       100+perf scale as bowling; the 1000 clamp is a safety cap that
-       is not reached on current data (top batter ~881).
+     Final rating = 100 + 5*Career + 3*RecentForm + Achievement + Experience
+       (base 100 is the floor; the scale is ~100-1000, not hard-capped)
 
-     Career Score (<=100) = 0.5*RunsScore + 0.3*AvgScore + 0.2*SrScore
-       each XScore = player.X / (highest X among QUALIFIED batters) * 100
+     Career Score = 0.5*RunsScore + 0.3*AvgScore + 0.2*SrScore
+       each XScore = player.X / (highest X among ELIGIBLE batters) * 100
 
-     Recent Form Score (<=100) = clamp( sum(last5 match points)/5, 0, 100 )
+     Recent Form Score = sum(last 5 match points) / 5   (no clamping)
        Per-match points:
-         Runs:  0 -> -10 | 1-5 -> 0 | 6-9 -> 5 | 10-19 -> 10
-                20-29 -> 25 | 30-49 -> 35 | 50+ -> 50
-         SR bonus:  <100 -> -10 | 100-199 -> 0 | 200-299 -> +5 | 300+ -> +10
+         Runs:  0 -> -10 | 1-5 -> 0 | 6-9 -> +5 | 10-19 -> +10
+                20-29 -> +25 | 30-49 -> +35 | 50+ -> +50
+         SR bonus:  <100 -> -10 | >200 -> +5 | >300 -> +10 (else 0)
          + Highest scorer +20 | Not out +5 | POTM +20
          DNB (did not bat) -> 0
-       Denominator is always 5 (the last five matches count equally).
 
-     Achievement Score (<=100) = player.RAP / (highest RAP among qualified) * 100
-     Experience  Score (<=100) = player.Innings / (highest Innings among qualified) * 100
+     Achievement Score = player.RAP / (highest RAP among eligible) * 100
+     Experience Score  = fixed tier by career innings (NOT a benchmark):
+       50+ -> 100 | 40-49 -> 70 | 30-39 -> 50 | 20-29 -> 30 | 10-19 -> 10
 
-   Eligibility to APPEAR in the published rankings:
-       >= 10 innings AND >= 100 career runs.
-   Below-threshold players still get a rating computed but are not listed.
-
-   Bowling / all-rounder are intentionally not computed here yet.
+   Eligibility: >= 10 innings AND >= 100 career runs.
    ============================================================ */
 (function () {
   "use strict";
@@ -223,7 +212,18 @@
 
   function recentFormScore(recentBat) {
     const sum = (recentBat || []).reduce((a, m) => a + battingMatchPoints(m), 0);
-    return clamp(sum / 5, 0, 100); // always over 5 matches; clamp to the 0-100 band
+    return sum / 5; // HCCL v1.0: average of the last 5 matches, no clamping
+  }
+
+  // Experience score is a fixed tier by career innings (HCCL v1.0), NOT a
+  // benchmark - so there is no "Highest Innings" benchmark.
+  function battingExperience(innings) {
+    if (innings >= 50) return 100;
+    if (innings >= 40) return 70;
+    if (innings >= 30) return 50;
+    if (innings >= 20) return 30;
+    if (innings >= 10) return 10;
+    return 0;
   }
 
   function isBattingEligible(p) {
@@ -236,27 +236,24 @@
   // its component breakdown for tooltips / debugging later.
   function computeBatting(players) {
     const eligible = (players || []).filter(isBattingEligible);
+    // Benchmarks = highest value among eligible batters (HCCL v1.0).
     const maxOf = key => eligible.reduce((m, p) => Math.max(m, p[key] || 0), 0);
-    const max = {
-      runs: maxOf("runs"), avg: maxOf("avg"), sr: maxOf("sr"),
-      rap: maxOf("rap"), innings: maxOf("innings"),
-    };
+    const max = { runs: maxOf("runs"), avg: maxOf("avg"), sr: maxOf("sr"), rap: maxOf("rap") };
 
     const rows = eligible.map(p => {
-      // Career sub-scores are rounded UP (ceiling) before weighting - the
-      // agreed HCCL convention (matches the reference spreadsheet).
-      const runsScore = Math.ceil(max.runs ? (p.runs / max.runs) * 100 : 0);
-      const avgScore = Math.ceil(max.avg ? (p.avg / max.avg) * 100 : 0);
-      const srScore = Math.ceil(max.sr ? (p.sr / max.sr) * 100 : 0);
-      const career = 0.5 * runsScore + 0.3 * avgScore + 0.2 * srScore; // <=100
-      const recent = recentFormScore(p.recentBat);                     // <=100
-      const achievement = max.rap ? clamp((p.rap / max.rap) * 100, 0, 100) : 0;
-      const experience = max.innings ? clamp((p.innings / max.innings) * 100, 0, 100) : 0;
+      // Career sub-scores = player value / highest eligible value * 100
+      // (HCCL v1.0 - no rounding, no clamping).
+      const runsScore = max.runs ? (p.runs / max.runs) * 100 : 0;
+      const avgScore = max.avg ? (p.avg / max.avg) * 100 : 0;
+      const srScore = max.sr ? (p.sr / max.sr) * 100 : 0;
+      const career = 0.5 * runsScore + 0.3 * avgScore + 0.2 * srScore;
+      const recent = recentFormScore(p.recentBat);
+      const achievement = max.rap ? (p.rap / max.rap) * 100 : 0;
+      const experience = battingExperience(p.innings); // fixed tier, not a benchmark
 
-      // 100 base + performance, added literally (same 100+perf scale as
-      // bowling). Clamp is a safety cap; not reached on current data.
-      const perf = 5 * career + 3 * recent + achievement + experience; // 0..1000
-      const rating = clamp(BAT_BASE + perf, BAT_BASE, 1000);
+      // HCCL v1.0 final: 100 + 5*Career + 3*Recent + Achievement + Experience.
+      // No clamping (base 100 is the floor; max is ~1000).
+      const rating = BAT_BASE + 5 * career + 3 * recent + achievement + experience;
       return {
         id: p.id, name: p.name, team: p.team,
         rating: Math.round(rating), ratingRaw: rating,
@@ -294,26 +291,21 @@
   }
 
   /* ---------------------- bowling rating math ---------------------- */
-  // Bowling is documented in the "HCCL Bowling Rankings System". Unlike
-  // batting, the base 100 is applied literally (no remap) - the spec's
-  // stated range is "approximately 100 to 1000", and the weights make
-  // hitting all four career benchmarks at once impossible, so ratings
-  // stay comfortably under 1000 in practice.
+  // Official "HCCL Bowling Rating System v1.0" - no rounding, no clamping.
   //
-  //   Rating = 100 + Career*5 + RecentForm*3 + Achievement*2
-  //   Career (<=100) = 0.6*WicketsScore + 0.2*AvgScore + 0.1*EcoScore + 0.1*SrScore
-  //     WicketsScore = wickets / (most wickets among qualified) * 100
-  //     AvgScore/EcoScore/SrScore = (best among qualified) / player * 100  (lower is better)
-  //   RecentForm (<=100) = clamp( avg of last-5 match scores, 0, 100 )
+  //   Rating = 100 + 5*Career + 3*RecentForm + 2*Achievement
+  //   Career = 0.6*WicketsScore + 0.2*AvgScore + 0.1*EcoScore + 0.1*SrScore
+  //     WicketsScore = wickets / (most wickets among eligible) * 100
+  //     AvgScore/EcoScore/SrScore = (best among eligible) / player * 100  (lower is better)
+  //   RecentForm = avg of last-5 match scores / 5   (no clamping)
   //     match = WicketPts(0/25/50/75/100 for 0/1/2/3/4+ wkts)
   //           + EcoBonus(<6:+20 | <9:+10 | <12:+5 | >15:-10 | else 0)
   //           + POTM(+20); DNB -> 0
-  //   Achievement (<=100) = AchPoints / (highest among qualified) * 100
+  //   Achievement = AchPoints / (highest among eligible) * 100
   //     AchPoints = 3Fers*15 + 4Fers*35 + POTMs*50   (== the sheet's BAP column)
   //
-  // Qualification (spec left this open, so we mirror batting's structure):
-  //   >= 10 innings AND >= 10 career wickets.
-  const BOWL_ELIGIBLE = { innings: 10, wickets: 10 };
+  // Qualification (HCCL v1.0): minimum 10 career wickets.
+  const BOWL_ELIGIBLE = { wickets: 10 };
   const BOWL_BASE = 100;
 
   function bowlingMatchPoints(m) {
@@ -332,7 +324,7 @@
 
   function bowlingRecentFormScore(recentBowl) {
     const sum = (recentBowl || []).reduce((a, m) => a + bowlingMatchPoints(m), 0);
-    return clamp(sum / 5, 0, 100); // always over 5 matches; clamp to 0-100
+    return sum / 5; // HCCL v1.0: average of the last 5 matches, no clamping
   }
 
   function bowlingAchievementPoints(p) {
@@ -340,7 +332,7 @@
   }
 
   function isBowlingEligible(p) {
-    return p.innings >= BOWL_ELIGIBLE.innings && p.wickets >= BOWL_ELIGIBLE.wickets;
+    return p.wickets >= BOWL_ELIGIBLE.wickets;
   }
 
   // players -> { rows, meta }. rows are eligible bowlers, best-first, with
@@ -359,18 +351,19 @@
     };
 
     const rows = eligible.map(p => {
-      // Career sub-scores are rounded UP (ceiling) before weighting - the
-      // agreed HCCL convention (matches the reference spreadsheet).
-      const wicketsScore = Math.ceil(bench.wickets ? (p.wickets / bench.wickets) * 100 : 0);
-      const avgScore = Math.ceil(p.bowlAvg > 0 && isFinite(bench.avg) ? (bench.avg / p.bowlAvg) * 100 : 0);
-      const ecoScore = Math.ceil(p.eco > 0 && isFinite(bench.eco) ? (bench.eco / p.eco) * 100 : 0);
-      const srScore = Math.ceil(p.bsr > 0 && isFinite(bench.bsr) ? (bench.bsr / p.bsr) * 100 : 0);
-      const career = clamp(0.6 * wicketsScore + 0.2 * avgScore + 0.1 * ecoScore + 0.1 * srScore, 0, 100);
+      // Career sub-scores (HCCL v1.0 - no rounding, no clamping). Wickets:
+      // higher is better; avg/eco/SR: lower is better, so benchmark / player.
+      const wicketsScore = bench.wickets ? (p.wickets / bench.wickets) * 100 : 0;
+      const avgScore = p.bowlAvg > 0 && isFinite(bench.avg) ? (bench.avg / p.bowlAvg) * 100 : 0;
+      const ecoScore = p.eco > 0 && isFinite(bench.eco) ? (bench.eco / p.eco) * 100 : 0;
+      const srScore = p.bsr > 0 && isFinite(bench.bsr) ? (bench.bsr / p.bsr) * 100 : 0;
+      const career = 0.6 * wicketsScore + 0.2 * avgScore + 0.1 * ecoScore + 0.1 * srScore;
       const recent = bowlingRecentFormScore(p.recentBowl);
       const ap = bowlingAchievementPoints(p);
-      const achievement = bench.ap ? clamp((ap / bench.ap) * 100, 0, 100) : 0;
+      const achievement = bench.ap ? (ap / bench.ap) * 100 : 0;
 
-      const rating = clamp(BOWL_BASE + 5 * career + 3 * recent + 2 * achievement, BOWL_BASE, 1000);
+      // HCCL v1.0 final: 100 + 5*Career + 3*Recent + 2*Achievement (no clamping).
+      const rating = BOWL_BASE + 5 * career + 3 * recent + 2 * achievement;
       return {
         id: p.id, name: p.name, team: p.team,
         rating: Math.round(rating), ratingRaw: rating,

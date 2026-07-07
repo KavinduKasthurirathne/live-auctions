@@ -318,7 +318,7 @@ P034,Nimesh Dimalsha,LORDS,36,309,174,9.4,177.6,2,0,9,3,180,"1. 0 runs, 0 SR, Hi
 3. 0 Wickets, 16 Eco, POTM NO
 4. DNB, POTM NO
 5. 1 Wickets, 12 Eco, POTM NO",33,223
-P035,Vimukthi,LORDS,37,502,234,14.3,214.5,5,2,9,2,245,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+P035,Vimukthi Gunathilake,LORDS,37,502,234,14.3,214.5,5,2,9,2,245,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 2. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 4. 42 runs, 221.1 SR, Highest scorer Yes, Not out No, POTM Yes
