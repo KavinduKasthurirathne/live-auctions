@@ -775,11 +775,25 @@ body:not(.can-edit) .rank-import { display: none; }
   font-family: "Russo One", sans-serif; font-weight: 700; font-size: 16px;
   letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 16px;
 }
+/* Leaderboard sub-tabs: a segmented control (deliberately unlike the gold
+   season pills) that switches between Overall / Batting / Bowling. */
+.board-tabs {
+  display: inline-flex; gap: 4px; margin-bottom: 16px;
+  padding: 4px; border-radius: 12px;
+  background: var(--panel-2); border: 1px solid var(--border);
+}
+.board-tab {
+  border: none; background: transparent; color: var(--muted);
+  padding: 8px 20px; border-radius: 9px; cursor: pointer;
+  font-size: 13px; font-weight: 600; letter-spacing: .3px; transition: all 0.15s ease;
+}
+.board-tab:hover { color: var(--text); }
+.board-tab.active { background: var(--panel-3); color: var(--yellow); box-shadow: 0 1px 3px rgba(0,0,0,0.35); }
+
 .lb { margin-bottom: 22px; }
 .lb:last-child { margin-bottom: 0; }
 .lb-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 .lb-head h4 { font-family: "Russo One", sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .5px; }
-.lb-note { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
 /* Wide tables scroll horizontally inside their own container. */
 .lb-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2); }
 .lb-table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }

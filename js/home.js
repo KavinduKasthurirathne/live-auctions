@@ -47,6 +47,8 @@
   const getSeasons = () => (cloudSeasons && cloudSeasons.length) ? cloudSeasons : SEASONS;
   // Active season tab (season number). Defaults to the ongoing season, else the last.
   let activeSeason = (SEASONS.find(s => s.ongoing) || SEASONS[SEASONS.length - 1]).no;
+  // Active leaderboard sub-tab within a season: "overall" | "batting" | "bowling".
+  let activeBoard = "overall";
 
   /* ---------- bubble helpers (team logos / player photos) ---------- */
   const BUBBLE_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
@@ -165,14 +167,14 @@
   }
 
   // Generic leaderboard table. columns: [{ label, num?, cell(row, rank) }]
-  function statTable(title, note, columns, rows) {
+  function statTable(title, columns, rows) {
     const head = columns.map(c => `<th class="${c.num ? "num" : ""}">${esc(c.label)}</th>`).join("");
     const body = rows.length
       ? rows.map((r, i) =>
           `<tr>${columns.map(c => `<td class="${c.num ? "num" : ""}">${c.cell(r, i)}</td>`).join("")}</tr>`).join("")
       : `<tr><td class="lb-empty" colspan="${columns.length}">No stats available for this season yet.</td></tr>`;
     return `<div class="lb">
-      <div class="lb-head"><h4>${esc(title)}</h4>${note ? `<span class="lb-note">${esc(note)}</span>` : ""}</div>
+      <div class="lb-head"><h4>${esc(title)}</h4></div>
       <div class="lb-scroll"><table class="lb-table">
         <thead><tr>${head}</tr></thead>
         <tbody>${body}</tbody>
@@ -200,7 +202,7 @@
       { label: "Mdns", num: true, cell: r => esc(r[COL.maiden]) },
       { label: "POTM", num: true, cell: r => esc(r[COL.pom]) },
     ];
-    return statTable("Overall Stats", "All players", cols, rows);
+    return statTable("Overall Stats", cols, rows);
   }
 
   function battingBoard(rows) {
@@ -216,7 +218,7 @@
       { label: "30s/50s", num: true, cell: r => slash(r[COL.s30], r[COL.s50]) },
       { label: "HS", num: true, cell: r => esc(r[COL.hs]) },
     ];
-    return statTable("Batting Stats", "Sorted by Runs", cols, sorted);
+    return statTable("Batting Stats", cols, sorted);
   }
 
   function bowlingBoard(rows) {
@@ -231,7 +233,19 @@
       { label: "Mdns", num: true, cell: r => esc(r[COL.maiden]) },
       { label: "BBF", num: true, cell: r => esc(bbf(r[COL.bestBowl])) },
     ];
-    return statTable("Bowling Stats", "Sorted by Wickets", cols, sorted);
+    return statTable("Bowling Stats", cols, sorted);
+  }
+
+  const BOARDS = [
+    { key: "overall", label: "Overall", build: overallBoard },
+    { key: "batting", label: "Batting", build: battingBoard },
+    { key: "bowling", label: "Bowling", build: bowlingBoard },
+  ];
+  // Only the active leaderboard is shown; the sub-tabs above switch between them
+  // so viewers don't scroll past three stacked tables.
+  function boardPanelHtml(rows) {
+    const b = BOARDS.find(x => x.key === activeBoard) || BOARDS[0];
+    return b.build(rows);
   }
 
   /* ------------------------- rendering ------------------------- */
@@ -264,9 +278,12 @@
         </div>
         <div class="season-boards">
           <h3 class="season-boards-title">Season ${pad2(s.no)} · Player Stats</h3>
-          ${overallBoard(rows)}
-          ${battingBoard(rows)}
-          ${bowlingBoard(rows)}
+          <div class="board-tabs" role="tablist">
+            ${BOARDS.map(b => `<button class="board-tab${b.key === activeBoard ? " active" : ""}" data-board="${b.key}">${esc(b.label)}</button>`).join("")}
+          </div>
+          <div class="board-panel" id="boardPanel">
+            ${boardPanelHtml(rows)}
+          </div>
         </div>
       </article>`;
   }
@@ -298,6 +315,20 @@
   }
 
   function onClick(e) {
+    // Leaderboard sub-tab: swap only the board panel so the page doesn't jump.
+    const board = e.target.closest("[data-board]");
+    if (board) {
+      const key = board.getAttribute("data-board");
+      if (key === activeBoard) return;
+      activeBoard = key;
+      const s = getSeasons().find(x => x.no === activeSeason);
+      const panel = document.getElementById("boardPanel");
+      if (panel && s) panel.innerHTML = boardPanelHtml(seasonRows(s.no));
+      document.querySelectorAll(".board-tab").forEach(t =>
+        t.classList.toggle("active", t.getAttribute("data-board") === activeBoard));
+      return;
+    }
+    // Season tab: rebuild the whole panel for the picked season.
     const tab = e.target.closest("[data-season]");
     if (!tab) return;
     const no = parseInt(tab.getAttribute("data-season"), 10);
