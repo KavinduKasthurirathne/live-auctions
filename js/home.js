@@ -2,44 +2,51 @@
    HCCL Home page  (renders into #view-home)
 
    Landing view after sign-in: a branded hero (league logo + big
-   "HC CHAMPIONS LEAGUE" title + tagline) and a sliding carousel of
-   past seasons. The SEASONS array below is the seed source + offline
-   fallback; when signed in, the same data is read from Firestore
-   (home/seasons) so it stays consistent across devices - "seed once,
-   read-only", mirroring ranking.js. No dependencies beyond the DOM.
+   "HC CHAMPIONS LEAGUE" title + tagline) followed by a per-season
+   view. A row of season tabs (Season 01 … 06) switches the active
+   season; each season shows its honors podium (MVP / Champion /
+   Runner-up bubbles + Most Runs / Most Wickets) and three detailed
+   leaderboards (Overall / Batting / Bowling) built from the bundled
+   per-season stats CSVs (window.HCCL_SEASON_STATS, season-stats-data.js).
+
+   The SEASONS array below is the honors seed + offline fallback; when
+   signed in, the same honors are read from Firestore (home/seasons) so
+   they stay consistent across devices - "seed once, read-only",
+   mirroring ranking.js. The leaderboard stats are always the bundled
+   CSVs. No dependencies beyond the DOM.
    ============================================================ */
 (function () {
   "use strict";
 
-  // -------- sample season data (replace with real values later) --------
+  // -------- season honors (replace with real values later) --------
   // champion / runnerUp are TEAM names (rendered as team-logo bubbles);
   // mvp / mostRuns / mostWickets are PLAYER names (rendered as photo bubbles).
   // Each: { no, year, ongoing?, champion, runnerUp, mvp, mostRuns, mostWickets }
   const SEASONS = [
-    { no: 1, year: "2025 NOV", champion: "SUPER FIRE DRAGONS", runnerUp: "MATRIX", mvp: "SASINDU MADUSHAN", mostRuns: "HASITHA LAKMAL", mostWickets: "SASINDU MADUSHAN" },
-    { no: 2, year: "2025 DEC", champion: "ZYCO KINGS", runnerUp: "WIZARD TITANS", mvp: "UDARA PERERA", mostRuns: "YASITHA NAWOD", mostWickets: "UDARA PERERA" },
-    { no: 3, year: "2026 JAN", champion: "MIND GAMERS", runnerUp: "INVINCIBLE LORDS", mvp: "THENU PABEESHA", mostRuns: "THENU PABEESHA", mostWickets: "UDARA PERERA" },
-    { no: 4, year: "2026 FEB", champion: "VELOCITY REAPERS", runnerUp: "AURA DYNASTY", mvp: "CHATHUKA LAKSHAN", mostRuns: "CHATHUKA LAKSHAN", mostWickets: "UDARA PERERA" },
-    { no: 5, year: "2026 MAY", champion: "SUPER FIRE DRAGONS", runnerUp: "WIZARD TITANS", mvp: "YATHISH LEYON", mostRuns: "SASINDU MADUSHAN", mostWickets: "UDARA PERERA" },
-    { no: 6, year: "2026 JUN", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "SASINDU MADUSHAN", mostWickets: "YASITHA NAWOD" },
+    { no: 1, year: "NOV 2025 - DEC 2025", champion: "SUPER FIRE DRAGONS", runnerUp: "MATRIX", mvp: "SASINDU MADUSHAN", mostRuns: "HASITHA LAKMAL", mostWickets: "SASINDU MADUSHAN" },
+    { no: 2, year: "DEC 2025", champion: "ZYCO KINGS", runnerUp: "WIZARD TITANS", mvp: "UDARA PERERA", mostRuns: "YASITHA NAWOD", mostWickets: "UDARA PERERA" },
+    { no: 3, year: "JAN 2026", champion: "MIND GAMERS", runnerUp: "INVINCIBLE LORDS", mvp: "THENU PABEESHA", mostRuns: "THENU PABEESHA", mostWickets: "UDARA PERERA" },
+    { no: 4, year: "FEB 2026 - MAR 2026", champion: "VELOCITY REAPERS", runnerUp: "AURA DYNASTY", mvp: "CHATHUKA LAKSHAN", mostRuns: "CHATHUKA LAKSHAN", mostWickets: "UDARA PERERA" },
+    { no: 5, year: "APR 2026 - MAY 2026", champion: "SUPER FIRE DRAGONS", runnerUp: "WIZARD TITANS", mvp: "YATHISH LEYON", mostRuns: "SASINDU MADUSHAN", mostWickets: "UDARA PERERA" },
+    { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "SASINDU MADUSHAN", mostWickets: "YASITHA NAWOD" },
   ];
 
-  const AUTOPLAY_MS = 6000;
-  // Bump when the SEASONS data above changes so an editor re-publishes the
+  // Bump when the SEASONS honors above change so an editor re-publishes the
   // cloud copy (home/seasons); everyone signed in reads that copy.
   const SEASONS_VERSION = "2026-07-06";
   const pad2 = n => String(n).padStart(2, "0");
+  const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  let index = 0;         // current slide
-  let timer = null;      // autoplay handle
   let cloudSeasons = null; // seasons read from Firestore (home/seasons), or null
   // Cloud copy wins when present; otherwise the bundled SEASONS render offline.
   const getSeasons = () => (cloudSeasons && cloudSeasons.length) ? cloudSeasons : SEASONS;
+  // Active season tab (season number). Defaults to the ongoing season, else the last.
+  let activeSeason = (SEASONS.find(s => s.ongoing) || SEASONS[SEASONS.length - 1]).no;
 
   /* ---------- bubble helpers (team logos / player photos) ---------- */
   const BUBBLE_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
@@ -51,9 +58,9 @@
   const firstInitial = s => { const t = String(s || "").trim(); return t && t !== "—" ? t[0].toUpperCase() : "?"; };
 
   // Committed asset files (exact names; extensions vary between .png/.jpeg).
-  // A team/player NAME from SEASONS resolves to its file via a lookup keyed by
-  // the lowercased basename, so the UPPERCASE SEASONS values match regardless
-  // of case. Add a file here (and to SEASONS) to introduce a new team/player.
+  // A team/player NAME resolves to its file via a lookup keyed by the lowercased
+  // basename, so UPPERCASE values match regardless of case. Add a file here to
+  // introduce a new team/player.
   const TEAM_LOGO_FILES = [
     "Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg",
     "Silentearz.jpeg", "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg",
@@ -120,7 +127,123 @@
       : `<div class="season-no">S${pad2(s.no)}</div>`;
   }
 
-  function seasonCardHtml(s) {
+  /* ---------------- per-season stats (bundled CSVs) --------------- */
+  // Column indices in "docs/HCCL Player Stats/Seasons/S#.csv" (see header row).
+  const COL = {
+    no: 0, name: 1, team: 2, matches: 3, pom: 4, runs: 6, batAvg: 7, batSR: 8,
+    s30: 9, s50: 10, hs: 12, sixes: 13, fours: 14, wickets: 22, maiden: 24,
+    bowlAvg: 25, bowlSR: 26, econ: 27, bestBowl: 30,
+  };
+
+  const seasonRowsCache = {};
+  // Parse one season's CSV into an array of cell-arrays (header row dropped).
+  // The season sheets have no quoted/comma-containing fields, so a plain split
+  // is safe (kept minimal on purpose - regenerate season-stats-data.js to update).
+  function seasonRows(no) {
+    if (seasonRowsCache[no]) return seasonRowsCache[no];
+    const store = window.HCCL_SEASON_STATS || {};
+    const csv = store[no] != null ? store[no] : store[String(no)];
+    if (!csv) return (seasonRowsCache[no] = []);
+    const rows = String(csv).split(/\r?\n/)
+      .map(l => l.trim()).filter(Boolean).slice(1)
+      .map(line => line.split(",").map(c => c.trim()));
+    return (seasonRowsCache[no] = rows);
+  }
+
+  // "4-11" style figure; blank / "0" (never bowled) shows as an em dash.
+  const bbf = v => { const t = String(v || "").trim(); return (!t || t === "0") ? "—" : t; };
+  // "30s/50s" and "4s/6s" combined cells.
+  const slash = (a, b) => `${esc(a)}/${esc(b)}`;
+
+  // Small team badge + name used inside leaderboard rows.
+  function teamCell(team) {
+    const img = teamLogo(team);
+    const logo = img
+      ? `<span class="lb-logo" style="background-image:url('${img}')"></span>`
+      : `<span class="lb-logo fallback" style="background:${bubbleColor(team)}">${esc(firstInitial(team))}</span>`;
+    return `<span class="lb-team">${logo}<span class="lb-team-name">${esc(team)}</span></span>`;
+  }
+
+  // Generic leaderboard table. columns: [{ label, num?, cell(row, rank) }]
+  function statTable(title, note, columns, rows) {
+    const head = columns.map(c => `<th class="${c.num ? "num" : ""}">${esc(c.label)}</th>`).join("");
+    const body = rows.length
+      ? rows.map((r, i) =>
+          `<tr>${columns.map(c => `<td class="${c.num ? "num" : ""}">${c.cell(r, i)}</td>`).join("")}</tr>`).join("")
+      : `<tr><td class="lb-empty" colspan="${columns.length}">No stats available for this season yet.</td></tr>`;
+    return `<div class="lb">
+      <div class="lb-head"><h4>${esc(title)}</h4>${note ? `<span class="lb-note">${esc(note)}</span>` : ""}</div>
+      <div class="lb-scroll"><table class="lb-table">
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body}</tbody>
+      </table></div>
+    </div>`;
+  }
+
+  function overallBoard(rows) {
+    const cols = [
+      { label: "#", cell: r => esc(r[COL.no]) },
+      { label: "Player", cell: r => `<span class="lb-player">${esc(r[COL.name])}</span>` },
+      { label: "Team", cell: r => teamCell(r[COL.team]) },
+      { label: "M", num: true, cell: r => esc(r[COL.matches]) },
+      { label: "Runs", num: true, cell: r => esc(r[COL.runs]) },
+      { label: "Bat Avg", num: true, cell: r => esc(r[COL.batAvg]) },
+      { label: "Bat SR", num: true, cell: r => esc(r[COL.batSR]) },
+      { label: "HS", num: true, cell: r => esc(r[COL.hs]) },
+      { label: "30s/50s", num: true, cell: r => slash(r[COL.s30], r[COL.s50]) },
+      { label: "4s/6s", num: true, cell: r => slash(r[COL.fours], r[COL.sixes]) },
+      { label: "Wkts", num: true, cell: r => esc(r[COL.wickets]) },
+      { label: "Bowl Avg", num: true, cell: r => esc(r[COL.bowlAvg]) },
+      { label: "Econ", num: true, cell: r => esc(r[COL.econ]) },
+      { label: "Bowl SR", num: true, cell: r => esc(r[COL.bowlSR]) },
+      { label: "BBF", num: true, cell: r => esc(bbf(r[COL.bestBowl])) },
+      { label: "Mdns", num: true, cell: r => esc(r[COL.maiden]) },
+      { label: "POTM", num: true, cell: r => esc(r[COL.pom]) },
+    ];
+    return statTable("Overall Stats", "All players", cols, rows);
+  }
+
+  function battingBoard(rows) {
+    const sorted = rows.slice().sort((a, b) => num(b[COL.runs]) - num(a[COL.runs]));
+    const cols = [
+      { label: "#", num: true, cell: (r, i) => String(i + 1) },
+      { label: "Player", cell: r => `<span class="lb-player">${esc(r[COL.name])}</span>` },
+      { label: "Team", cell: r => teamCell(r[COL.team]) },
+      { label: "Runs", num: true, cell: r => esc(r[COL.runs]) },
+      { label: "Bat Avg", num: true, cell: r => esc(r[COL.batAvg]) },
+      { label: "Bat SR", num: true, cell: r => esc(r[COL.batSR]) },
+      { label: "4s/6s", num: true, cell: r => slash(r[COL.fours], r[COL.sixes]) },
+      { label: "30s/50s", num: true, cell: r => slash(r[COL.s30], r[COL.s50]) },
+      { label: "HS", num: true, cell: r => esc(r[COL.hs]) },
+    ];
+    return statTable("Batting Stats", "Sorted by Runs", cols, sorted);
+  }
+
+  function bowlingBoard(rows) {
+    const sorted = rows.slice().sort((a, b) => num(b[COL.wickets]) - num(a[COL.wickets]));
+    const cols = [
+      { label: "#", num: true, cell: (r, i) => String(i + 1) },
+      { label: "Player", cell: r => `<span class="lb-player">${esc(r[COL.name])}</span>` },
+      { label: "Team", cell: r => teamCell(r[COL.team]) },
+      { label: "Wkts", num: true, cell: r => esc(r[COL.wickets]) },
+      { label: "Econ", num: true, cell: r => esc(r[COL.econ]) },
+      { label: "Bowl Avg", num: true, cell: r => esc(r[COL.bowlAvg]) },
+      { label: "Mdns", num: true, cell: r => esc(r[COL.maiden]) },
+      { label: "BBF", num: true, cell: r => esc(bbf(r[COL.bestBowl])) },
+    ];
+    return statTable("Bowling Stats", "Sorted by Wickets", cols, sorted);
+  }
+
+  /* ------------------------- rendering ------------------------- */
+  function seasonTabsHtml(list) {
+    return list.map(s =>
+      `<button class="season-tab${s.no === activeSeason ? " active" : ""}" data-season="${s.no}">
+        Season ${pad2(s.no)}${s.ongoing ? `<span class="season-tab-live">● LIVE</span>` : ""}
+      </button>`).join("");
+  }
+
+  function seasonPanelHtml(s) {
+    const rows = seasonRows(s.no);
     return `
       <article class="season-card">
         <div class="season-card-head">
@@ -139,6 +262,12 @@
           ${extraItem("🏏", "Most Runs", s.mostRuns)}
           ${extraItem("🎯", "Most Wickets", s.mostWickets)}
         </div>
+        <div class="season-boards">
+          <h3 class="season-boards-title">Season ${pad2(s.no)} · Player Stats</h3>
+          ${overallBoard(rows)}
+          ${battingBoard(rows)}
+          ${bowlingBoard(rows)}
+        </div>
       </article>`;
   }
 
@@ -146,6 +275,10 @@
     const view = document.getElementById("view-home");
     if (!view) return;
     const list = getSeasons();
+    // Keep the active season in range if the honors list changes (cloud copy).
+    if (!list.some(s => s.no === activeSeason)) activeSeason = list.length ? list[list.length - 1].no : 1;
+    const active = list.find(s => s.no === activeSeason) || list[0];
+
     view.innerHTML = `
       <section class="home-hero">
         <div class="home-hero-logo" style="background-image:url('assets/brand-logo.jpg')"></div>
@@ -155,60 +288,28 @@
       </section>
 
       <section class="home-seasons">
-        <div class="home-seasons-head">
-          <h2>Seasons</h2>
-          <div class="carousel-nav">
-            <button class="carousel-btn" id="seasonPrev" aria-label="Previous season">‹</button>
-            <button class="carousel-btn" id="seasonNext" aria-label="Next season">›</button>
-          </div>
-        </div>
-        <div class="season-carousel" id="seasonCarousel">
-          <div class="season-track" id="seasonTrack">
-            ${list.map(seasonCardHtml).join("")}
-          </div>
-        </div>
-        <div class="carousel-dots" id="seasonDots">
-          ${list.map((s, i) => `<button class="dot${i === index ? " on" : ""}" data-go="${i}" aria-label="Season ${pad2(s.no)}"></button>`).join("")}
+        <nav class="season-tabs" id="seasonTabs">
+          ${seasonTabsHtml(list)}
+        </nav>
+        <div class="season-panel" id="seasonPanel">
+          ${active ? seasonPanelHtml(active) : ""}
         </div>
       </section>`;
-    applyIndex();
-    // Pause autoplay while the pointer is over the carousel.
-    const car = document.getElementById("seasonCarousel");
-    if (car) {
-      car.addEventListener("mouseenter", stopAutoplay);
-      car.addEventListener("mouseleave", restartAutoplay);
-    }
   }
-
-  // Slide the track and light the active dot (no full re-render).
-  function applyIndex() {
-    const track = document.getElementById("seasonTrack");
-    if (track) track.style.transform = `translateX(-${index * 100}%)`;
-    document.querySelectorAll("#seasonDots .dot").forEach((d, i) =>
-      d.classList.toggle("on", i === index));
-  }
-
-  function go(i, user) {
-    const n = getSeasons().length;
-    index = (i + n) % n;
-    applyIndex();
-    if (user) restartAutoplay(); // reset the timer after a manual move
-  }
-
-  function restartAutoplay() {
-    stopAutoplay();
-    timer = setInterval(() => go(index + 1, false), AUTOPLAY_MS);
-  }
-  function stopAutoplay() { if (timer) { clearInterval(timer); timer = null; } }
 
   function onClick(e) {
-    if (e.target.closest("#seasonNext")) return go(index + 1, true);
-    if (e.target.closest("#seasonPrev")) return go(index - 1, true);
-    const dot = e.target.closest("[data-go]");
-    if (dot) go(parseInt(dot.getAttribute("data-go"), 10) || 0, true);
+    const tab = e.target.closest("[data-season]");
+    if (!tab) return;
+    const no = parseInt(tab.getAttribute("data-season"), 10);
+    if (!no || no === activeSeason) return;
+    activeSeason = no;
+    render();
+    // Bring the freshly rendered season panel into view under the tabs.
+    const panel = document.getElementById("seasonPanel");
+    if (panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
-  /* ---------------- Firestore: read cloud seasons + editor seed --------------- */
+  /* ---------------- Firestore: read cloud honors + editor seed --------------- */
   // "Seed once, read-only" (mirrors ranking.js): everyone reads home/seasons; an
   // editor whose bundled data is newer than the stored doc (re)publishes it.
   // Viewers never write (Firestore rules enforce it) and fall back to SEASONS.
@@ -225,7 +326,6 @@
       const fresh = !!(data && data.version === SEASONS_VERSION && Array.isArray(data.seasons));
       if (fresh) {
         cloudSeasons = data.seasons;
-        if (index >= cloudSeasons.length) index = 0; // keep the slide in range
         render();
       }
       // Missing or stale -> an editor publishes the current bundled seasons.
@@ -243,12 +343,11 @@
     const view = document.getElementById("view-home");
     if (!view) return;
     view.addEventListener("click", onClick);
-    // Read cloud seasons (and seed them, if an editor) once signed in.
+    // Read cloud honors (and seed them, if an editor) once signed in.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
       window.HCCL.onChange(() => startHomeSync());
     }
     render();
-    restartAutoplay();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
