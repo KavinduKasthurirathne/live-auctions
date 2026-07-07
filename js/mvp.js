@@ -200,7 +200,7 @@
     return `<div class="rank-card"><table class="rank-table mvp-table">
       <thead><tr>
         <th class="rk-pos">Pos</th><th class="rk-name">Player</th><th class="rk-team">Team</th>
-        <th class="mvp-num" title="Matches played">M</th>
+        <th class="mvp-num" title="Matches played">Matches</th>
         <th class="mvp-num" title="Season MVP points">MVP</th>
       </tr></thead>
       <tbody>${body}</tbody></table>${expander}</div>`;
