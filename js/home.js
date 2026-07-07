@@ -139,6 +139,19 @@
     s30: 9, s50: 10, hs: 12, sixes: 13, fours: 14, wickets: 22, maiden: 24,
     bowlAvg: 25, bowlSR: 26, econ: 27, bestBowl: 30,
   };
+  // Header spot-checks used to validate an imported Season Stats CSV against
+  // the same fixed 36-column layout the COL map above assumes.
+  const SEASON_CSV_HEADER_CHECKS = [
+    [0, /^no\.?$/i], [1, /player name/i], [2, /team name/i],
+    [6, /runs scored/i], [22, /^wickets$/i], [30, /best bowl/i],
+  ];
+
+  // Per-season CSV text uploaded live by an editor for the ongoing season
+  // (Firestore seasonStatsLive/S#), keyed by season number. Wins over the
+  // bundled window.HCCL_SEASON_STATS when present - see seasonRows() below.
+  const liveCsvBySeason = {};
+  let liveSeasonNo = null; // season number the Firestore listener currently follows
+  let liveUnsub = null;    // unsubscribe fn for that listener
 
   const seasonRowsCache = {};
   // Parse one season's CSV into an array of cell-arrays (header row dropped).
@@ -147,7 +160,8 @@
   function seasonRows(no) {
     if (seasonRowsCache[no]) return seasonRowsCache[no];
     const store = window.HCCL_SEASON_STATS || {};
-    const csv = store[no] != null ? store[no] : store[String(no)];
+    const csv = liveCsvBySeason[no] != null ? liveCsvBySeason[no]
+      : (store[no] != null ? store[no] : store[String(no)]);
     if (!csv) return (seasonRowsCache[no] = []);
     const rows = String(csv).split(/\r?\n/)
       .map(l => l.trim()).filter(Boolean).slice(1)
@@ -297,7 +311,14 @@
           ${extraItem("🎯", "Most Wickets", s.mostWickets)}
         </div>
         <div class="season-boards">
-          <h3 class="season-boards-title">Season ${pad2(s.no)} · Player Stats</h3>
+          <div class="season-boards-head">
+            <h3 class="season-boards-title">Season ${pad2(s.no)} · Player Stats</h3>
+            ${s.ongoing ? `
+            <label class="btn btn-yellow file-btn season-stats-import" title="Upload the latest Season ${pad2(s.no)} stats CSV - updates the leaderboard live for everyone">
+              <span>⬆ Import Season Stats</span>
+              <input type="file" class="season-stats-import-file" data-season="${s.no}" accept=".csv,text/csv" hidden />
+            </label>` : ""}
+          </div>
           <div class="board-tabs" role="tablist">
             ${BOARDS.map(b => `<button class="board-tab${b.key === activeBoard ? " active" : ""}" data-board="${b.key}">${esc(b.label)}</button>`).join("")}
           </div>
@@ -387,6 +408,9 @@
           seasons: SEASONS,
         }).catch(err => console.error("home cloud seed failed:", err));
       }
+      // The ongoing season may have changed along with the honors - keep the
+      // live-stats listener pointed at whichever season is ongoing now.
+      startSeasonLiveSync();
     }, err => console.error("home snapshot error:", err));
   }
 
@@ -436,13 +460,121 @@
     }
   }
 
+  /* ------ Firestore: live stats override for the ONGOING season only ------ */
+  // "Store raw CSV, recompute client-side" (mirrors ranking.js's ranking/stats):
+  // an editor imports the day's Season Stats CSV; it's published as-is to
+  // seasonStatsLive/S{no}; every signed-in client's onSnapshot listener picks
+  // it up and seasonRows() prefers it over the bundled CSV for that season.
+  // Only ever follows whichever season is currently flagged `ongoing` - a
+  // finished season always renders from the committed bundle.
+  function notify(msg, kind) {
+    if (typeof window.toast === "function") window.toast(msg, kind);
+    else console.log("[home]", msg);
+  }
+
+  // Validate an uploaded CSV against the fixed 36-column Season Stats layout
+  // the COL map assumes. Every leaderboard cell is looked up by position, so a
+  // wrong-shaped file must be rejected outright rather than silently accepted -
+  // an accepted mismatch would corrupt every stat cell with no visible sign.
+  function validateSeasonCsv(text) {
+    const parseCsv = window.HCCLRanking && window.HCCLRanking.parseCsv;
+    let grid = [];
+    try { grid = parseCsv ? parseCsv(text) : null; } catch (e) { grid = null; }
+    if (!grid) return { ok: false, reason: "Couldn't read that file as CSV." };
+    grid = grid.filter(r => r && r.some(c => String(c || "").trim() !== ""));
+    if (grid.length < 2) return { ok: false, reason: "Empty CSV - add at least one player row." };
+    const header = grid[0].map(c => String(c || "").trim());
+    while (header.length && !header[header.length - 1]) header.pop(); // trailing Excel-export blanks
+    if (header.length !== 36) {
+      return { ok: false, reason: `Expected 36 columns (Season Stats format), found ${header.length}.` };
+    }
+    for (const [i, re] of SEASON_CSV_HEADER_CHECKS) {
+      if (!re.test(header[i] || "")) {
+        return { ok: false, reason: `That doesn't look like a Season Stats CSV - column ${i + 1} should be "${header[i] != null ? header[i] : ""}".` };
+      }
+    }
+    const dataRows = grid.slice(1);
+    if (dataRows.some(r => r.length < 31)) {
+      return { ok: false, reason: "Some rows are missing columns - check the file wasn't truncated." };
+    }
+    return { ok: true, playerCount: dataRows.length };
+  }
+
+  function startSeasonLiveSync() {
+    const H = window.HCCL;
+    if (!H || !H.configured || !H.user || !H.db || !H.fs) return;
+    const fs = H.fs;
+    if (!fs.doc || !fs.onSnapshot) return;
+    const ongoing = getSeasons().find(s => s.ongoing);
+    const no = ongoing ? ongoing.no : null;
+    if (no === liveSeasonNo) return; // already following the right season (or correctly following none)
+    if (liveUnsub) { liveUnsub(); liveUnsub = null; }
+    // A season that just stopped being "ongoing" must immediately revert to
+    // the committed bundle, not keep showing a stale import.
+    if (liveSeasonNo != null) { delete liveCsvBySeason[liveSeasonNo]; delete seasonRowsCache[liveSeasonNo]; }
+    liveSeasonNo = no;
+    if (no == null) { render(); return; }
+    const ref = fs.doc(H.db, "seasonStatsLive", "S" + no);
+    liveUnsub = fs.onSnapshot(ref, snap => {
+      const data = snap.exists() ? snap.data() : null;
+      const csv = data && typeof data.csv === "string" && data.csv.trim() ? data.csv : null;
+      if (csv) liveCsvBySeason[no] = csv; else delete liveCsvBySeason[no];
+      delete seasonRowsCache[no]; // invalidate BEFORE render() recomputes
+      render();
+    }, err => console.error("season live stats snapshot error:", err));
+  }
+
+  // Editor-only: publish an uploaded Season Stats CSV so it updates the
+  // ongoing season's leaderboard for everyone (or apply locally when offline).
+  async function importSeasonCsv(file, seasonNo) {
+    if (!file || !seasonNo) return;
+    const H = window.HCCL;
+    let text = "";
+    try { text = await file.text(); } catch (e) { notify("Couldn't read that file.", "bad"); return; }
+    const check = validateSeasonCsv(text);
+    if (!check.ok) { notify(check.reason, "bad"); return; }
+    // Re-confirm this season is still ongoing (the button may be stale if the
+    // tab's been open across a season change).
+    const ongoing = getSeasons().find(s => s.ongoing);
+    if (!ongoing || ongoing.no !== seasonNo) { notify("That season is no longer ongoing - refresh and try again.", "bad"); return; }
+
+    if (H && H.configured && H.db && H.fs && H.fs.setDoc && H.canEdit && H.canEdit()) {
+      try {
+        const ref = H.fs.doc(H.db, "seasonStatsLive", "S" + seasonNo);
+        await H.fs.setDoc(ref, {
+          season: seasonNo, csv: text, playerCount: check.playerCount,
+          updatedAt: H.fs.serverTimestamp ? H.fs.serverTimestamp() : Date.now(),
+          updatedBy: (H.user && (H.user.displayName || H.user.email)) || "",
+        });
+        notify(`Season ${pad2(seasonNo)} stats imported - ${check.playerCount} players. Live for everyone.`, "good");
+        // onSnapshot re-renders every device (including this one).
+      } catch (e) {
+        console.error("season stats import failed:", e);
+        notify("Upload failed - need moderator/admin + published rules.", "bad");
+      }
+      return;
+    }
+    if (H && H.configured) { notify("Only moderators/admins can import stats.", "bad"); return; }
+    // Offline / open mode (no cloud): apply on this device only.
+    liveCsvBySeason[seasonNo] = text; delete seasonRowsCache[seasonNo]; render();
+    notify(`Season ${pad2(seasonNo)} stats imported - ${check.playerCount} players (this device only).`, "good");
+  }
+
   function init() {
     const view = document.getElementById("view-home");
     if (!view) return;
     view.addEventListener("click", onClick);
+    view.addEventListener("change", e => {
+      const inp = e.target.closest(".season-stats-import-file");
+      if (inp && inp.files && inp.files[0]) {
+        const no = parseInt(inp.getAttribute("data-season"), 10);
+        if (no) importSeasonCsv(inp.files[0], no);
+        inp.value = "";
+      }
+    });
     // Read cloud honors + upload the per-season stats (both editor-seeded) once signed in.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
-      window.HCCL.onChange(() => { startHomeSync(); seedSeasonStats(); });
+      window.HCCL.onChange(() => { startHomeSync(); seedSeasonStats(); startSeasonLiveSync(); });
     }
     render();
   }

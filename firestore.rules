@@ -76,6 +76,16 @@ service cloud.firestore {
       allow write: if canEdit();
     }
 
+    // Live season stats override: seasonStatsLive/S{no} = { season, csv,
+    // playerCount, updatedAt, updatedBy }. Editors import a fresh CSV while a
+    // season is ongoing to update that season's leaderboard for everyone in
+    // real time, without a redeploy. Separate from the write-only seasonStats/*
+    // archival mirror above.
+    match /seasonStatsLive/{document=**} {
+      allow read: if signedIn();
+      allow write: if canEdit();
+    }
+
     // Season MVP: mvp/{matchId} = one parsed STUMPS match report.
     // Editors upload/delete matches; everyone signed in reads (scores are
     // computed client-side from these docs).

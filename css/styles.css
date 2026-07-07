@@ -771,10 +771,14 @@ body:not(.can-edit) .rank-import { display: none; }
 
 /* ---- Per-season leaderboards (Overall / Batting / Bowling) ---- */
 .season-boards { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 20px; }
+.season-boards-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.season-boards-head .season-boards-title { margin-bottom: 0; }
 .season-boards-title {
   font-family: "Russo One", sans-serif; font-weight: 700; font-size: 16px;
   letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 16px;
 }
+/* Import is an editor-only control (admin/moderator, or offline mode). */
+body:not(.can-edit) .season-stats-import { display: none; }
 /* Leaderboard sub-tabs: a segmented control (deliberately unlike the gold
    season pills) that switches between Overall / Batting / Bowling. */
 .board-tabs {
