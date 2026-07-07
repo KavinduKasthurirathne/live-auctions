@@ -68,6 +68,14 @@ service cloud.firestore {
       allow write: if canEdit();
     }
 
+    // Per-season player stats: seasonStats/S1 … seasonStats/S6 (each { season,
+    // players:[…] }) + seasonStats/index. Uploaded by editors from the bundled
+    // season CSVs; everyone signed in reads.
+    match /seasonStats/{document=**} {
+      allow read: if signedIn();
+      allow write: if canEdit();
+    }
+
     // Season MVP: mvp/{matchId} = one parsed STUMPS match report.
     // Editors upload/delete matches; everyone signed in reads (scores are
     // computed client-side from these docs).

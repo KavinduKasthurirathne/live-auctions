@@ -34,6 +34,9 @@
   // Bump when the SEASONS honors above change so an editor re-publishes the
   // cloud copy (home/seasons); everyone signed in reads that copy.
   const SEASONS_VERSION = "2026-07-06";
+  // Bump whenever the bundled season CSVs (season-stats-data.js) are regenerated
+  // so an editor re-uploads the per-season stats to Firestore (seasonStats/S#).
+  const SEASON_STATS_VERSION = "2026-07-07";
   const pad2 = n => String(n).padStart(2, "0");
   const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 
@@ -150,6 +153,23 @@
       .map(l => l.trim()).filter(Boolean).slice(1)
       .map(line => line.split(",").map(c => c.trim()));
     return (seasonRowsCache[no] = rows);
+  }
+
+  // Same CSV, but as an array of {header: value} objects - the shape uploaded to
+  // Firestore (seasonStats/S#) so the cloud copy is self-describing / queryable.
+  function seasonPlayers(no) {
+    const store = window.HCCL_SEASON_STATS || {};
+    const csv = store[no] != null ? store[no] : store[String(no)];
+    if (!csv) return [];
+    const lines = String(csv).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return [];
+    const header = lines[0].split(",").map(h => h.trim());
+    return lines.slice(1).map(line => {
+      const cells = line.split(",").map(c => c.trim());
+      const obj = {};
+      header.forEach((h, i) => { obj[h] = cells[i] != null ? cells[i] : ""; });
+      return obj;
+    });
   }
 
   // "4-11" style figure; blank / "0" (never bowled) shows as an em dash.
@@ -370,13 +390,59 @@
     }, err => console.error("home snapshot error:", err));
   }
 
+  /* ------ Firestore: upload per-season stats (editors, seed once) ------ */
+  // "Seed once, read-only" for the detailed stats: an editor publishes the
+  // bundled season CSVs to Firestore as one document per season
+  // (seasonStats/S1 … seasonStats/S6, each { season, players:[…] }) plus a small
+  // seasonStats/index. Viewers never write (rules enforce it). The site itself
+  // still renders from the bundled CSVs; this cloud copy is the shared record.
+  let statsSeedTried = false;
+  async function seedSeasonStats() {
+    const H = window.HCCL;
+    if (!H || !H.configured || !H.db || !H.fs || !H.canEdit || !H.canEdit()) return;
+    const fs = H.fs;
+    if (!fs.doc || !fs.getDoc || !fs.writeBatch) return;
+    if (statsSeedTried) return;           // one attempt per page load
+    statsSeedTried = true;
+    try {
+      const idxRef = fs.doc(H.db, "seasonStats", "index");
+      const idxSnap = await fs.getDoc(idxRef);
+      if (idxSnap.exists() && idxSnap.data().version === SEASON_STATS_VERSION) return; // already current
+      const by = (H.user && (H.user.displayName || H.user.email)) || "";
+      const stamp = fs.serverTimestamp ? fs.serverTimestamp() : Date.now();
+      const batch = fs.writeBatch(H.db);
+      const summary = [];
+      getSeasons().forEach(s => {
+        const players = seasonPlayers(s.no);
+        if (!players.length) return;
+        batch.set(fs.doc(H.db, "seasonStats", "S" + s.no), {
+          season: s.no,
+          year: s.year || "",
+          ongoing: !!s.ongoing,
+          version: SEASON_STATS_VERSION,
+          updatedAt: stamp,
+          updatedBy: by,
+          playerCount: players.length,
+          players,
+        });
+        summary.push({ season: s.no, players: players.length });
+      });
+      batch.set(idxRef, { version: SEASON_STATS_VERSION, seasons: summary, updatedAt: stamp, updatedBy: by });
+      await batch.commit();
+      console.log(`season stats uploaded to Firestore (seasonStats/*, ${SEASON_STATS_VERSION})`);
+    } catch (e) {
+      statsSeedTried = false;             // allow a retry on the next auth change
+      console.error("season stats upload failed (need editor + published rules):", e);
+    }
+  }
+
   function init() {
     const view = document.getElementById("view-home");
     if (!view) return;
     view.addEventListener("click", onClick);
-    // Read cloud honors (and seed them, if an editor) once signed in.
+    // Read cloud honors + upload the per-season stats (both editor-seeded) once signed in.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
-      window.HCCL.onChange(() => startHomeSync());
+      window.HCCL.onChange(() => { startHomeSync(); seedSeasonStats(); });
     }
     render();
   }
