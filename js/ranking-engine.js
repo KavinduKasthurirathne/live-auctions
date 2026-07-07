@@ -56,7 +56,7 @@
   function parseCsv(text) {
     const rows = [];
     let field = "", row = [], inQ = false;
-    text = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    text = String(text).replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     for (let i = 0; i < text.length; i++) {
       const c = text[i];
       if (inQ) {
@@ -76,18 +76,43 @@
     return rows;
   }
 
-  // Column layout of the HCCL stats sheet (0-indexed). Fixed by
-  // position because the header has duplicate labels (AVG, Recent 5
-  // Matches) for the batting vs bowling halves.
+  // Fallback positional layout (the original sheet), used only if a sheet's
+  // header can't be recognised.
   const COL = {
     id: 0, name: 1, team: 2,
-    // batting
     innings: 3, runs: 4, avg: 5, sr: 6, thirties: 7, fifties: 8, ducks: 9,
     potms: 10, rap: 11, recentBat: 12,
-    // bowling (kept for future engine work)
     wickets: 13, bowlAvg: 14, eco: 15, threeFers: 16, fourFers: 17,
     bsr: 18, bap: 19, recentBowl: 20,
   };
+
+  // Resolve column indices from the HEADER ROW by name, so the engine is
+  // robust to added/reordered columns (e.g. a new sheet inserting "Balls
+  // Faced" / "Balls Bowled" or trailing extras). The header repeats "AVG"
+  // and "Recent 5 Matches" for the batting vs bowling halves, so those are
+  // split around the WICKETS column. Falls back to COL for unknown headers.
+  function resolveCols(header) {
+    const norm = s => String(s == null ? "" : s).replace(/﻿/g, "").trim().toLowerCase();
+    const H = (header || []).map(norm);
+    const first = name => H.indexOf(norm(name));
+    const allOf = name => H.reduce((a, h, i) => (h === norm(name) ? a.concat(i) : a), []);
+    if (first("ID") < 0 || first("NAME") < 0) return COL; // not a recognisable HCCL header
+    const wickets = first("WICKETS");
+    const avgs = allOf("AVG");
+    const recents = allOf("Recent 5 Matches");
+    const beforeW = i => wickets < 0 || i < wickets;
+    const afterW = i => wickets >= 0 && i > wickets;
+    const pick = (list, pred) => { const v = list.find(pred); return v == null ? -1 : v; };
+    return {
+      id: first("ID"), name: first("NAME"), team: first("TEAM"),
+      innings: first("Innings"), runs: first("RUNS"),
+      avg: pick(avgs, beforeW), sr: first("SR"),
+      potms: first("POTMs"), rap: first("RAP"), recentBat: pick(recents, beforeW),
+      wickets, bowlAvg: pick(avgs, afterW), eco: first("ECO"),
+      threeFers: first("3Fers"), fourFers: first("4Fers"), bsr: first("BSR"),
+      recentBowl: pick(recents, afterW),
+    };
+  }
 
   // Parse one "Recent 5 Matches" batting cell into up to 5 match objects.
   // Lines look like: "1. 81 runs, 300 SR, Highest scorer Yes, Not out No, POTM Yes"
@@ -135,30 +160,31 @@
   // Raw CSV text -> array of player stat objects.
   function parsePlayers(csvText) {
     const rows = parseCsv(csvText);
+    const cols = resolveCols(rows[0] || []); // map columns by header name
     const players = [];
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      if (!r || !/^P\d+/i.test((r[COL.id] || "").trim())) continue; // skip header/blank rows
+      if (!r || !/^P\d+/i.test((r[cols.id] || "").trim())) continue; // skip header/blank rows
       players.push({
-        id: (r[COL.id] || "").trim(),
-        name: (r[COL.name] || "").trim(),
-        team: titleCase((r[COL.team] || "").trim()),
-        potms: Math.round(num(r[COL.potms])), // career Player-of-the-Match count (used by bowling achievements)
+        id: (r[cols.id] || "").trim(),
+        name: (r[cols.name] || "").trim(),
+        team: titleCase((r[cols.team] || "").trim()),
+        potms: Math.round(num(r[cols.potms])), // career Player-of-the-Match count (used by bowling achievements)
         // batting
-        innings: Math.round(num(r[COL.innings])),
-        runs: Math.round(num(r[COL.runs])),
-        avg: num(r[COL.avg]),
-        sr: num(r[COL.sr]),
-        rap: Math.round(num(r[COL.rap])),
-        recentBat: parseRecentBatting(r[COL.recentBat]),
+        innings: Math.round(num(r[cols.innings])),
+        runs: Math.round(num(r[cols.runs])),
+        avg: num(r[cols.avg]),
+        sr: num(r[cols.sr]),
+        rap: Math.round(num(r[cols.rap])),
+        recentBat: parseRecentBatting(r[cols.recentBat]),
         // bowling
-        wickets: Math.round(num(r[COL.wickets])),
-        bowlAvg: num(r[COL.bowlAvg]),
-        eco: num(r[COL.eco]),
-        threeFers: Math.round(num(r[COL.threeFers])),
-        fourFers: Math.round(num(r[COL.fourFers])),
-        bsr: num(r[COL.bsr]), // bowling strike rate (balls per wicket, lower better)
-        recentBowl: parseRecentBowling(r[COL.recentBowl]),
+        wickets: Math.round(num(r[cols.wickets])),
+        bowlAvg: num(r[cols.bowlAvg]),
+        eco: num(r[cols.eco]),
+        threeFers: Math.round(num(r[cols.threeFers])),
+        fourFers: Math.round(num(r[cols.fourFers])),
+        bsr: num(r[cols.bsr]), // bowling strike rate (balls per wicket, lower better)
+        recentBowl: parseRecentBowling(r[cols.recentBowl]),
       });
     }
     return players;

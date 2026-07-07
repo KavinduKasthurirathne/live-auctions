@@ -134,7 +134,10 @@
         // onSnapshot re-renders every device (including this one).
       } catch (e) {
         console.error("stats upload failed:", e);
-        notify("Upload failed - need moderator/admin + published rules.", "bad");
+        const denied = e && (e.code === "permission-denied" || /permission/i.test(e.message || ""));
+        notify(denied
+          ? "Upload blocked by Firestore rules. Publish the rules and sign in as admin/moderator."
+          : "Upload failed: " + ((e && e.message) || "check your connection and try again."), "bad");
       }
       return;
     }
