@@ -353,7 +353,7 @@
       if (!ps.length) return;
       html += `<div class="fan-pool-team"><div class="fan-pool-team-name">${esc(teamName(tid))}</div>`;
       ps.forEach(p => {
-        html += `<label class="fan-pick"><input type="checkbox" data-pick="${p.id}" ${picked.has(p.id) ? "checked" : ""}/>${esc(p.name)}</label>`;
+        html += `<label class="fan-pick"><input type="checkbox" data-pick="${p.id}" ${picked.has(p.id) ? "checked" : ""}/><span>${esc(p.name)}</span></label>`;
       });
       html += `</div>`;
     });
@@ -372,13 +372,16 @@
       html += `<div class="fan-entries">`;
       day.entries.forEach(e => {
         const pts = entryPoints(day, e);
-        html += `<div class="fan-entry">
-          <div class="fan-entry-head"><b>${esc(fContestant(e.contestantId) ? fContestant(e.contestantId).name : "?")}</b>
-            ${day.hasResults ? `<span class="fan-pts">${fmtPts(pts)} pts</span>` : `<span class="hint">pending results</span>`}
+        const cname = fContestant(e.contestantId) ? fContestant(e.contestantId).name : "?";
+        html += `<details class="fan-entry">
+          <summary class="fan-entry-head">
+            <span class="fen-caret" aria-hidden="true">▸</span>
+            <b class="fen-cname">${esc(cname)}</b>
+            ${day.hasResults ? `<span class="fan-pts">${fmtPts(pts)} pts</span>` : `<span class="hint">pending</span>`}
             <span class="fan-entry-actions"><button class="icon-btn" data-edit-entry="${e.id}" title="Edit">✎</button><button class="icon-btn del" data-del-entry="${e.id}" title="Delete">✕</button></span>
-          </div>
+          </summary>
           <div class="fan-entry-players">${e.playerIds.map(pid => playerChip(pid, e, day)).join("")}</div>
-        </div>`;
+        </details>`;
       });
       html += `</div>`;
     }
@@ -393,7 +396,10 @@
       else if (pid === e.viceCaptainId) val *= 1.5;
       pts = `<span class="pchip-pts">${fmtPts(val)}</span>`;
     }
-    return `<span class="fan-pchip">${esc(pname(pid))}${tag}${pts}</span>`;
+    return `<div class="fan-pchip">
+      <span class="fen-ico" aria-hidden="true">👤</span>
+      <span class="fen-pname">${esc(pname(pid))}</span>${tag}${pts}
+    </div>`;
   }
 
   function renderResultsSection(day) {
@@ -409,9 +415,11 @@
         const perf = (day.performance && day.performance[p.id]) || {};
         html += `<div class="fan-res-row">
           <span class="frr-name">${esc(p.name)}</span>
-          <input type="number" min="0" inputmode="numeric" data-runs="${p.id}" value="${perf.runs != null ? perf.runs : ""}" placeholder="runs"/>
-          <input type="number" min="0" inputmode="numeric" data-wkts="${p.id}" value="${perf.wickets != null ? perf.wickets : ""}" placeholder="wkts"/>
-          <span class="frr-pts">${fmtPts(playerDayPoints(day, p.id))}</span>
+          <div class="frr-inputs">
+            <input type="number" min="0" inputmode="numeric" data-runs="${p.id}" value="${perf.runs != null ? perf.runs : ""}" placeholder="runs"/>
+            <input type="number" min="0" inputmode="numeric" data-wkts="${p.id}" value="${perf.wickets != null ? perf.wickets : ""}" placeholder="wkts"/>
+            <span class="frr-pts">${fmtPts(playerDayPoints(day, p.id))}</span>
+          </div>
         </div>`;
       });
       html += `</div>`;
@@ -842,8 +850,8 @@
     if ((m = t.closest("[data-del-day]"))) return delDay(m.getAttribute("data-del-day"));
     if (t.closest("[data-add-entry]")) return saveEntry();
     if (t.closest("[data-cancel-entry]")) { UI.editEntryId = null; renderFanBody(); return; }
-    if ((m = t.closest("[data-edit-entry]"))) { UI.editEntryId = m.getAttribute("data-edit-entry"); renderFanBody(); return; }
-    if ((m = t.closest("[data-del-entry]"))) return delEntry(m.getAttribute("data-del-entry"));
+    if ((m = t.closest("[data-edit-entry]"))) { e.preventDefault(); UI.editEntryId = m.getAttribute("data-edit-entry"); renderFanBody(); return; }
+    if ((m = t.closest("[data-del-entry]"))) { e.preventDefault(); return delEntry(m.getAttribute("data-del-entry")); }
     if (t.closest("[data-save-results]")) return saveResults();
     if (t.closest("[data-save-team]")) return saveTeam();
     if (t.closest("[data-cancel-team]")) { UI.editTeamId = null; renderFanBody(); return; }

@@ -22,36 +22,52 @@
 .fan-chip input { accent-color: var(--gold); }
 
 /* player pool picker */
-.fan-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin: 6px 0; }
-.fan-pool-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
-.fan-pool-team-name { font-weight: 800; font-size: 13px; color: var(--yellow); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-.fan-pick { display: flex; align-items: center; gap: 8px; padding: 5px 2px; font-size: 14px; cursor: pointer; }
-.fan-pick input { accent-color: var(--red); width: 16px; height: 16px; flex: none; }
+.fan-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 14px; margin: 6px 0; }
+.fan-pool-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px 8px; }
+.fan-pool-team-name { font-weight: 800; font-size: 12px; color: var(--yellow); text-transform: uppercase; letter-spacing: 1px; margin: 2px 4px 8px; }
+.fan-pick { display: flex; align-items: center; gap: 10px; padding: 8px 8px; font-size: 14px; cursor: pointer; border-radius: 9px; transition: background 0.12s ease; }
+.fan-pick:hover { background: rgba(255, 255, 255, 0.04); }
+.fan-pick input { accent-color: var(--red); width: 17px; height: 17px; flex: none; }
 .fan-pick input:disabled { opacity: 0.4; }
+.fan-pick span { flex: 1; min-width: 0; line-height: 1.25; }
+.fan-pick input:checked + span { color: var(--yellow); font-weight: 700; }
 .fan-count { font-weight: 700; color: var(--muted); margin: 8px 0; }
 .fan-count.full { color: var(--green); }
 
-/* entries list */
+/* entries list - each contestant is a collapsible team dropdown */
 .fan-entries { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-.fan-entry { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
-.fan-entry-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.fan-entry-head b { font-size: 15px; }
-.fan-pts { color: var(--yellow); font-weight: 800; }
-.fan-entry-actions { margin-left: auto; display: flex; gap: 6px; }
-.fan-entry-players { display: flex; flex-wrap: wrap; gap: 6px; }
-.fan-pchip { display: inline-flex; align-items: center; gap: 5px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
-.fan-pchip .cap, .fan-pchip .vc { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 5px; }
+.fan-entry { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.fan-entry-head { /* <summary> */
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; padding: 12px;
+}
+.fan-entry-head::-webkit-details-marker { display: none; }
+.fan-entry-head:hover { background: rgba(255, 255, 255, 0.03); }
+.fen-caret { flex: none; color: var(--muted); font-size: 12px; transition: transform 0.15s ease; }
+.fan-entry[open] .fen-caret { transform: rotate(90deg); }
+.fen-cname { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-pts { color: var(--yellow); font-weight: 800; flex: none; }
+.fan-entry-head .hint { flex: none; font-size: 12px; }
+.fan-entry-actions { flex: none; display: flex; gap: 4px; }
+/* the picked team, revealed when the dropdown is open */
+.fan-entry-players { display: flex; flex-direction: column; gap: 5px; padding: 2px 12px 12px; }
+.fan-pchip { display: flex; align-items: center; gap: 9px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px; font-size: 13.5px; }
+.fen-ico { flex: none; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--panel); border: 1px solid var(--border); font-size: 12px; }
+.fen-pname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-pchip .cap, .fan-pchip .vc { flex: none; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 5px; }
 .fan-pchip .cap { background: var(--red); color: #fff; }
 .fan-pchip .vc { background: var(--gold); color: #1a1300; }
-.pchip-pts { color: var(--yellow); font-weight: 700; }
+.pchip-pts { flex: none; color: var(--yellow); font-weight: 800; min-width: 46px; text-align: right; }
 
-/* results entry */
-.fan-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin: 6px 0 14px; }
+/* results entry - full name on its own line, inputs below (no truncation) */
+.fan-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 6px 0 14px; }
 .fan-results-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
-.fan-res-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
-.frr-name { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fan-res-row input { width: 62px; flex: none; padding: 7px 8px; }
-.frr-pts { width: 44px; flex: none; text-align: right; color: var(--yellow); font-weight: 800; font-size: 14px; }
+.fan-res-row { display: flex; flex-direction: column; gap: 6px; padding: 9px 0; border-bottom: 1px solid var(--panel-3); }
+.fan-res-row:last-child { border-bottom: none; }
+.frr-name { font-size: 14px; font-weight: 600; line-height: 1.25; }
+.frr-inputs { display: flex; align-items: center; gap: 8px; }
+.fan-res-row input { flex: 1 1 0; min-width: 0; padding: 7px 8px; text-align: center; }
+.frr-pts { flex: none; width: 48px; text-align: right; color: var(--yellow); font-weight: 800; font-size: 15px; }
 .frr-sub { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
 
 /* leaderboards */
