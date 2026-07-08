@@ -1,49 +1,49 @@
-﻿ID,NAME,TEAM,Innings,RUNS,Balls Faced,AVG,SR,30s,50s,0s,POTMs,RAP,Recent 5 Matches,WICKETS,Balls Bowled,AVG,ECO,3Fers,4Fers,BSR,BAP,Recent 5 Matches,Bat Dismissals,Bowl Runs Conceded
-P001,Sasindu Madushan,MATRIX,73,1107,451,16.3,245.5,7,4,14,15,995,"1. 11 runs, 275 SR, Highest scorer No, Not out No, POTM No
-2. 4 runs, 133.3 SR, Highest scorer No, Not out No, POTM No
-3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-4. 81 runs, 300 SR, Highest scorer Yes, Not out No, POTM Yes
-5. 8 runs, 266.7 SR, Highest scorer No, Not out No, POTM No",104,647,11.1,10.7,10,1,6.22,935,"0 Wickets, 13 Eco, POTM NO
-2 Wickets, 12 Eco, POTM NO
-1 Wickets, 12 Eco, POTM NO
-0 Wickets, 26 Eco, POTM YES
-1 Wickets, 15 Eco, POTM NO",68,1154
-P002,Pasindu Dilshan,MATRIX,76,776,339,10.8,228.9,7,0,14,9,555,"1. 18 runs, 163.6 SR, Highest scorer No, Not out No, POTM Yes
-2. 25 runs, 277.8 SR, Highest scorer No, Not out No, POTM No
-3. 9 runs, 300 SR, Highest scorer No, Not out No, POTM No
-4. 16 runs, 228.6 SR, Highest scorer No, Not out No, POTM No
-5. 12 runs, 240 SR, Highest scorer No, Not out No, POTM No",67,388,13.8,14.3,6,2,5.79,610,"3 Wickets, 8 Eco, POTM YES
-0 Wickets, 20 Eco, POTM NO
-1 Wickets, 17 Eco, POTM NO
-2 Wickets, 13.5 Eco, POTM NO
-1 Wickets, 16 Eco, POTM NO",72,925
-P003,Nisitha Gihan,MATRIX,73,836,422,13.3,198.1,4,3,15,3,315,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-2. 4 runs, 100 SR, Highest scorer No, Not out No, POTM No
-3. 1 runs, 50 SR, Highest scorer No, Not out No, POTM No
-4. 4 runs, 400 SR, Highest scorer No, Not out Yes, POTM No
-5. 10 runs, 142.9 SR, Highest scorer No, Not out Yes, POTM No",43,297,14.1,12.2,1,0,6.91,165,"DNB, POTM NO
-DNB, POTM NO
-0 Wickets, 14 Eco, POTM NO
-0 Wickets, 24 Eco, POTM NO
-1 Wickets, 13 Eco, POTM NO",63,606
-P004,Sandun Chinthana,MATRIX,40,415,253,11.9,165.8,2,1,9,6,365,"1. 12 runs, 150 SR, Highest scorer No, Not out Yes, POTM No
-2. 11 runs, 220 SR, Highest scorer No, Not out No, POTM No
-3. 9 runs, 100 SR, Highest scorer No, Not out No, POTM No
+ID,NAME,TEAM,Innings,RUNS,Balls Faced,AVG,SR,30s,50s,0s,POTMs,RAP,Recent 5 Matches,WICKETS,Balls Bowled,AVG,ECO,3Fers,4Fers,BSR,BAP,Recent 5 Matches,Bat Dismissals,Bowl Runs Conceded
+P001,Sasindu Madushan,MATRIX,74,1112,453,16.1,245.5,7,4,14,15,995,"1. 5 runs, 250 SR, Highest scorer No, Not out No, POTM No
+2. 11 runs, 275 SR, Highest scorer No, Not out No, POTM No
+3. 4 runs, 133.3 SR, Highest scorer No, Not out No, POTM No
 4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-5. 21 runs, 190.9 SR, Highest scorer No, Not out No, POTM Yes",25,133,11.2,12.7,1,0,5.32,315,"1 Wickets, 0 Eco, POTM NO
-DNB, POTM NO
-1 Wickets, 16 Eco, POTM NO
-1 Wickets, 9 Eco, POTM NO
-2 Wickets, 8 Eco, POTM YES",35,280
-P005,Yasantha Ruwan,MATRIX,22,208,130,10.9,160,1,0,4,0,15,"1. DNB, POTM No
-2. 6 runs, 200 SR, Highest scorer No, Not out No, POTM No
-3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-4. DNB, POTM No
-5. 18 runs, 225 SR, Highest scorer No, Not out No, POTM No",19,117,13.4,13.1,1,0,6.16,15,"1 Wickets, 9 Eco, POTM NO
-0 Wickets, 10 Eco, POTM NO
-2 Wickets, 0 Eco, POTM NO
-1 Wickets, 18 Eco, POTM NO
-0 Wickets, 16 Eco, POTM NO",19,255
+5. 81 runs, 300 SR, Highest scorer Yes, Not out No, POTM Yes",105,653,11,10.6,10,1,6.22,935,"1. 1 Wickets, 1 Runs Conceded, 1 Eco, POTM NO
+2. 0 Wickets, 13 Eco, POTM NO
+3. 2 Wickets, 12 Eco, POTM NO
+4. 1 Wickets, 12 Eco, POTM NO
+5. 0 Wickets, 26 Eco, POTM YES",69,1155
+P002,Pasindu Dilshan,MATRIX,77,784,342,10.7,229.2,7,0,14,9,555,"1. 8 runs, 266.7 SR, Highest scorer No, Not out No, POTM No
+2. 18 runs, 163.6 SR, Highest scorer No, Not out No, POTM Yes
+3. 25 runs, 277.8 SR, Highest scorer No, Not out No, POTM No
+4. 9 runs, 300 SR, Highest scorer No, Not out No, POTM No
+5. 16 runs, 228.6 SR, Highest scorer No, Not out No, POTM No",70,400,13.6,14.3,7,2,5.71,625,"1. 3 Wickets, 28 Runs Conceded, 14 Eco, POTM NO
+2. 3 Wickets, 8 Eco, POTM YES
+3. 0 Wickets, 20 Eco, POTM NO
+4. 1 Wickets, 17 Eco, POTM NO
+5. 2 Wickets, 13.5 Eco, POTM NO",73,953
+P003,Nisitha Gihan,MATRIX,74,868,439,13.6,197.7,5,3,15,3,330,"1. 32 runs, 188.2 SR, Highest scorer No, Not out No, POTM No
+2. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+3. 4 runs, 100 SR, Highest scorer No, Not out No, POTM No
+4. 1 runs, 50 SR, Highest scorer No, Not out No, POTM No
+5. 4 runs, 400 SR, Highest scorer No, Not out Yes, POTM No",44,303,14.1,12.3,1,0,6.89,165,"1. 1 Wickets, 14 Runs Conceded, 14 Eco, POTM NO
+2. DNB, POTM NO
+3. DNB, POTM NO
+4. 0 Wickets, 14 Eco, POTM NO
+5. 0 Wickets, 24 Eco, POTM NO",64,620
+P004,Sandun Chinthana,MATRIX,41,433,261,12,165.9,2,1,9,6,365,"1. 18 runs, 225 SR, Highest scorer No, Not out No, POTM No
+2. 12 runs, 150 SR, Highest scorer No, Not out Yes, POTM No
+3. 11 runs, 220 SR, Highest scorer No, Not out No, POTM No
+4. 9 runs, 100 SR, Highest scorer No, Not out No, POTM No
+5. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",25,139,11.6,12.5,1,0,5.56,315,"1. 0 Wickets, 10 Runs Conceded, 10 Eco, POTM NO
+2. 1 Wickets, 0 Eco, POTM NO
+3. DNB, POTM NO
+4. 1 Wickets, 16 Eco, POTM NO
+5. 1 Wickets, 9 Eco, POTM NO",36,290
+P005,Yasantha Ruwan,MATRIX,23,208,133,10.4,156.4,1,0,5,0,15,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+2. DNB, POTM No
+3. 6 runs, 200 SR, Highest scorer No, Not out No, POTM No
+4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+5. DNB, POTM No",19,123,13.9,12.9,1,0,6.47,15,"1. 0 Wickets, 10 Runs Conceded, 10 Eco, POTM NO
+2. 1 Wickets, 9 Eco, POTM NO
+3. 0 Wickets, 10 Eco, POTM NO
+4. 2 Wickets, 0 Eco, POTM NO
+5. 1 Wickets, 18 Eco, POTM NO",20,265
 P006,Yasitha Nawod,TITANS,75,1150,461,16.4,249.5,11,2,12,13,885,"1. 12 runs, 400 SR, Highest scorer No, Not out No, POTM No
 2. 6 runs, 150 SR, Highest scorer No, Not out No, POTM No
 3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
@@ -71,7 +71,7 @@ P008,Yathish Leyon,TITANS,74,782,390,12.6,200.5,2,3,11,16,935,"1. 8 runs, 114.3 
 3. 1 Wickets, 13 Eco, POTM NO
 4. DNB, POTM NO
 5. 0 Wickets, 12 Eco, POTM NO",62,1157
-P009,Arqi,TITANS,12,84,48,7.6,175,0,0,4,1,50,"1. 3 runs, 150 SR, Highest scorer No, Not out No, POTM No
+P009,Mohamed Arqam,TITANS,12,84,48,7.6,175,0,0,4,1,50,"1. 3 runs, 150 SR, Highest scorer No, Not out No, POTM No
 2. 19 runs, 211.1 SR, Highest scorer Yes, Not out No, POTM No
 3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM Yes
@@ -89,96 +89,96 @@ P010,Kavindu Induwara,TITANS,9,64,35,7.1,182.9,0,0,4,0,0,"1. 0 runs, 0 SR, Highe
 3. 1 Wickets, 17 Eco, POTM NO
 4. DNB, POTM NO
 5. DNB, POTM NO",9,38
-P011,Binura Yeshan,GAMERS,49,855,339,20.9,252.2,6,4,5,5,480,"1. 37 runs, 231.3 SR, Highest scorer Yes, Not out No, POTM No
-2. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-3. 36 runs, 327.3 SR, Highest scorer Yes, Not out No, POTM No
-4. 8 runs, 160 SR, Highest scorer No, Not out No, POTM No
-5. 50 runs, 238.1 SR, Highest scorer Yes, Not out No, POTM No",27,201,14.4,11.6,0,1,7.44,285,"0 Wickets, 22 Eco, POTM NO
-DNB, POTM NO
-0 Wickets, 23 Eco, POTM NO
-1 Wickets, 21 Eco, POTM NO
-1 Wickets, 11 Eco, POTM NO",41,389
-P012,Poorna Kavishka,GAMERS,73,721,349,11.1,206.6,4,1,17,5,345,"1. 4 runs, 200 SR, Highest scorer No, Not out No, POTM No
-2. 39 runs, 300 SR, Highest scorer No, Not out No, POTM No
-3. 16 runs, 266.7 SR, Highest scorer No, Not out No, POTM Yes
-4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-5. 6 runs, 300 SR, Highest scorer No, Not out No, POTM No",84,483,13.2,13.8,6,2,5.75,410,"2 Wickets, 7 Eco, POTM NO
-1 Wickets, 16 Eco, POTM NO
-4 Wickets, 5.3 Eco, POTM YES
-DNB, POTM NO
-0 Wickets, 28 Eco, POTM NO",65,1109
-P013,Rasindu Rathnayake,GAMERS,62,613,313,10.6,195.8,4,1,19,7,445,"1. 26 runs, 236.4 SR, Highest scorer No, Not out YES, POTM No
-2. 4 runs, 400 SR, Highest scorer No, Not out Yes, POTM No
-3. 17 runs, 170 SR, Highest scorer No, Not out No, POTM No
-4. 4 runs, 133.3 SR, Highest scorer No, Not out No, POTM No
-5. 13 runs, 216.7 SR, Highest scorer No, Not out No, POTM Yes",72,419,11.6,12,9,1,5.82,520,"1 Wickets, 15 Eco, POTM NO
-3 Wickets, 16.5 Eco, POTM NO
-0 Wickets, 13 Eco, POTM NO
-0 Wickets, 36 Eco, POTM NO
-3 Wickets, 7.8 Eco, POTM YES",58,835
-P014,Sameera Gimhan,GAMERS,63,763,368,13.2,207.3,5,2,10,5,395,"1. 6 runs, 150 SR, Highest scorer No, Not out No, POTM No
-2. 55 runs, 261.9 SR, Highest scorer Yes, Not out No, POTM Yes
-3. 9 runs, 300 SR, Highest scorer No, Not out Yes, POTM No
-4. 25 runs, 250 SR, Highest scorer Yes, Not out No, POTM No
-5. 9 runs, 225 SR, Highest scorer No, Not out No, POTM No",54,316,12.9,13.2,0,2,5.85,320,"0 Wickets, 14 Eco, POTM NO
-1 Wickets, 6 Eco, POTM YES
-DNB, POTM NO
-2 Wickets, 17 Eco, POTM NO
-1 Wickets, 8 Eco, POTM NO",58,697
-P015,Thilanga Dumindu ,GAMERS,26,189,92,7.6,205.4,0,0,3,0,0,"1. 11 runs, 366.7 SR, Highest scorer No, Not out No, POTM No
-2. DNB, POTM No
-3. 4 runs, 66.7 SR, Highest scorer No, POTM No
-4. 5 runs, 250 SR, Highest scorer No, Not out No, POTM No
-5. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",10,62,13.5,13.1,0,0,5.7,0,"0 Wickets, 20.4 Eco, POTM NO
-DNB, POTM NO
-DNB, POTM NO
-DNB, POTM NO
-0 Wickets, 18 Eco, POTM NO",25,135
-P016,Chathuka Lakshan,TEARZ,72,1021,401,14.8,254.6,6,3,11,11,745,"1. 31 runs, 310 SR, Highest scorer No, Not out No, POTM Yes
-2. 25 runs, 277.8 SR, Highest scorer Yes, Not out No, POTM Yes
-3. 31 runs, 442.9 SR, Highest scorer Yes, Not out No, POTM No
-4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-5. 6 runs, 300 SR, Highest scorer No, Not out No, POTM No",89,507,11,11.6,12,0,5.7,730,"1 Wickets, 5 Eco, POTM YES
-3 Wickets, 2.6 Eco, POTM YES
-2 Wickets, 1.2 Eco, POTM NO
-3 Wickets, 12 Eco, POTM NO
-1 Wickets, 9 Eco, POTM NO",69,979
-P017,Udara Perera,TEARZ,72,774,423,12.3,183,5,1,9,17,960,"1. DNB, POTM No
-2. DNB, POTM No
-3. 18 runs, 128.6 SR, Highest scorer No, Not out No, POTM Yes
-4. 8 runs, 160 SR, Highest scorer No, Not out No, POTM No
-5. 8 runs, 114.3 SR, Highest scorer No, Not out No, POTM No",132,761,13.4,13.9,18,3,5.77,1225,"2 Wickets, 16 Eco, POTM NO
-1 Wickets, 20 Eco, POTM NO
-3 Wickets, 11 Eco, POTM YES
-0 Wickets, 30 Eco, POTM NO
-2 Wickets, 12.5 Eco, POTM NO",63,1769
-P018,Milindu Wijenayake,TEARZ,57,718,377,15.3,190.5,6,1,7,2,225,"1. 34 runs, 309.1 SR, Highest scorer No, Not out Yes, POTM No
-2. DNB, POTM No
+P011,Binura Yeshan,GAMERS,50,861,342,20.5,251.8,6,4,5,5,480,"1. 6 runs, 200 SR, Highest scorer No, Not out No, POTM No
+2. 37 runs, 231.3 SR, Highest scorer Yes, Not out No, POTM No
 3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-4. 4 runs, 133.3 SR, Highest scorer No, Not out No, POTM No
-5. 6 runs, 200 SR, Highest scorer No, Not out No, POTM Yes",28,211,16.1,12.8,0,0,7.54,100,"0 Wickets, 21 Eco, POTM NO
-1 Wickets, 4 Eco, POTM NO
-DNB, POTM NO
-1 Wickets, 9 Eco, POTM NO
-2 Wickets, 7.2 Eco, POTM YES",47,451
-P019,Wathsunu Lankananda,TEARZ,25,385,183,16.7,210.4,4,1,12,0,95,"1. 20 runs, 200 SR, Highest scorer No, Not out No, POTM No
-2. 4 runs, 400 SR, Highest scorer No, Not out Yes, POTM No
-3. 1 runs, 50 SR, Highest scorer No, Not out No, POTM No
-4. 7 runs, 233.3 SR, Highest scorer No, Not out No, POTM No
-5. 28 runs, 233.3 SR, Highest scorer Yes, Not out No, POTM No",8,72,20.3,13.5,0,0,9,0,"0 Wickets, 16 Eco, POTM NO
-DNB, POTM NO
-DNB, POTM NO
-0 Wickets, 8 Eco, POTM NO
-DNB, POTM NO",23,162
-P020,Vihanga Kavinda,TEARZ,12,154,78,15.4,197.4,1,1,1,1,100,"1. 8 runs, 114.3 SR, Highest scorer No, Not out No, POTM No
-2. 5 runs, 125 SR, Highest scorer No, Not out No, POTM No
+4. 36 runs, 327.3 SR, Highest scorer Yes, Not out No, POTM No
+5. 8 runs, 160 SR, Highest scorer No, Not out No, POTM No",27,201,14.4,11.6,0,1,7.44,285,"1. DNB, POTM NO
+2. 0 Wickets, 22 Eco, POTM NO
+3. DNB, POTM NO
+4. 0 Wickets, 23 Eco, POTM NO
+5. 1 Wickets, 21 Eco, POTM NO",42,389
+P012,Poorna Kavishka,GAMERS,74,742,354,11.2,209.6,4,1,17,5,345,"1. 21 runs, 420 SR, Highest scorer No, Not out No, POTM No
+2. 4 runs, 200 SR, Highest scorer No, Not out No, POTM No
+3. 39 runs, 300 SR, Highest scorer No, Not out No, POTM No
+4. 16 runs, 266.7 SR, Highest scorer No, Not out No, POTM Yes
+5. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",84,489,13.5,13.9,6,2,5.82,410,"1. 0 Wickets, 24 Runs Conceded, 24 Eco, POTM NO
+2. 2 Wickets, 7 Eco, POTM NO
+3. 1 Wickets, 16 Eco, POTM NO
+4. 4 Wickets, 5.3 Eco, POTM YES
+5. DNB, POTM NO",66,1133
+P013,Rasindu Rathnayake,GAMERS,63,615,317,10.4,194,4,1,19,7,445,"1. 2 runs, 50 SR, Highest scorer No, Not out No, POTM No
+2. 26 runs, 236.4 SR, Highest scorer No, Not out YES, POTM No
+3. 4 runs, 400 SR, Highest scorer No, Not out Yes, POTM No
+4. 17 runs, 170 SR, Highest scorer No, Not out No, POTM No
+5. 4 runs, 133.3 SR, Highest scorer No, Not out No, POTM No",73,425,11.6,12,9,1,5.82,520,"1. 1 Wickets, 15 Runs Conceded, 15 Eco, POTM NO
+2. 1 Wickets, 15 Eco, POTM NO
+3. 3 Wickets, 16.5 Eco, POTM NO
+4. 0 Wickets, 13 Eco, POTM NO
+5. 0 Wickets, 36 Eco, POTM NO",59,850
+P014,Sameera Gimhan,GAMERS,64,766,371,13,206.5,5,2,10,5,395,"1. 3 runs, 100 SR, Highest scorer No, Not out No, POTM No
+2. 6 runs, 150 SR, Highest scorer No, Not out No, POTM No
+3. 55 runs, 261.9 SR, Highest scorer Yes, Not out No, POTM Yes
+4. 9 runs, 300 SR, Highest scorer No, Not out Yes, POTM No
+5. 25 runs, 250 SR, Highest scorer Yes, Not out No, POTM No",54,316,12.9,13.2,0,2,5.85,320,"1. DNB, POTM NO
+2. 0 Wickets, 14 Eco, POTM NO
+3. 1 Wickets, 6 Eco, POTM YES
+4. DNB, POTM NO
+5. 2 Wickets, 17 Eco, POTM NO",59,697
+P015,Thilanga Dumindu ,GAMERS,27,191,94,7.3,203.2,0,0,3,0,0,"1. 2 runs, 100 SR, Highest scorer No, Not out No, POTM No
+2. 11 runs, 366.7 SR, Highest scorer No, Not out No, POTM No
 3. DNB, POTM No
-4. 5 runs, 125 SR, Highest scorer No, Not out No, POTM No
-5. 59 runs, 281 SR, Highest scorer Yes, Not out No, POTM No",3,36,25.7,12.8,0,0,12,50,"1. 0 Wickets, 23 Eco, POTM NO
-2. 1 Wickets, 10 Eco, POTM NO
+4. 4 runs, 66.7 SR, Highest scorer No, POTM No
+5. 5 runs, 250 SR, Highest scorer No, Not out No, POTM No",10,62,13.5,13.1,0,0,5.7,0,"1. DNB, POTM NO
+2. 0 Wickets, 20.4 Eco, POTM NO
 3. DNB, POTM NO
 4. DNB, POTM NO
-5. 0 Wickets, 19 Eco, POTM NO",10,77
+5. DNB, POTM NO",26,135
+P016,Chathuka Lakshan,TEARZ,73,1021,402,14.6,254,6,3,12,11,745,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+2. 31 runs, 310 SR, Highest scorer No, Not out No, POTM Yes
+3. 25 runs, 277.8 SR, Highest scorer Yes, Not out No, POTM Yes
+4. 31 runs, 442.9 SR, Highest scorer Yes, Not out No, POTM No
+5. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",89,513,11.2,11.6,12,0,5.76,730,"1. 0 Wickets, 14 Runs Conceded, 14 Eco, POTM NO
+2. 1 Wickets, 5 Eco, POTM YES
+3. 3 Wickets, 2.6 Eco, POTM YES
+4. 2 Wickets, 1.2 Eco, POTM NO
+5. 3 Wickets, 12 Eco, POTM NO",70,993
+P017,Udara Perera,TEARZ,73,823,445,12.9,184.9,6,1,9,18,1025,"1. 49 runs, 222.7 SR, Highest scorer Yes, Not out No, POTM Yes
+2. DNB, POTM No
+3. DNB, POTM No
+4. 18 runs, 128.6 SR, Highest scorer No, Not out No, POTM Yes
+5. 8 runs, 160 SR, Highest scorer No, Not out No, POTM No",134,773,13.4,13.9,18,3,5.77,1275,"1. 2 Wickets, 28 Runs Conceded, 14 Eco, POTM YES
+2. 2 Wickets, 16 Eco, POTM NO
+3. 1 Wickets, 20 Eco, POTM NO
+4. 3 Wickets, 11 Eco, POTM YES
+5. 0 Wickets, 30 Eco, POTM NO",64,1797
+P018,Milindu Wijenayake,TEARZ,58,718,381,15,188.5,6,1,8,2,225,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+2. 34 runs, 309.1 SR, Highest scorer No, Not out Yes, POTM No
+3. DNB, POTM No
+4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+5. 4 runs, 133.3 SR, Highest scorer No, Not out No, POTM No",29,217,15.8,12.7,0,0,7.48,100,"1. 1 Wickets, 7 Runs Conceded, 7 Eco, POTM NO
+2. 0 Wickets, 21 Eco, POTM NO
+3. 1 Wickets, 4 Eco, POTM NO
+4. DNB, POTM NO
+5. 1 Wickets, 9 Eco, POTM NO",48,458
+P019,Wathsunu Lankananda,TEARZ,26,385,184,16,209.2,4,1,13,0,95,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+2. 20 runs, 200 SR, Highest scorer No, Not out No, POTM No
+3. 4 runs, 400 SR, Highest scorer No, Not out Yes, POTM No
+4. 1 runs, 50 SR, Highest scorer No, Not out No, POTM No
+5. 7 runs, 233.3 SR, Highest scorer No, Not out No, POTM No",9,75,18,13,0,0,8.33,0,"1. 1 Wickets, 0 Runs Conceded, 0 Eco, POTM NO
+2. 0 Wickets, 16 Eco, POTM NO
+3. DNB, POTM NO
+4. DNB, POTM NO
+5. 0 Wickets, 8 Eco, POTM NO",24,162
+P020,Vihanga Kavinda,TEARZ,13,168,86,15.3,195.3,1,1,1,1,100,"1. 14 runs, 175 SR, Highest scorer No, Not out No, POTM No
+2. 8 runs, 114.3 SR, Highest scorer No, Not out No, POTM No
+3. 5 runs, 125 SR, Highest scorer No, Not out No, POTM No
+4. DNB, POTM No
+5. 5 runs, 125 SR, Highest scorer No, Not out No, POTM No",4,42,22.8,13,0,0,10.5,50,"1. 1 Wickets, 14 Runs Conceded, 14 Eco, POTM NO
+2. 0 Wickets, 23 Eco, POTM NO
+3. 1 Wickets, 10 Eco, POTM NO
+4. DNB, POTM NO
+5. DNB, POTM NO",11,91
 P021,Chamindu Tishan,DRAGONS,63,608,304,11.5,200,3,1,14,7,430,"1. 37 runs, 264.3 SR, Highest scorer No, Not out No, POTM No
 2. 4 runs, 80 SR, Highest scorer No, Not out No, POTM No
 3. 15 runs, 187.5 SR, Highest scorer No, Not out No, POTM No
@@ -260,7 +260,7 @@ P029,Kasun de Silva,AURA,70,920,409,15.1,224.9,7,2,12,10,675,"1. 24 runs, 218.2 
 3. 0 Wickets, 22 Eco, POTM NO
 4. 1 Wickets, 13 Eco, POTM NO
 5. 1 Wickets, 18.5 Eco, POTM NO",61,908
-P030,Rashmika,AURA,42,410,234,10.8,175.2,3,0,10,4,245,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+P030,Rashmika Rajathunga,AURA,42,410,234,10.8,175.2,3,0,10,4,245,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 2. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 3. 23 runs, 209.1 SR, Highest scorer Yes, Not out No, POTM No
 4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
@@ -269,33 +269,33 @@ P030,Rashmika,AURA,42,410,234,10.8,175.2,3,0,10,4,245,"1. 0 runs, 0 SR, Highest 
 1 Wickets, 3 Eco, POTM NO
 DNB, POTM NO
 0 Wickets, 23 Eco, POTM NO",38,347
-P031,Kalana Thenuja,LORDS,72,770,383,11.7,201,4,0,12,11,610,"1. 29 runs, 263.6 SR, Highest scorer No, Not out No, POTM Yes
-2. 21 runs, 262.5 SR, Highest scorer No, Not out No, POTM Yes
-3. 6 runs, 2000 SR, Highest scorer No, Not out No, POTM No
-4. 6 runs, 120 SR, Highest scorer No, Not out No, POTM No
-5. 7 runs, 87.5 SR, Highest scorer No, Not out No, POTM No",89,526,15,15.3,6,1,5.91,675,"1. 4 Wickets, 14 Eco, POTM YES
-2. 2 Wickets, 13 Eco, POTM YES
-3. 2 Wickets, 6 Eco, POTM NO
-4. 1 Wickets, 17 Eco, POTM NO
-5. 3 Wickets, 12 Eco, POTM NO",66,1337
-P032,Shanuka Nawarathne,LORDS,60,423,247,8.5,171.3,3,0,14,2,145,"1. 1 runs, 33.3 SR, Highest scorer No, Not out No, POTM No
-2. 31 runs, 238.5 SR, Highest scorer No, Not out Yes, POTM No
-3. 6 runs, 150 SR, Highest scorer No, Not out No, POTM No
-4. 1 runs, 50 SR, Highest scorer No, Not out No, POTM No
-5. 11 runs, 275 SR, Highest scorer No, Not out No, POTM No",38,223,13.9,14.3,0,0,5.87,100,"1. DNB, POTM NO
+P031,Kalana Thenuja,LORDS,73,801,393,12,203.8,5,0,12,12,675,"1. 31 runs, 310 SR, Highest scorer Yes, Not out No, POTM Yes
+2. 29 runs, 263.6 SR, Highest scorer No, Not out No, POTM Yes
+3. 21 runs, 262.5 SR, Highest scorer No, Not out No, POTM Yes
+4. 6 runs, 2000 SR, Highest scorer No, Not out No, POTM No
+5. 6 runs, 120 SR, Highest scorer No, Not out No, POTM No",93,537,14.6,15.1,6,2,5.77,760,"1. 4 Wickets, 18 Runs Conceded, 9.8 Eco, POTM YES
+2. 4 Wickets, 14 Eco, POTM YES
+3. 2 Wickets, 13 Eco, POTM YES
+4. 2 Wickets, 6 Eco, POTM NO
+5. 1 Wickets, 17 Eco, POTM NO",67,1355
+P032,Shanuka Nawarathne,LORDS,61,431,249,8.6,173.1,3,0,14,2,145,"1. 8 runs, 400 SR, Highest scorer No, Not out Yes, POTM No
+2. 1 runs, 33.3 SR, Highest scorer No, Not out No, POTM No
+3. 31 runs, 238.5 SR, Highest scorer No, Not out Yes, POTM No
+4. 6 runs, 150 SR, Highest scorer No, Not out No, POTM No
+5. 1 runs, 50 SR, Highest scorer No, Not out No, POTM No",38,223,13.9,14.3,0,0,5.87,100,"1. DNB, POTM NO
 2. DNB, POTM NO
-3. 0 Wickets, 31 Eco, POTM NO
-4. 1 Wickets, 17 Eco, POTM NO
-5. DNB, POTM NO",50,528
+3. DNB, POTM NO
+4. 0 Wickets, 31 Eco, POTM NO
+5. 1 Wickets, 17 Eco, POTM NO",50,528
 P033,Wenura Sandeepa,LORDS,75,847,362,12.5,234,4,1,13,11,645,"1. 60 runs, 285.7 SR, Highest scorer Yes, Not out Yes, POTM No
 2. DNB, POTM No
 3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 4. 6 runs, 150 SR, Highest scorer No, Not out No, POTM No
-5. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",72,404,9.7,10.3,5,1,5.61,660,"1. 0 Wickets, 19 Eco, POTM NO
-2. 1 Wickets, 14 Eco, POTM NO
-3. 3 Wickets, 1.2 Eco, POTM NO
-4. 3 Wickets, 1.7 Eco, POTM YES
-5. 0 Wickets, 13 Eco, POTM NO",68,696
+5. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",73,410,9.8,10.4,5,1,5.62,660,"1. 1 Wickets, 16 Runs Conceded, 16 Eco, POTM NO
+2. 0 Wickets, 19 Eco, POTM NO
+3. 1 Wickets, 14 Eco, POTM NO
+4. 3 Wickets, 1.2 Eco, POTM NO
+5. 3 Wickets, 1.7 Eco, POTM YES",68,712
 P034,Nimesh Dimalsha,LORDS,36,309,174,9.4,177.6,2,0,9,3,180,"1. 0 runs, 0 SR, Highest scorer No, Not out Yes, POTM No
 2. DNB, POTM No
 3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
@@ -305,15 +305,15 @@ P034,Nimesh Dimalsha,LORDS,36,309,174,9.4,177.6,2,0,9,3,180,"1. 0 runs, 0 SR, Hi
 3. 0 Wickets, 16 Eco, POTM NO
 4. DNB, POTM NO
 5. 1 Wickets, 12 Eco, POTM NO",33,223
-P035,Vimukthi Gunathilake,LORDS,37,502,234,14.3,214.5,5,2,9,2,245,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+P035,Vimukthi Gunathilake,LORDS,38,502,234,14.3,214.5,5,2,9,2,245,"1. 0 runs, 0 SR, Highest scorer No, Not out Yes, POTM No
 2. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
-4. 42 runs, 221.1 SR, Highest scorer Yes, Not out No, POTM Yes
-5. 16 runs, 266.7 SR, Highest scorer No, Not out No, POTM No",25,133,8.8,9.9,0,0,5.32,100,"1. 1 Wickets, 7.5 Eco, POTM NO
-2. DNB, POTM NO
+4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+5. 42 runs, 221.1 SR, Highest scorer Yes, Not out No, POTM Yes",25,133,8.8,9.9,0,0,5.32,100,"1. DNB, POTM NO
+2. 1 Wickets, 7.5 Eco, POTM NO
 3. DNB, POTM NO
 4. DNB, POTM NO
-5. 1 Wickets, 4 Eco, POTM NO",35,219
+5. DNB, POTM NO",35,219
 P036,Umesh Anjana,REAPERS,44,342,215,9.5,159.1,0,0,8,12,600,"1. DNB, POTM No
 2. DNB, POTM No
 3. DNB, POTM No
@@ -350,7 +350,7 @@ P039,Kanishka Supun,REAPERS,79,982,488,14.7,201.2,4,3,12,6,465,"1. 3 runs, 150 S
 3. 3 Wickets, 10 Eco, POTM YES
 4. 1 Wickets, 12 Eco, POTM NO
 5. DNB, POTM NO",67,684
-P040,Loku,REAPERS,11,100,56,11.1,178.6,0,0,3,1,50,"1. 16 runs, 160 SR, Highest scorer No, Not out No, POTM No
+P040,Loku T Rathnayaka,REAPERS,11,100,56,11.1,178.6,0,0,3,1,50,"1. 16 runs, 160 SR, Highest scorer No, Not out No, POTM No
 2. 10 runs, 200 SR, Highest scorer No, Not out No, POTM No
 3. 17 runs, 212.5 SR, Highest scorer No, Not out No, POTM No
 4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
@@ -380,4 +380,8 @@ DNB, POTM NO",56,774
 P043,Navindu Pamod,AURA,2,23,9,11.5,255.6,0,0,0,1,50,"1. 8 runs, 200 SR, Highest scorer No, Not out No, POTM No
 2. 15 runs, 300 SR, Highest scorer Yes, Not out No, POTM Yes",1,12,16,8,0,0,12,50,"1. 0 Wickets, 14 Eco, POTM NO
 2. 1 Wickets, 2 Eco, POTM YES",2,16
-P044,Anupama,REAPERS,1,0,1,0,0,0,0,1,0,0,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",1,6,6,6,0,0,6,0,"1. 1 Wickets, 6 Eco, POTM NO",1,6
+P044,Anupam Rivisara,REAPERS,3,13,7,4.3,185.7,0,0,2,0,0,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+2. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
+3. 13 runs, 260 SR, Highest scorer No, Not out No, POTM No",4,17,4,5.6,0,0,4.25,0,"1. 1 Wickets, 6 Eco, POTM NO
+2. 1 Wickets, 9 Eco, POTM NO
+3. 2 Wickets, 1.2 Eco, POTM NO",3,16
