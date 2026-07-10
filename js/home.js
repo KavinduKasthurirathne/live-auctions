@@ -19,6 +19,13 @@
   "use strict";
 
 
+  // champion / runnerUp are TEAM names (team-logo bubbles); mvp / mostRuns /
+  // mostWickets are PLAYER names (photo bubbles).
+  //
+  // mostRuns / mostWickets are DERIVED from each season's stats sheet (its top
+  // run-scorer / wicket-taker), so importing a CSV re-crowns them automatically.
+  // The values below survive only as a fallback for a season with no sheet.
+  // `mvp` stays manual - it's an award, not something the sheet can tell us.
   const SEASONS = [
     { no: 1, year: "NOV 2025 - DEC 2025", champion: "SUPER FIRE DRAGONS", runnerUp: "MATRIX", mvp: "SASINDU MADUSHAN", mostRuns: "HASITHA LAKMAL", mostWickets: "SASINDU MADUSHAN",
       playoffs: {
@@ -55,21 +62,32 @@
         q2:    { winner: "SUPER FIRE DRAGONS" },
         final: { winner: "SUPER FIRE DRAGONS" },
       } },
-    // Ongoing: no `playoffs` yet -> the bracket renders as a TBD skeleton.
+    // Ongoing: fill slots in as they're decided. "" (or "TBD") renders a TBD
+    // placeholder, so a partly-known bracket is fine - name teams as they qualify.
     { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "SASINDU MADUSHAN", mostWickets: "CHAMIKA KAUSHILA",
       playoffs: {
-        q1:    { a: "TBD", b: "TBD", winner: "TBD" },
-        elim:  { a: "SUPER FIRE DRAGONS", b: "TBD", winner: "TBD" },
-        q2:    { winner: "TBD" },
-        final: { winner: "TBD" },
-      }
-     },
+        q1:    { a: "", b: "", winner: "" },
+        elim:  { a: "SUPER FIRE DRAGONS", b: "", winner: "" },
+        q2:    { winner: "" },
+        final: { winner: "" },
+      } },
   ];
 
-  // Bump when the SEASONS honors above change so an editor re-publishes the
-  // cloud copy (home/seasons); everyone signed in reads that copy. (The cloud
-  // copy WINS over the bundle, so a stale version would hide new fields.)
-  const SEASONS_VERSION = "2026-07-10";
+  // The cloud copy (home/seasons) WINS over the bundle above, and it is only
+  // re-published when the stored version differs. So the version is DERIVED from
+  // the SEASONS content: edit anything above and the hash changes, the stored
+  // copy looks stale, and the next editor to load the page re-publishes it.
+  // (A hand-maintained version string meant an edit here silently did nothing -
+  // the stale cloud copy kept overriding it.) Change SEASONS_SCHEMA only to
+  // force a reseed without touching the data.
+  const SEASONS_SCHEMA = "v2";
+  function hashJson(value) {
+    const s = JSON.stringify(value);
+    let h = 5381; // djb2/xor - short, stable, and dependency-free
+    for (let i = 0; i < s.length; i++) h = (((h << 5) + h) ^ s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  }
+  const SEASONS_VERSION = `${SEASONS_SCHEMA}-${hashJson(SEASONS)}`;
   // Bump whenever the bundled season CSVs (season-stats-data.js) are regenerated
   // so an editor re-uploads the per-season stats to Firestore (seasonStats/S#).
   const SEASON_STATS_VERSION = "2026-07-07";
@@ -170,15 +188,23 @@
   // Q2 and Final line-ups are DERIVED here so the bracket is always self-
   // consistent. Any slot we can't resolve renders as a "TBD" placeholder, which
   // is what an ongoing season (no `playoffs` key) shows for every slot.
+  // Tokens an author may use for "not decided yet" - all normalise to "" (TBD).
+  const UNKNOWN_TEAM = new Set(["", "TBD", "TBA", "-", "--", "—", "?", "N/A"]);
   function resolvePlayoffs(s) {
     const p = (s && s.playoffs) || null;
-    const t = v => (v == null ? "" : String(v).trim());
+    const t = v => {
+      const str = v == null ? "" : String(v).trim();
+      return UNKNOWN_TEAM.has(str.toUpperCase()) ? "" : str;
+    };
     const empty = { a: "", b: "", winner: "" };
     if (!p || !p.q1 || !p.elim) return { q1: empty, elim: empty, q2: empty, final: empty };
 
     const q1a = t(p.q1.a), q1b = t(p.q1.b), q1w = t(p.q1.winner);
-    // The loser only resolves when the winner is one of the two named teams.
-    const q1l = q1w === q1a ? q1b : (q1w === q1b ? q1a : "");
+    // The loser resolves ONLY when the winner is one of the two named teams.
+    // Guarding on q1w first matters: with no winner yet, both it and an unnamed
+    // opponent are "", so a bare `q1w === q1a` would wrongly drop the OTHER,
+    // real team into Qualifier 2 as a loser of a match that hasn't happened.
+    const q1l = !q1w ? "" : (q1w === q1a ? q1b : (q1w === q1b ? q1a : ""));
     const ea = t(p.elim.a), eb = t(p.elim.b), ew = t(p.elim.winner);
     const q2w = t(p.q2 && p.q2.winner);
     const fw = t(p.final && p.final.winner);
@@ -402,8 +428,33 @@
     return statTable("Overall Stats", cols, rows);
   }
 
+  /* ---- season leaders, derived from the season's own stats sheet ---- */
+  // Ranking orders, shared by the leaderboards and the Most Runs / Most Wickets
+  // bubbles so a player can never top the board yet miss the bubble. Ties break
+  // on the next most meaningful stat, then on name so the order is stable.
+  const byRuns = (a, b) =>
+    num(b[COL.runs]) - num(a[COL.runs]) ||
+    num(b[COL.batAvg]) - num(a[COL.batAvg]) ||
+    num(b[COL.batSR]) - num(a[COL.batSR]) ||
+    String(a[COL.name]).localeCompare(String(b[COL.name]));
+  const byWickets = (a, b) =>
+    num(b[COL.wickets]) - num(a[COL.wickets]) ||
+    num(a[COL.econ]) - num(b[COL.econ]) ||      // tie on wickets -> better (lower) economy
+    num(a[COL.bowlAvg]) - num(b[COL.bowlAvg]) ||
+    String(a[COL.name]).localeCompare(String(b[COL.name]));
+
+  // Top player by `cmp`, but only once someone has actually scored/taken one -
+  // early in an ongoing season every row is 0 and the "leader" is meaningless.
+  // Returned upper-cased to match the podium's styling; photo lookup is
+  // case-insensitive, so the bubble still resolves.
+  function seasonLeader(rows, cmp, statIdx) {
+    if (!rows.length) return "";
+    const top = rows.slice().sort(cmp)[0];
+    return num(top[statIdx]) > 0 ? String(top[COL.name]).trim().toUpperCase() : "";
+  }
+
   function battingBoard(rows) {
-    const sorted = rows.slice().sort((a, b) => num(b[COL.runs]) - num(a[COL.runs]));
+    const sorted = rows.slice().sort(byRuns);
     const cols = [
       { label: "#", num: true, cell: (r, i) => String(i + 1) },
       { label: "Player", cell: r => `<span class="lb-player">${esc(r[COL.name])}</span>` },
@@ -419,7 +470,7 @@
   }
 
   function bowlingBoard(rows) {
-    const sorted = rows.slice().sort((a, b) => num(b[COL.wickets]) - num(a[COL.wickets]));
+    const sorted = rows.slice().sort(byWickets);
     const cols = [
       { label: "#", num: true, cell: (r, i) => String(i + 1) },
       { label: "Player", cell: r => `<span class="lb-player">${esc(r[COL.name])}</span>` },
@@ -455,6 +506,11 @@
 
   function seasonPanelHtml(s) {
     const rows = seasonRows(s.no);
+    // Derived from this season's stats sheet, so importing a new CSV for the
+    // ongoing season re-crowns these automatically. The authored SEASONS values
+    // are only a fallback for a season with no sheet (or no runs/wickets yet).
+    const mostRuns = seasonLeader(rows, byRuns, COL.runs) || s.mostRuns || "—";
+    const mostWickets = seasonLeader(rows, byWickets, COL.wickets) || s.mostWickets || "—";
     return `
       <article class="season-card">
         <div class="season-card-head">
@@ -471,8 +527,8 @@
         </div>
         ${playoffsHtml(s)}
         <div class="season-extra">
-          ${extraItem("🏏", "Most Runs", s.mostRuns)}
-          ${extraItem("🎯", "Most Wickets", s.mostWickets)}
+          ${extraItem("🏏", "Most Runs", mostRuns)}
+          ${extraItem("🎯", "Most Wickets", mostWickets)}
         </div>
         <div class="season-boards">
           <div class="season-boards-head">
