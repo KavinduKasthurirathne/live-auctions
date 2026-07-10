@@ -21,19 +21,61 @@
   // -------- season honors (replace with real values later) --------
   // champion / runnerUp are TEAM names (rendered as team-logo bubbles);
   // mvp / mostRuns / mostWickets are PLAYER names (rendered as photo bubbles).
-  // Each: { no, year, ongoing?, champion, runnerUp, mvp, mostRuns, mostWickets }
+  //
+  // playoffs (optional) drives the IPL-style bracket. Only the two first-round
+  // matches and the three winners are stored - Qualifier 2 and the Final derive
+  // their line-ups from those (Q2 = Q1 loser vs Eliminator winner; Final = Q1
+  // winner vs Q2 winner), so the bracket can never contradict itself. Seeds are
+  // positional: q1.a/q1.b are seeds 1/2, elim.a/elim.b are seeds 3/4.
+  // Omit `playoffs` entirely (e.g. an ongoing season) to render a TBD skeleton.
+  //
+  // NOTE: the q1/elim line-ups below are PLACEHOLDERS - only each season's
+  // champion and runner-up are real. Replace the other two qualifiers (and the
+  // seeding order) with the real playoff teams, then bump SEASONS_VERSION.
   const SEASONS = [
-    { no: 1, year: "NOV 2025 - DEC 2025", champion: "SUPER FIRE DRAGONS", runnerUp: "MATRIX", mvp: "SASINDU MADUSHAN", mostRuns: "HASITHA LAKMAL", mostWickets: "SASINDU MADUSHAN" },
-    { no: 2, year: "DEC 2025", champion: "ZYCO KINGS", runnerUp: "WIZARD TITANS", mvp: "UDARA PERERA", mostRuns: "YASITHA NAWOD", mostWickets: "UDARA PERERA" },
-    { no: 3, year: "JAN 2026", champion: "MIND GAMERS", runnerUp: "INVINCIBLE LORDS", mvp: "THENU PABEESHA", mostRuns: "THENU PABEESHA", mostWickets: "UDARA PERERA" },
-    { no: 4, year: "FEB 2026 - MAR 2026", champion: "VELOCITY REAPERS", runnerUp: "AURA DYNASTY", mvp: "CHATHUKA LAKSHAN", mostRuns: "CHATHUKA LAKSHAN", mostWickets: "UDARA PERERA" },
-    { no: 5, year: "APR 2026 - MAY 2026", champion: "SUPER FIRE DRAGONS", runnerUp: "WIZARD TITANS", mvp: "YATHISH LEYON", mostRuns: "SASINDU MADUSHAN", mostWickets: "UDARA PERERA" },
+    { no: 1, year: "NOV 2025 - DEC 2025", champion: "SUPER FIRE DRAGONS", runnerUp: "MATRIX", mvp: "SASINDU MADUSHAN", mostRuns: "HASITHA LAKMAL", mostWickets: "SASINDU MADUSHAN",
+      playoffs: {
+        q1:    { a: "SUPER FIRE DRAGONS", b: "INVINCIBLE LORDS", winner: "SUPER FIRE DRAGONS" },
+        elim:  { a: "MATRIX", b: "ZYCO KINGS", winner: "MATRIX" },
+        q2:    { winner: "MATRIX" },
+        final: { winner: "SUPER FIRE DRAGONS" },
+      } },
+    { no: 2, year: "DEC 2025", champion: "ZYCO KINGS", runnerUp: "WIZARD TITANS", mvp: "UDARA PERERA", mostRuns: "YASITHA NAWOD", mostWickets: "UDARA PERERA",
+      playoffs: {
+        q1:    { a: "ZYCO KINGS", b: "MATRIX", winner: "ZYCO KINGS" },
+        elim:  { a: "WIZARD TITANS", b: "MIND GAMERS", winner: "WIZARD TITANS" },
+        q2:    { winner: "WIZARD TITANS" },
+        final: { winner: "ZYCO KINGS" },
+      } },
+    { no: 3, year: "JAN 2026", champion: "MIND GAMERS", runnerUp: "INVINCIBLE LORDS", mvp: "THENU PABEESHA", mostRuns: "THENU PABEESHA", mostWickets: "UDARA PERERA",
+      playoffs: {
+        q1:    { a: "MIND GAMERS", b: "MATRIX", winner: "MIND GAMERS" },
+        elim:  { a: "INVINCIBLE LORDS", b: "ZYCO KINGS", winner: "INVINCIBLE LORDS" },
+        q2:    { winner: "INVINCIBLE LORDS" },
+        final: { winner: "MIND GAMERS" },
+      } },
+    { no: 4, year: "FEB 2026 - MAR 2026", champion: "VELOCITY REAPERS", runnerUp: "AURA DYNASTY", mvp: "CHATHUKA LAKSHAN", mostRuns: "CHATHUKA LAKSHAN", mostWickets: "UDARA PERERA",
+      playoffs: {
+        q1:    { a: "VELOCITY REAPERS", b: "SILENTEARZ", winner: "VELOCITY REAPERS" },
+        elim:  { a: "AURA DYNASTY", b: "SUPER FIRE DRAGONS", winner: "AURA DYNASTY" },
+        q2:    { winner: "AURA DYNASTY" },
+        final: { winner: "VELOCITY REAPERS" },
+      } },
+    { no: 5, year: "APR 2026 - MAY 2026", champion: "SUPER FIRE DRAGONS", runnerUp: "WIZARD TITANS", mvp: "YATHISH LEYON", mostRuns: "SASINDU MADUSHAN", mostWickets: "UDARA PERERA",
+      playoffs: {
+        q1:    { a: "SUPER FIRE DRAGONS", b: "MIND GAMERS", winner: "SUPER FIRE DRAGONS" },
+        elim:  { a: "WIZARD TITANS", b: "SILENTEARZ", winner: "WIZARD TITANS" },
+        q2:    { winner: "WIZARD TITANS" },
+        final: { winner: "SUPER FIRE DRAGONS" },
+      } },
+    // Ongoing: no `playoffs` yet -> the bracket renders as a TBD skeleton.
     { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "SASINDU MADUSHAN", mostWickets: "YASITHA NAWOD" },
   ];
 
   // Bump when the SEASONS honors above change so an editor re-publishes the
-  // cloud copy (home/seasons); everyone signed in reads that copy.
-  const SEASONS_VERSION = "2026-07-06";
+  // cloud copy (home/seasons); everyone signed in reads that copy. (The cloud
+  // copy WINS over the bundle, so a stale version would hide new fields.)
+  const SEASONS_VERSION = "2026-07-10";
   // Bump whenever the bundled season CSVs (season-stats-data.js) are regenerated
   // so an editor re-uploads the per-season stats to Firestore (seasonStats/S#).
   const SEASON_STATS_VERSION = "2026-07-07";
@@ -125,6 +167,129 @@
     </div>`;
   }
 
+  /* -------------------- playoffs bracket (IPL style) -------------------- */
+  // Three columns: [Qualifier 1 / Eliminator] -> [Qualifier 2] -> [Final].
+  // Q1 winner goes straight to the Final; Q1 loser drops to Q2, where it meets
+  // the Eliminator winner; the Q2 winner joins the Final.
+  //
+  // Only q1/elim line-ups + the three winners are authored (see SEASONS above);
+  // Q2 and Final line-ups are DERIVED here so the bracket is always self-
+  // consistent. Any slot we can't resolve renders as a "TBD" placeholder, which
+  // is what an ongoing season (no `playoffs` key) shows for every slot.
+  function resolvePlayoffs(s) {
+    const p = (s && s.playoffs) || null;
+    const t = v => (v == null ? "" : String(v).trim());
+    const empty = { a: "", b: "", winner: "" };
+    if (!p || !p.q1 || !p.elim) return { q1: empty, elim: empty, q2: empty, final: empty };
+
+    const q1a = t(p.q1.a), q1b = t(p.q1.b), q1w = t(p.q1.winner);
+    // The loser only resolves when the winner is one of the two named teams.
+    const q1l = q1w === q1a ? q1b : (q1w === q1b ? q1a : "");
+    const ea = t(p.elim.a), eb = t(p.elim.b), ew = t(p.elim.winner);
+    const q2w = t(p.q2 && p.q2.winner);
+    const fw = t(p.final && p.final.winner);
+    return {
+      q1:    { a: q1a, b: q1b, winner: q1w },
+      elim:  { a: ea, b: eb, winner: ew },
+      q2:    { a: q1l, b: ew, winner: q2w },   // Q1 loser vs Eliminator winner
+      final: { a: q1w, b: q2w, winner: fw },   // Q1 winner vs Q2 winner
+    };
+  }
+
+  // One team row. `data-team` is the hover key - omitted for TBD so unresolved
+  // slots aren't hoverable. The same attribute tags the connector paths, so
+  // highlighting a team lights up every box AND line it passes through.
+  function plTeam(team, seed, isWinner) {
+    const known = !!team;
+    const cls = `pl-team${isWinner ? " win" : ""}${known ? "" : " tbd"}`;
+    return `<div class="${cls}"${known ? ` data-team="${esc(team)}"` : ""}>
+      ${seed ? `<span class="pl-seed">${seed}</span>` : `<span class="pl-seed blank"></span>`}
+      ${known ? logoSpan(team, "pl-logo") : `<span class="pl-logo fallback tbd">?</span>`}
+      <span class="pl-name">${esc(known ? team : "TBD")}</span>
+      ${isWinner ? `<span class="pl-check" title="Winner">✓</span>` : ""}
+    </div>`;
+  }
+
+  function plMatch(slot, title, teamsHtml) {
+    return `<div class="pl-match pl-${slot}" data-slot="${slot}">
+      <div class="pl-match-title">${esc(title)}</div>
+      ${teamsHtml}
+    </div>`;
+  }
+
+  function playoffsHtml(s) {
+    const p = resolvePlayoffs(s);
+    // A team "wins" its match only when the winner is actually that named team.
+    const won = (m, team) => !!team && m.winner === team;
+    // Connector: leaves `from` box at fy (0-1 of its height), enters `to` at ty.
+    // `team` is the club travelling that edge - drives the hover trace.
+    const line = (from, fy, to, ty, team) =>
+      `<path class="pl-line" data-from="${from}" data-fy="${fy}" data-to="${to}" data-ty="${ty}"${team ? ` data-team="${esc(team)}"` : ""} />`;
+
+    return `<section class="playoffs">
+      <div class="playoffs-head">
+        <h3 class="playoffs-title">Playoffs Journey</h3>
+        <span class="playoffs-hint">Hover a team to trace its path</span>
+      </div>
+      <div class="pl-bracket">
+        <svg class="pl-lines" aria-hidden="true" focusable="false">
+          ${line("q1", 0.34, "final", 0.34, p.q1.winner)}
+          ${line("q1", 0.74, "q2", 0.34, p.q2.a)}
+          ${line("elim", 0.5, "q2", 0.74, p.q2.b)}
+          ${line("q2", 0.5, "final", 0.74, p.final.b)}
+        </svg>
+        ${plMatch("q1", "Qualifier 1",
+          plTeam(p.q1.a, 1, won(p.q1, p.q1.a)) + plTeam(p.q1.b, 2, won(p.q1, p.q1.b)))}
+        ${plMatch("elim", "Eliminator",
+          plTeam(p.elim.a, 3, won(p.elim, p.elim.a)) + plTeam(p.elim.b, 4, won(p.elim, p.elim.b)))}
+        ${plMatch("q2", "Qualifier 2",
+          plTeam(p.q2.a, 0, won(p.q2, p.q2.a)) + plTeam(p.q2.b, 0, won(p.q2, p.q2.b)))}
+        ${plMatch("final", "Final",
+          plTeam(p.final.a, 0, won(p.final, p.final.a)) + plTeam(p.final.b, 0, won(p.final, p.final.b)))}
+      </div>
+    </section>`;
+  }
+
+  // Connector paths are drawn from measured box geometry (rather than hard-coded
+  // coordinates) so the bracket stays correct at any width. Re-run after every
+  // render and on resize. Below the mobile breakpoint the boxes stack and CSS
+  // hides the <svg>, so the stale `d` attributes are harmless.
+  function drawBracketLines() {
+    const root = document.querySelector(".pl-bracket");
+    if (!root) return;
+    const svg = root.querySelector(".pl-lines");
+    if (!svg) return;
+    const box = root.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+    root.querySelectorAll(".pl-line").forEach(path => {
+      const from = root.querySelector(`[data-slot="${path.getAttribute("data-from")}"]`);
+      const to = root.querySelector(`[data-slot="${path.getAttribute("data-to")}"]`);
+      if (!from || !to) return;
+      const f = from.getBoundingClientRect(), t = to.getBoundingClientRect();
+      const x1 = f.right - box.left, y1 = f.top - box.top + f.height * parseFloat(path.getAttribute("data-fy"));
+      const x2 = t.left - box.left, y2 = t.top - box.top + t.height * parseFloat(path.getAttribute("data-ty"));
+      const mx = x1 + (x2 - x1) / 2; // S-curve control points sit on the midline
+      path.setAttribute("d", `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`);
+    });
+  }
+
+  // Hover trace: light up every element tagged with the hovered team (its boxes
+  // AND the connector edges it travels), and dim the rest.
+  function traceTeam(team) {
+    const root = document.querySelector(".pl-bracket");
+    if (!root) return;
+    root.classList.toggle("tracing", !!team);
+    root.querySelectorAll("[data-team]").forEach(el =>
+      el.classList.toggle("on", !!team && el.getAttribute("data-team") === team));
+  }
+
+  function onBracketHover(e) {
+    if (!e.target.closest) return;
+    const row = e.target.closest(".pl-team[data-team]");
+    traceTeam(row ? row.getAttribute("data-team") : "");
+  }
+
   function seasonBadge(s) {
     const l = seasonLogo(s.no);
     return l
@@ -192,12 +357,16 @@
   const slash = (a, b) => `${esc(a)}/${esc(b)}`;
 
   // Small team badge + name used inside leaderboard rows.
-  function teamCell(team) {
+  // A small round team badge: the logo when we have one, else a colored initial.
+  function logoSpan(team, cls) {
     const img = teamLogo(team);
-    const logo = img
-      ? `<span class="lb-logo" style="background-image:url('${img}')"></span>`
-      : `<span class="lb-logo fallback" style="background:${bubbleColor(team)}">${esc(firstInitial(team))}</span>`;
-    return `<span class="lb-team">${logo}<span class="lb-team-name">${esc(team)}</span></span>`;
+    return img
+      ? `<span class="${cls}" style="background-image:url('${img}')"></span>`
+      : `<span class="${cls} fallback" style="background:${bubbleColor(team)}">${esc(firstInitial(team))}</span>`;
+  }
+
+  function teamCell(team) {
+    return `<span class="lb-team">${logoSpan(team, "lb-logo")}<span class="lb-team-name">${esc(team)}</span></span>`;
   }
 
   // Generic leaderboard table. columns: [{ label, num?, cell(row, rank) }]
@@ -306,6 +475,7 @@
           ${podiumItem("champion", "Champion", "team", s.champion)}
           ${podiumItem("runner", "Runner-up", "team", s.runnerUp)}
         </div>
+        ${playoffsHtml(s)}
         <div class="season-extra">
           ${extraItem("🏏", "Most Runs", s.mostRuns)}
           ${extraItem("🎯", "Most Wickets", s.mostWickets)}
@@ -353,6 +523,8 @@
           ${active ? seasonPanelHtml(active) : ""}
         </div>
       </section>`;
+    // Connectors need the boxes laid out first; measure on the next frame.
+    requestAnimationFrame(drawBracketLines);
   }
 
   function onClick(e) {
@@ -572,6 +744,12 @@
         inp.value = "";
       }
     });
+    // Playoffs bracket: trace a team's path on hover, and drop the trace when
+    // the pointer leaves the view entirely (mouseover alone never fires then).
+    view.addEventListener("mouseover", onBracketHover);
+    view.addEventListener("mouseleave", () => traceTeam(""));
+    // Connector geometry is measured, so it must be recomputed when the width changes.
+    window.addEventListener("resize", () => requestAnimationFrame(drawBracketLines));
     // Read cloud honors + upload the per-season stats (both editor-seeded) once signed in.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
       window.HCCL.onChange(() => { startHomeSync(); seedSeasonStats(); startSeasonLiveSync(); });
