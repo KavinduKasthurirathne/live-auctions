@@ -36,40 +36,47 @@
     { no: 1, year: "NOV 2025 - DEC 2025", champion: "SUPER FIRE DRAGONS", runnerUp: "MATRIX", mvp: "SASINDU MADUSHAN", mostRuns: "HASITHA LAKMAL", mostWickets: "SASINDU MADUSHAN",
       playoffs: {
         q1:    { a: "SUPER FIRE DRAGONS", b: "INVINCIBLE LORDS", winner: "SUPER FIRE DRAGONS" },
-        elim:  { a: "MATRIX", b: "ZYCO KINGS", winner: "MATRIX" },
+        elim:  { a: "MATRIX", b: "THICKHEADERS", winner: "MATRIX" },
         q2:    { winner: "MATRIX" },
         final: { winner: "SUPER FIRE DRAGONS" },
       } },
     { no: 2, year: "DEC 2025", champion: "ZYCO KINGS", runnerUp: "WIZARD TITANS", mvp: "UDARA PERERA", mostRuns: "YASITHA NAWOD", mostWickets: "UDARA PERERA",
       playoffs: {
-        q1:    { a: "ZYCO KINGS", b: "MATRIX", winner: "ZYCO KINGS" },
-        elim:  { a: "WIZARD TITANS", b: "MIND GAMERS", winner: "WIZARD TITANS" },
+        q1:    { a: "ZYCO KINGS", b: "WIZARD TITANS", winner: "ZYCO KINGS" },
+        elim:  { a: "SUPER FIRE DRAGONS", b: "MIND GAMERS", winner: "SUPER FIRE DRAGONS" },
         q2:    { winner: "WIZARD TITANS" },
         final: { winner: "ZYCO KINGS" },
       } },
     { no: 3, year: "JAN 2026", champion: "MIND GAMERS", runnerUp: "INVINCIBLE LORDS", mvp: "THENU PABEESHA", mostRuns: "THENU PABEESHA", mostWickets: "UDARA PERERA",
       playoffs: {
-        q1:    { a: "MIND GAMERS", b: "MATRIX", winner: "MIND GAMERS" },
-        elim:  { a: "INVINCIBLE LORDS", b: "ZYCO KINGS", winner: "INVINCIBLE LORDS" },
+        q1:    { a: "MIND GAMERS", b: "WIZARD TITANS", winner: "MIND GAMERS" },
+        elim:  { a: "INVINCIBLE LORDS", b: "MATRIX", winner: "INVINCIBLE LORDS" },
         q2:    { winner: "INVINCIBLE LORDS" },
         final: { winner: "MIND GAMERS" },
       } },
     { no: 4, year: "FEB 2026 - MAR 2026", champion: "VELOCITY REAPERS", runnerUp: "AURA DYNASTY", mvp: "CHATHUKA LAKSHAN", mostRuns: "CHATHUKA LAKSHAN", mostWickets: "UDARA PERERA",
       playoffs: {
-        q1:    { a: "VELOCITY REAPERS", b: "SILENTEARZ", winner: "VELOCITY REAPERS" },
-        elim:  { a: "AURA DYNASTY", b: "SUPER FIRE DRAGONS", winner: "AURA DYNASTY" },
-        q2:    { winner: "AURA DYNASTY" },
+        q1:    { a: "AURA DYNASTY", b: "VELOCITY REAPERS", winner: "AURA DYNASTY" },
+        elim:  { a: "SUPER FIRE DRAGONS", b: "SILENTEARZ", winner: "SUPER FIRE DRAGONS" },
+        q2:    { winner: "VELOCITY REAPERS" },
         final: { winner: "VELOCITY REAPERS" },
       } },
     { no: 5, year: "APR 2026 - MAY 2026", champion: "SUPER FIRE DRAGONS", runnerUp: "WIZARD TITANS", mvp: "YATHISH LEYON", mostRuns: "SASINDU MADUSHAN", mostWickets: "UDARA PERERA",
       playoffs: {
-        q1:    { a: "SUPER FIRE DRAGONS", b: "MIND GAMERS", winner: "SUPER FIRE DRAGONS" },
-        elim:  { a: "WIZARD TITANS", b: "SILENTEARZ", winner: "WIZARD TITANS" },
-        q2:    { winner: "WIZARD TITANS" },
+        q1:    { a: "WIZARD TITANS", b: "MIND GAMERS", winner: "WIZARD TITANS" },
+        elim:  { a: "SUPER FIRE DRAGONS", b: "MATRIX", winner: "SUPER FIRE DRAGONS" },
+        q2:    { winner: "SUPER FIRE DRAGONS" },
         final: { winner: "SUPER FIRE DRAGONS" },
       } },
     // Ongoing: no `playoffs` yet -> the bracket renders as a TBD skeleton.
-    { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "SASINDU MADUSHAN", mostWickets: "YASITHA NAWOD" },
+    { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "SASINDU MADUSHAN", mostWickets: "CHAMIKA KAUSHILA",
+      playoffs: {
+        q1:    { a: "TBD", b: "TBD", winner: "TBD" },
+        elim:  { a: "SUPER FIRE DRAGONS", b: "TBD", winner: "TBD" },
+        q2:    { winner: "TBD" },
+        final: { winner: "TBD" },
+      }
+     },
   ];
 
   // Bump when the SEASONS honors above change so an editor re-publishes the
@@ -228,8 +235,8 @@
 
     return `<section class="playoffs">
       <div class="playoffs-head">
-        <h3 class="playoffs-title">Playoffs Journey</h3>
-        <span class="playoffs-hint">Hover a team to trace its path</span>
+        <h3 class="playoffs-title">Playoffs</h3>
+        <span class="playoffs-hint"></span>
       </div>
       <div class="pl-bracket">
         <svg class="pl-lines" aria-hidden="true" focusable="false">
