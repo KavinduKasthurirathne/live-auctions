@@ -5,7 +5,10 @@
    ============================================================ */
 window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyB1SOeZq09MSXAF_DZFOey1zutywb2TSJY",
-  authDomain: "hand-cricket-league-ed0d8.firebaseapp.com",
+  // Must be the site's own origin, not *.firebaseapp.com: the auth iframe/handler
+  // are proxied first-party via vercel.json, otherwise Chrome's third-party storage
+  // partitioning stalls signInWithPopup after account selection.
+  authDomain: "hc-champions-league.vercel.app",
   databaseURL: "https://hand-cricket-league-ed0d8-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "hand-cricket-league-ed0d8",
   storageBucket: "hand-cricket-league-ed0d8.firebasestorage.app",
