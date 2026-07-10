@@ -18,20 +18,7 @@
 (function () {
   "use strict";
 
-  // -------- season honors (replace with real values later) --------
-  // champion / runnerUp are TEAM names (rendered as team-logo bubbles);
-  // mvp / mostRuns / mostWickets are PLAYER names (rendered as photo bubbles).
-  //
-  // playoffs (optional) drives the IPL-style bracket. Only the two first-round
-  // matches and the three winners are stored - Qualifier 2 and the Final derive
-  // their line-ups from those (Q2 = Q1 loser vs Eliminator winner; Final = Q1
-  // winner vs Q2 winner), so the bracket can never contradict itself. Seeds are
-  // positional: q1.a/q1.b are seeds 1/2, elim.a/elim.b are seeds 3/4.
-  // Omit `playoffs` entirely (e.g. an ongoing season) to render a TBD skeleton.
-  //
-  // NOTE: the q1/elim line-ups below are PLACEHOLDERS - only each season's
-  // champion and runner-up are real. Replace the other two qualifiers (and the
-  // seeding order) with the real playoff teams, then bump SEASONS_VERSION.
+
   const SEASONS = [
     { no: 1, year: "NOV 2025 - DEC 2025", champion: "SUPER FIRE DRAGONS", runnerUp: "MATRIX", mvp: "SASINDU MADUSHAN", mostRuns: "HASITHA LAKMAL", mostWickets: "SASINDU MADUSHAN",
       playoffs: {
@@ -121,7 +108,7 @@
   ];
   const PLAYER_PHOTO_FILES = [
     "Chathuka Lakshan.jpeg", "Hasitha Lakmal.png", "Sasindu Madushan.png", "Thenu Pabeesha.png",
-    "Udara Perera.jpeg", "Yasitha Nawod.jpeg", "Yathish Leyon.png",
+    "Udara Perera.jpeg", "Yasitha Nawod.jpeg", "Yathish Leyon.png", "Chamika Kaushila.jpeg",
   ];
   const SEASON_LOGO_FILES = {
     1: "S1 LOGO.png", 2: "S2 LOGO.png", 3: "S3 LOGO.png",
