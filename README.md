@@ -13,7 +13,7 @@ Two ways to run, automatically chosen:
   quietly falls back to saving everything in the browser's local storage, exactly as a
   standalone tool. Nothing is lost.
 
-🔗 **Live site:** https://live-auctions-hazel.vercel.app
+🔗 **Live site:** https://hc-champions-league.vercel.app
 
 ---
 
@@ -328,7 +328,7 @@ There is **nothing to install or build** - no `npm install`, no compile step.
 ## 🌐 Deployment
 
 The site is a static bundle, deployed on **Vercel** at
-https://live-auctions-hazel.vercel.app. Any static host works (Vercel, Netlify, GitHub
+https://hc-champions-league.vercel.app. Any static host works (Vercel, Netlify, GitHub
 Pages, Firebase Hosting). `vercel.json` is included for optional auth-handler rewrites.
 
 To deploy your own copy: push this folder to a static host and make sure
