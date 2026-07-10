@@ -123,6 +123,7 @@
   const TEAM_LOGO_FILES = [
     "Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg",
     "Silentearz.jpeg", "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg",
+    "Thickheaders.png", "Nobel Knights.png",
   ];
   const PLAYER_PHOTO_FILES = [
     "Chathuka Lakshan.jpeg", "Hasitha Lakmal.png", "Sasindu Madushan.png", "Thenu Pabeesha.png",
