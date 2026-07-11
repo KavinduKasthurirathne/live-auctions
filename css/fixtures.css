@@ -116,16 +116,12 @@
 .fx-pos { width: 34px; color: var(--muted); font-weight: 800; }
 .fx-stname { text-align: left !important; display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .fx-card-table .fx-stname { display: table-cell; }
-/* Playoff cut-off: everything above the line qualifies (IPL-style top 4). */
-.fx-table tbody tr.fx-qualified td { background: rgba(255, 204, 0, .045); }
-.fx-table tbody tr.fx-qualified:hover td { background: rgba(255, 204, 0, .085); }
-.fx-table tbody tr.fx-cutoff td {
-  border-bottom: 2px solid var(--yellow);
-  box-shadow: 0 1px 8px rgba(255, 204, 0, .28);
-}
+/* Playoff cut-off: a single clean yellow rule under the last qualifying team
+   (IPL-style top 4). Deliberately NO row tint or glow - those have to be painted
+   per <td>, and the seams between cells show through as vertical column bars. */
+.fx-table tbody tr.fx-cutoff td { border-bottom: 2px solid var(--yellow); }
 /* Kill the next row's top border so the yellow line reads as a single crisp rule. */
 .fx-table tbody tr.fx-cutoff + tr td { border-top: none; }
-.fx-table tbody tr.fx-qualified .fx-pos { color: var(--yellow); }
 
 .fx-pts { font-weight: 800; color: var(--yellow); }
 .fx-pos-nrr { color: var(--green); }

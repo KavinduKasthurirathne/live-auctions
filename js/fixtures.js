@@ -257,7 +257,7 @@
     // when some team actually sits below it - otherwise it's a line under nothing.
     const cutoff = eng().CONFIG.playoffCutoff;
     const showCutoff = rows.length > cutoff;
-    const body = rows.map(r => `<tr class="${showCutoff && r.pos === cutoff ? "fx-cutoff" : ""}${r.pos <= cutoff && showCutoff ? " fx-qualified" : ""}">
+    const body = rows.map(r => `<tr${showCutoff && r.pos === cutoff ? ` class="fx-cutoff"` : ""}>
       <td class="fx-pos">${r.pos}</td>
       <td class="fx-stname">${teamLogoHtml(r.teamId, "fx-logo sm")}<span>${esc(r.name)}</span></td>
       <td>${r.played}</td>
