@@ -324,10 +324,12 @@
       const inp = e.target.closest("#rankImportFile");
       if (inp && inp.files && inp.files[0]) { importStatsCsv(inp.files[0]); inp.value = ""; }
     });
-    // Re-render when the tab is opened so team icons pick up auction
-    // logos once the cloud sync has delivered them.
-    const tabs = document.getElementById("tabs");
-    if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="ranking"]')) render(); });
+    // Re-render when the board is opened so team icons pick up auction
+    // logos once the cloud sync has delivered them. Player Ranking lives
+    // under the Rankings tab, so watch both the top tab and our sub-tab.
+    document.addEventListener("click", e => {
+      if (e.target.closest('[data-tab="rankings"], [data-subtab="ranking"]')) render();
+    });
     // Subscribe to the shared imported CSV, and re-render when the signed-in
     // role changes so the editor-only Import button shows/hides correctly.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {

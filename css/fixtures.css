@@ -158,7 +158,8 @@
 .fx-backdrop.hidden { display: none !important; }
 .fx-modal {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-  width: 100%; max-width: 720px; max-height: 88vh; display: flex; flex-direction: column;
+  width: 100%; max-width: 720px; max-height: 88vh; max-height: min(88vh, calc(100dvh - 24px));
+  display: flex; flex-direction: column;
   box-shadow: var(--shadow); animation: fxPop .22s cubic-bezier(.2, 1.2, .4, 1);
 }
 @keyframes fxPop { from { transform: translateY(8px) scale(.98); opacity: 0; } }
@@ -248,6 +249,10 @@
   .fx-layout { grid-template-columns: 1fr; }
   .fx-side { position: static; }
 }
+@media (max-width: 760px) {
+  /* match the 16px iOS no-zoom rule from styles.css (these set their own size) */
+  .fx-form input, .fx-form select, .fx-form textarea { font-size: 16px; }
+}
 @media (max-width: 560px) {
   .fx-form-row, .fx-squads { grid-template-columns: 1fr; }
   .fx-teams { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -255,6 +260,6 @@
   .fx-team:last-child .fx-score { margin-left: auto; margin-right: 0; }
   .fx-vs { align-self: center; }
   .fx-card-actions .btn { flex: 1 1 auto; }
-  .fx-modal { max-height: 92vh; }
+  .fx-modal { max-height: 92vh; max-height: min(92vh, calc(100dvh - 12px)); }
   .fx-modal-foot .btn { flex: 1 1 auto; }
 }

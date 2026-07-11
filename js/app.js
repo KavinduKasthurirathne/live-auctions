@@ -384,15 +384,39 @@ function toast(msg, kind = "") {
 /* ============================================================
    TABS
    ============================================================ */
+/* Old top-level tab names -> their new home after the nav regrouping
+   (Squads lives under Auction; MVP + Player Ranking under Rankings).
+   Keeps every legacy switchTab()/[data-goto] call working. */
+const TAB_ALIASES = {
+  squads:  { tab: "auctions", sub: "squads" },
+  mvp:     { tab: "rankings", sub: "mvp" },
+  ranking: { tab: "rankings", sub: "ranking" },
+};
+
 function switchTab(name) {
+  const alias = TAB_ALIASES[name];
+  if (alias) { switchTab(alias.tab); switchSubTab(alias.sub); return; }
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
+  // Open the new view at the top - otherwise it keeps the old view's scroll
+  // offset and its controls land hidden underneath the sticky header.
+  window.scrollTo(0, 0);
+  // Keep the active pill in sight in the swipeable mobile nav bar.
+  const active = $(".tab.active");
+  if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
 }
 
-/* Auctions sub-tabs: Auction Room / Players / Teams & Purse / Dashboard. */
+/* Sub-tabs: each section owns its own group (Auction: Room / Players /
+   Teams & Purse / Squads / Dashboard - Rankings: MVP / Player Ranking).
+   Toggling is scoped to the group's `.view` so one bar never disturbs
+   the other section's selection. */
 function switchSubTab(name) {
-  $$(".subtab").forEach(t => t.classList.toggle("active", t.dataset.subtab === name));
-  $$(".subview").forEach(v => v.classList.toggle("active", v.id === "subview-" + name));
+  const btn = $$(".subtab").find(t => t.dataset.subtab === name);
+  const scope = btn ? btn.closest(".view") : null;
+  if (!scope) return;
+  $$(".subtab", scope).forEach(t => t.classList.toggle("active", t.dataset.subtab === name));
+  $$(".subview", scope).forEach(v => v.classList.toggle("active", v.id === "subview-" + name));
+  window.scrollTo(0, 0); // same reason as switchTab
   if (name === "dashboard") renderInsights(); // build charts now that the dashboard is visible
 }
 
@@ -477,6 +501,11 @@ function renderAuction() {
       const rb = $("#btnReauction2");
       if (rb) rb.onclick = reauctionUnsold;
     }
+    // Same shared-overlay handling as the normal path below - without this,
+    // the LAST player's SOLD/UNSOLD overlay could never be dismissed ("Next
+    // Player" clears lastResult, but this early return skipped hideOverlay()).
+    if (state.auction.lastResult) showResultView(state.auction.lastResult);
+    else hideOverlay();
     return;
   }
 
@@ -1380,7 +1409,7 @@ function resetAuction() {
   toast("Auction reset", "good");
 }
 function resetAll() {
-  if (!confirm("Erase EVERYTHINGteams, players and settings?")) return;
+  if (!confirm("Erase EVERYTHING - teams, players and settings?")) return;
   if (!confirm("Are you absolutely sure? This cannot be undone.")) return;
   state = defaultState();
   save();
@@ -1401,9 +1430,9 @@ function wireEvents() {
     switchTab(tab.dataset.tab);
     if (tab.dataset.tab === "auctions") switchSubTab("auction"); // land on Auction Room by default
   });
-  // Auctions sub-tab bar (Auction Room / Players / Teams & Purse / Dashboard)
-  const subtabs = $("#auctionSubtabs");
-  if (subtabs) subtabs.addEventListener("click", e => {
+  // Sub-tab bars - the Auction and Rankings sections share the same
+  // .subtab pattern; switchSubTab scopes the toggle to the right section.
+  document.addEventListener("click", e => {
     const st = e.target.closest(".subtab");
     if (st) switchSubTab(st.dataset.subtab);
   });

@@ -119,7 +119,7 @@ body {
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .view-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
-.view-head h2 { font-family: "Russo One", sans-serif; font-weight: 700; font-size: 26px; letter-spacing: 1px; }
+.view-head h2 { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(20px, 4.5vw, 26px); letter-spacing: 1px; }
 .view-head-tools { display: flex; gap: 10px; flex-wrap: wrap; }
 
 input, select {
@@ -224,7 +224,7 @@ input[type="file"] { padding: 8px; font-size: 13px; }
   border-radius: 18px; padding: 18px 22px;
 }
 .current-bid-box .label { color: var(--muted); font-size: 11px; letter-spacing: 2px; display: block; }
-.cb-amount { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(34px, 5vw, 60px); line-height: 1; color: #fff; text-shadow: 0 0 22px rgba(255,204,0,0.35); }
+/* (.cb-amount is styled once, in the POLISH section below.) */
 .cb-right { text-align: right; }
 .cb-leader { font-size: clamp(18px, 2.4vw, 26px); font-weight: 800; color: var(--yellow); }
 
@@ -303,7 +303,7 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .btn-mini { font-size: 11px; padding: 5px 9px; border-radius: 8px; }
 
 /* ===================== PURSE GRID ===================== */
-.purse-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.purse-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 16px; }
 .purse-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
 .purse-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .team-logo { width: 48px; height: 48px; border-radius: 12px; flex: none; background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat; display: grid; place-items: center; font-weight: 800; color: #fff; }
@@ -317,7 +317,7 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), var(--gold)); }
 
 /* ===================== SQUADS ===================== */
-.squads-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.squads-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 16px; align-items: start; }
 .squad-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
 .squad-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
 .squad-meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
@@ -330,7 +330,7 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .squad-empty { color: var(--muted); font-size: 13px; font-style: italic; }
 
 /* ===================== SETUP ===================== */
-.setup-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; align-items: start; }
+.setup-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 18px; align-items: start; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .card h3 { font-size: 18px; }
 .card label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
@@ -368,13 +368,35 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .toast.bad { border-color: var(--red); }
 
 /* ===================== RESPONSIVE ===================== */
+/* Tablets & phones: the nav becomes a single swipeable pill row under the
+   brand, so the sticky header stays two compact rows instead of wrapping. */
 @media (max-width: 900px) {
   .auction-stage { grid-template-columns: 1fr; }
-  .tabs { width: 100%; justify-content: center; }
+  .app-header { gap: 10px 12px; }
+  .brand { flex: 1; min-width: 0; }
+  .brand-logo { width: 46px; height: 46px; border-radius: 12px; font-size: 15px; }
+  .tabs {
+    order: 3; width: 100%;
+    flex-wrap: nowrap; justify-content: flex-start;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* soft fade on the clipped edges so the row reads as swipeable */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: none; }
+}
+@media (max-width: 760px) {
+  /* iOS Safari zooms the page when it focuses a field under 16px -
+     keep form fields at 16px on touch-size screens so it never zooms. */
+  input, select, textarea { font-size: 16px; }
+  .member-role-select { font-size: 16px; }
 }
 @media (max-width: 560px) {
   .tab { padding: 8px 12px; font-size: 13px; }
   .btn { padding: 11px 14px; font-size: 14px; }
+  .overlay-card { padding: 28px 20px; }
 }
 
 /* ===================== AUTH (sign-in + roles) ===================== */
@@ -400,7 +422,7 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 /* Members & Roles modal (admin) */
 .members-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
 .members-backdrop.hidden { display: none; }
-.members-modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 480px; max-height: 85vh; overflow: auto; padding: 18px; box-shadow: var(--shadow); }
+.members-modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 480px; max-height: 85vh; max-height: min(85vh, calc(100dvh - 32px)); overflow: auto; padding: 18px; box-shadow: var(--shadow); }
 .members-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .members-head h3 { margin: 0; font-size: 17px; }
 .members-list { display: flex; flex-direction: column; gap: 8px; }
@@ -522,18 +544,19 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .ins-complete-top b { color: var(--yellow); }
 .ins-bar { height: 10px; border-radius: 6px; background: var(--panel-3); overflow: hidden; }
 .ins-bar > span { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--yellow), var(--gold)); transition: width .4s ease; }
-.ins-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.ins-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap: 12px; margin-bottom: 22px; }
 .ins-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; }
 .ins-k { font-size: 10px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 .ins-v { font-size: 16px; font-weight: 700; }
 .ins-v.accent { color: var(--yellow); }
-.ins-charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.ins-charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 14px; margin-bottom: 22px; }
 .ins-chart { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
 .ins-chart h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
 .ins-chart canvas { height: 240px !important; max-height: 240px; }
-.ins-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 16px; }
+.ins-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: 16px; }
 @media (max-width: 520px) { .ins-tables { grid-template-columns: 1fr; } }
-.ins-table { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+/* overflow-x guards against a wide table forcing page-level sideways scroll */
+.ins-table { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
 .ins-table h3 { font-size: 14px; margin-bottom: 10px; }
 .ins-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ins-table th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
@@ -564,7 +587,7 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 
 /* A little life on the live bid + leading team */
 .current-bid-box { transition: box-shadow .3s, border-color .3s; }
-.cb-amount { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(26px, 4vw, 40px); color: var(--yellow); transition: transform .12s; }
+.cb-amount { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(26px, 4vw, 40px); line-height: 1; color: var(--yellow); text-shadow: 0 0 18px rgba(255,204,0,0.25); transition: transform .12s; }
 .team-bid-btn.leading { animation: ledGlow 1.4s ease-in-out infinite; }
 @keyframes ledGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.0); }
@@ -579,7 +602,7 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 body:not(.can-edit) .rank-import { display: none; }
 
 /* Three panels on one page: side-by-side on desktop, stacked on mobile. */
-.rank-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; align-items: start; }
+.rank-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 18px; align-items: start; }
 .rank-section { animation: fade 0.25s ease; }
 .rank-sec-title { font-size: 16px; margin-bottom: 10px; letter-spacing: .5px; }
 .rank-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 6px 6px 4px; }
@@ -636,7 +659,7 @@ body:not(.can-edit) .rank-import { display: none; }
 /* ===================== MVP RANKINGS ===================== */
 .mvp-block + .mvp-block { margin-top: 28px; }
 /* Match-wise (left) + Season MVP (right) side by side; stacks when narrow. */
-.mvp-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; align-items: start; }
+.mvp-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 22px; align-items: start; }
 .mvp-cols .mvp-block + .mvp-block { margin-top: 0; } /* grid gap handles spacing */
 .mvp-select { width: 100%; margin-bottom: 12px; }
 .mvp-hint { color: var(--muted); font-size: 12.5px; margin: -2px 0 12px; }
@@ -907,4 +930,85 @@ body:not(.can-edit) .season-stats-import { display: none; }
   .podium-item.champion .bubble { width: 104px; height: 104px; font-size: 36px; }
   .bubble { width: 74px; height: 74px; font-size: 26px; }
   .season-card { padding: 16px; }
+}
+
+/* ===================== PRO POLISH =====================
+   Finishing details that make the site feel finished: keyboard focus
+   rings, selection color, thin scrollbars, micro-interactions, a one-time
+   gold sheen on the hero titles - all subtle, all skipped for users who
+   prefer reduced motion. Kept LAST so these override earlier rules. */
+
+/* Text selection in brand gold. */
+::selection { background: var(--yellow); color: #1a1300; }
+
+/* Keyboard accessibility: a clear gold ring for keyboard focus only
+   (mouse/touch users never see it). Form fields already light their
+   border gold on focus, so they opt out of the ring. */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+
+/* Thin, dark scrollbars everywhere (Firefox + WebKit). The mobile nav
+   pills set scrollbar-width:none, which still wins over this. */
+* { scrollbar-width: thin; scrollbar-color: #3a3a41 transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3a3a41; border-radius: 999px; border: 2px solid rgba(0, 0, 0, 0); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #4a4a52; border: 2px solid rgba(0, 0, 0, 0); background-clip: padding-box; }
+
+/* A touch of depth under the sticky header. */
+.app-header { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+
+/* Cards lift gently on hover (fx-card / tracker-card already do). */
+.pcard, .purse-card, .squad-card, .ins-card {
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.pcard:hover, .purse-card:hover, .squad-card:hover, .ins-card:hover {
+  transform: translateY(-3px); border-color: #4a4a52; box-shadow: var(--shadow);
+}
+
+/* Primary buttons glow softly on hover (brightness comes from the base rule). */
+.btn-yellow:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(255, 204, 0, 0.20); }
+.btn-red:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(225, 6, 0, 0.28); }
+
+/* One-time gold sheen sweeping across the hero + sign-in titles on load.
+   The resting state matches the original white -> yellow gradient. */
+.home-hero-title, .gate-title {
+  background: linear-gradient(100deg, #fff 0%, var(--yellow) 28%, #fffbe6 42%, var(--yellow) 55%, #fff 72%, var(--yellow) 100%);
+  background-size: 320% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: titleSheen 2.2s ease-out 0.25s 1 both;
+}
+@keyframes titleSheen { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+
+/* Toast slides up into place. (Also fixes a subtle bug: the old `fade`
+   keyframe animated `transform` to `none`, momentarily cancelling the
+   toast's translateX(-50%) centering so it entered off-centre.) */
+.toast { animation: toastIn 0.28s cubic-bezier(0.2, 1.2, 0.4, 1); }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(14px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Sub-tab bars and the season pills become one-row swipe bars on small
+   screens. (Lives here at the END of the sheet so it outranks the base
+   flex-wrap:wrap rules defined above; .fan-subnav gets the same treatment
+   at the end of fantasy.css, which loads after this file.) */
+@media (max-width: 760px) {
+  .subtabs, .season-tabs {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+  }
+  .subtabs::-webkit-scrollbar, .season-tabs::-webkit-scrollbar { display: none; }
+  .subtab, .season-tab { flex: none; white-space: nowrap; }
+}
+
+/* Respect users who turn animations off. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

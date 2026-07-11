@@ -22,7 +22,7 @@
 .fan-chip input { accent-color: var(--gold); }
 
 /* player pool picker */
-.fan-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 14px; margin: 6px 0; }
+.fan-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(215px, 100%), 1fr)); gap: 14px; margin: 6px 0; }
 .fan-pool-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px 8px; }
 .fan-pool-team-name { font-weight: 800; font-size: 14px; color: var(--yellow); text-transform: uppercase; letter-spacing: 1px; margin: 2px 4px 8px; }
 .fan-pick { display: flex; align-items: center; gap: 10px; padding: 8px 8px; font-size: 14px; cursor: pointer; border-radius: 9px; transition: background 0.12s ease; }
@@ -60,7 +60,7 @@
 .pchip-pts { flex: none; color: var(--yellow); font-weight: 800; min-width: 46px; text-align: right; }
 
 /* results entry - full name on its own line, inputs below (no truncation) */
-.fan-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 6px 0 14px; }
+.fan-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 14px; margin: 6px 0 14px; }
 .fan-results-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
 .fan-res-row { display: flex; flex-direction: column; gap: 6px; padding: 9px 0; border-bottom: 1px solid var(--panel-3); }
 .fan-res-row:last-child { border-bottom: none; }
@@ -74,10 +74,23 @@
 .fan-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .fan-card-head h3 { margin: 0; }
 .fan-share-btn { flex: none; padding: 7px 12px; font-size: 13px; }
-.fan-board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.fan-board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; align-items: start; }
 .fan-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .fan-table th { text-align: left; color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .fan-table td { padding: 9px 8px; border-bottom: 1px solid var(--panel-2); vertical-align: middle; }
 .fan-table td.num, .fan-table th.num { text-align: right; }
 .fan-table td.strong { color: var(--yellow); font-weight: 800; font-size: 15px; }
 .fan-table tr:first-child td { font-weight: 700; }
+
+/* One-row swipe bar on small screens (same treatment as .subtabs /
+   .season-tabs at the end of styles.css). */
+@media (max-width: 760px) {
+  .fan-subnav {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+  }
+  .fan-subnav::-webkit-scrollbar { display: none; }
+  .fan-tab { flex: none; white-space: nowrap; }
+}

@@ -576,6 +576,13 @@
       </section>`;
     // Connectors need the boxes laid out first; measure on the next frame.
     requestAnimationFrame(drawBracketLines);
+    // On phones the season pills are a swipeable row - keep the selected
+    // season in view (scrollLeft only, so the page itself never jumps).
+    const bar = document.getElementById("seasonTabs");
+    const act = bar && bar.querySelector(".season-tab.active");
+    if (bar && act && bar.scrollWidth > bar.clientWidth) {
+      bar.scrollLeft = Math.max(0, act.offsetLeft - (bar.clientWidth - act.offsetWidth) / 2);
+    }
   }
 
   function onClick(e) {
