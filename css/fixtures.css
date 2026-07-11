@@ -45,7 +45,26 @@
 }
 .fx-hint-knockout { color: var(--gold); }
 .fx-hint-knockout b { color: var(--gold); }
+/* Super Over: a tie settled by one is a WIN/LOSS in the table, not a tie. */
+.fx-so { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+.fx-so-mark { font-size: 9px; margin-left: 2px; opacity: .85; }
+.fx-hint-so { color: var(--yellow); }
+.fx-hint-so b { color: var(--yellow); }
 @keyframes fxPulse { 50% { opacity: .55; } }
+
+.fx-superover {
+  display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+  font-size: 13px; padding: 9px 12px; border-radius: 10px;
+  background: rgba(255, 204, 0, .07); border: 1px solid rgba(255, 204, 0, .3);
+}
+.fx-superover b { color: var(--yellow); font-family: "Russo One", sans-serif; }
+.fx-so-tag { font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--yellow); }
+.fx-so-win { font-weight: 700; color: var(--green); }
+.fx-so-box { grid-template-columns: 1fr; }
+.fx-so-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.fx-check { flex-direction: row !important; align-items: center; gap: 8px; color: var(--text) !important; font-weight: 600; }
+.fx-check input { width: auto !important; accent-color: var(--yellow); }
+@media (max-width: 560px) { .fx-so-grid { grid-template-columns: 1fr 1fr; } }
 
 .fx-teams { display: flex; align-items: center; gap: 12px; }
 .fx-team { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }

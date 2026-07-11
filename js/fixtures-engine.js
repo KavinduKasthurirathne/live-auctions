@@ -20,9 +20,13 @@
   const CONFIG = {
     /* ---- POINTS SYSTEM (the one place to change it) ----
        Default league format: win 2, tie 1, loss 0. An abandoned / no-result
-       match splits a point, as in most cricket leagues. Adjust these numbers
-       (or add a key + handle it in pointsFor) if the format changes. */
-    points: { win: 2, tie: 1, loss: 0, abandoned: 1 },
+       match splits a point, as in most cricket leagues.
+       A tie that goes to a SUPER OVER is not a tie for the league: the Super
+       Over winner takes a full win (2) and the loser gets 0 - so the table
+       shows W/L, not T. `tie` points only apply to a tie with NO Super Over.
+       Adjust these numbers (or add a key + handle it in pointsFor) if the
+       format changes. */
+    points: { win: 2, tie: 1, loss: 0, abandoned: 1, superOverWin: 2, superOverLoss: 0 },
 
     // Abandoned matches still count as "played" in the table (they carry points).
     countAbandonedAsPlayed: true,
@@ -91,6 +95,26 @@
     if (hit) return hit;
     hit = list.find(t => { const tn = norm(t.name); return tn && (tn.includes(n) || n.includes(tn)); });
     return hit || null;
+  }
+
+  /* --------------------------- SUPER OVER ---------------------------------
+     A tied match may be decided by a Super Over. The scorecard still says the
+     match TIED (that's the cricket truth, and the innings runs still feed NRR),
+     but for the league the Super Over winner takes the win: W/L, never T.
+     Shape: resultData.superOver = { winnerTeamId, winnerName, home:{runs,wickets},
+     away:{runs,wickets} }. Super Over runs never touch NRR. */
+  function superOverOf(match) {
+    const so = match && match.resultData && match.resultData.superOver;
+    return so && so.winnerTeamId ? so : null;
+  }
+  const hasSuperOver = m => !!superOverOf(m);
+  // The team the league counts as the winner: Super Over winner if there was
+  // one, otherwise whoever won in normal play. "" for a true tie / no result.
+  function effectiveWinnerId(match) {
+    const so = superOverOf(match);
+    if (so) return so.winnerTeamId;
+    const rd = match && match.resultData;
+    return (rd && rd.winnerTeamId) || "";
   }
 
   /* ----------------- 1. parsed STUMPS match -> resultData ------------------ */
@@ -170,14 +194,20 @@
   function blankScore() { return { runs: 0, wickets: 0, balls: 0, name: "" }; }
   function findTeamById(teams, id) { return (teams || []).find(t => t.id === id) || null; }
 
-  // "Zyco Kings won by 14 runs" / "… by 3 wickets" / "Match tied" / "Abandoned".
+  // "Zyco Kings won by 14 runs" / "… by 3 wickets" / "Abandoned" /
+  // "Match tied" / "Match tied · Zyco Kings won the Super Over".
   function summarize(rd) {
     if (!rd) return "";
     const w = rd.winnerName || "";
     switch (rd.resultType) {
       case "runs": return w ? `${w} won by ${rd.margin} run${rd.margin === 1 ? "" : "s"}` : "";
       case "wickets": return w ? `${w} won by ${rd.margin} wicket${rd.margin === 1 ? "" : "s"}` : "";
-      case "tie": return "Match tied";
+      case "tie": {
+        const so = rd.superOver;
+        return so && so.winnerTeamId && so.winnerName
+          ? `Match tied · ${so.winnerName} won the Super Over`
+          : "Match tied";
+      }
       case "abandoned": return "Match abandoned";
       default: return "No result";
     }
@@ -189,7 +219,9 @@
     return outcome === "win" ? p.win
       : outcome === "tie" ? p.tie
         : outcome === "abandoned" ? p.abandoned
-          : p.loss;
+          : outcome === "superOverWin" ? p.superOverWin
+            : outcome === "superOverLoss" ? p.superOverLoss
+              : p.loss;
   }
 
   // matches: our stored match docs. teams: our team records.
@@ -202,6 +234,7 @@
       if (!rows.has(t.id)) rows.set(t.id, {
         teamId: t.id, name: t.name, logo: t.logo || "",
         played: 0, wins: 0, losses: 0, ties: 0, noResults: 0, points: 0,
+        superOverWins: 0, superOverLosses: 0,   // subset of wins/losses, for the tooltip
         runsFor: 0, ballsFor: 0, runsAgainst: 0, ballsAgainst: 0, nrrKnown: true,
       });
       return rows.get(t.id);
@@ -227,14 +260,30 @@
       }
 
       H.played++; A.played++;
-      if (rd.resultType === "tie") {
+      const so = superOverOf(m);
+      // Guard: a winner id that names neither side is unusable - score it as a
+      // tie rather than silently handing the win to the away team.
+      const wid = effectiveWinnerId(m);
+      const decided = wid === home.id || wid === away.id;
+      if (!decided) {
+        H.ties++; A.ties++;
+        H.points += pointsFor("tie"); A.points += pointsFor("tie");
+      } else if (rd.resultType === "tie" && !so) {
+        // A true tie (no Super Over): a point each.
         H.ties++; A.ties++;
         H.points += pointsFor("tie"); A.points += pointsFor("tie");
       } else {
-        const homeWon = rd.winnerTeamId ? rd.winnerTeamId === home.id : false;
+        // Decided in normal play, OR tied and settled by a Super Over. Either
+        // way the league records a WIN and a LOSS - never a tie.
+        const homeWon = wid === home.id;
         const winner = homeWon ? H : A, loser = homeWon ? A : H;
         winner.wins++; loser.losses++;
-        winner.points += pointsFor("win"); loser.points += pointsFor("loss");
+        if (so) {
+          winner.superOverWins++; loser.superOverLosses++;
+          winner.points += pointsFor("superOverWin"); loser.points += pointsFor("superOverLoss");
+        } else {
+          winner.points += pointsFor("win"); loser.points += pointsFor("loss");
+        }
       }
 
       // Net run rate inputs.
@@ -267,6 +316,7 @@
   root.HCCLFixtures = {
     CONFIG, STATUSES, STATUS_LABEL, FORMATS, RESULT_TYPES,
     STAGES, DEFAULT_STAGE, stageOf, stageMeta, countsForStandings, isKnockout,
+    superOverOf, hasSuperOver, effectiveWinnerId,
     deriveResult, summarize, standings, findTeam, oversToBalls, ballsToOvers,
   };
 })();

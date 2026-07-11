@@ -184,9 +184,11 @@
 
   function matchCard(m) {
     const rd = m.resultData;
-    const winnerId = rd && rd.winnerTeamId;
+    // Effective winner: the Super Over winner if the match was tied and went to one.
+    const winnerId = rd ? eng().effectiveWinnerId(m) : "";
     const hw = winnerId && winnerId === m.homeTeamId ? " fx-won" : "";
     const aw = winnerId && winnerId === m.awayTeamId ? " fx-won" : "";
+    const so = eng().hasSuperOver(m) ? `<span class="fx-chip fx-so">⚡ Super Over</span>` : "";
     const summary = rd && rd.summary
       ? `<div class="fx-summary">🏆 ${esc(rd.summary)}</div>`
       : isDone(m) ? "" : `<div class="fx-pending">Result pending</div>`;
@@ -204,7 +206,7 @@
 
     return `<article class="fx-card" data-fx-open="${esc(m.id)}" tabindex="0" role="button" aria-label="Open match details">
       <header class="fx-card-head">
-        <div class="fx-chips">${stageChip(m)}${statusChip(m)}${draftChip(m)}</div>
+        <div class="fx-chips">${stageChip(m)}${statusChip(m)}${so}${draftChip(m)}</div>
         <time class="fx-when">${esc(fmtDate(m.scheduledAt))}</time>
       </header>
       <div class="fx-teams">
@@ -247,10 +249,14 @@
         : "The table fills up as soon as the first group-stage match is completed.");
     }
     const p = eng().CONFIG.points;
+    const soNote = (n, kind) => n ? ` title="includes ${n} Super Over ${kind}"` : "";
     const body = rows.map(r => `<tr>
       <td class="fx-pos">${r.pos}</td>
       <td class="fx-stname">${teamLogoHtml(r.teamId, "fx-logo sm")}<span>${esc(r.name)}</span></td>
-      <td>${r.played}</td><td>${r.wins}</td><td>${r.losses}</td><td>${r.ties}</td>
+      <td>${r.played}</td>
+      <td${soNote(r.superOverWins, "win")}>${r.wins}${r.superOverWins ? `<span class="fx-so-mark">⚡</span>` : ""}</td>
+      <td${soNote(r.superOverLosses, "loss")}>${r.losses}${r.superOverLosses ? `<span class="fx-so-mark">⚡</span>` : ""}</td>
+      <td>${r.ties}</td>
       <td class="fx-pts">${r.points}</td>
       <td class="${r.nrr == null ? "fx-dim" : r.nrr >= 0 ? "fx-pos-nrr" : "fx-neg-nrr"}">${r.nrr == null ? "–" : (r.nrr > 0 ? "+" : "") + r.nrr.toFixed(2)}</td>
     </tr>`).join("");
@@ -264,7 +270,8 @@
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="hint fx-points-note">Group-stage results only · Points: win ${p.win} · tie ${p.tie} · loss ${p.loss} · abandoned ${p.abandoned} each</p>`;
+    <p class="hint fx-points-note">Group-stage results only · Points: win ${p.win} · tie ${p.tie} · loss ${p.loss} · abandoned ${p.abandoned} each<br />
+      ⚡ A tie decided by a Super Over counts as a win (${p.superOverWin}) / loss (${p.superOverLoss}), not a tie.</p>`;
   }
 
   /* ============================ RENDER: view ========================= */
@@ -487,16 +494,27 @@
     const m = matches.find(x => x.id === modal.matchId);
     if (!m) return shell("Match", emptyState("Match not found", "It may have just been deleted."), "");
     const rd = m.resultData, sc = m.scorecardData;
+    const winnerId = rd ? eng().effectiveWinnerId(m) : "";
+    const so = eng().superOverOf(m);
+
+    // Super Over line: the tie-breaker scores, shown under the main result.
+    const soLine = so ? `<div class="fx-superover">
+      <span class="fx-so-tag">⚡ Super Over</span>
+      <span>${esc(teamName(m.homeTeamId))} <b>${esc(String((so.home && so.home.runs) || 0))}/${esc(String((so.home && so.home.wickets) || 0))}</b></span>
+      <span class="fx-vs">vs</span>
+      <span>${esc(teamName(m.awayTeamId))} <b>${esc(String((so.away && so.away.runs) || 0))}/${esc(String((so.away && so.away.wickets) || 0))}</b></span>
+      <span class="fx-so-win">${esc(teamName(so.winnerTeamId))} won</span>
+    </div>` : "";
 
     const head = `<div class="fx-detail-head">
       <div class="fx-teams fx-teams-lg">
-        <div class="fx-team${rd && rd.winnerTeamId === m.homeTeamId ? " fx-won" : ""}">
+        <div class="fx-team${winnerId === m.homeTeamId ? " fx-won" : ""}">
           ${teamLogoHtml(m.homeTeamId, "fx-logo lg")}
           <span class="fx-tname">${esc(teamName(m.homeTeamId))}</span>
           ${scoreLine(m, "home")}
         </div>
         <span class="fx-vs">vs</span>
-        <div class="fx-team${rd && rd.winnerTeamId === m.awayTeamId ? " fx-won" : ""}">
+        <div class="fx-team${winnerId === m.awayTeamId ? " fx-won" : ""}">
           ${teamLogoHtml(m.awayTeamId, "fx-logo lg")}
           <span class="fx-tname">${esc(teamName(m.awayTeamId))}</span>
           ${scoreLine(m, "away")}
@@ -504,6 +522,7 @@
       </div>
       <div class="fx-chips">${statusChip(m)}${draftChip(m)}</div>
       ${rd && rd.summary ? `<div class="fx-summary big">🏆 ${esc(rd.summary)}</div>` : `<div class="fx-pending big">Result pending</div>`}
+      ${soLine}
       ${rd && rd.potm ? `<div class="fx-potm">⭐ Player of the Match: <b>${esc(rd.potm)}</b></div>` : ""}
     </div>`;
 
@@ -625,6 +644,31 @@
       </fieldset>`;
     };
 
+    // Super Over: only meaningful when the match TIED. STUMPS doesn't export it
+    // reliably, so it's entered here - optional, since not every tie goes to one.
+    const so = d.superOver || {};
+    const soOn = !!so.played;
+    const soWinOpts = `<option value="">— select winner —</option>` + ts.map(t =>
+      `<option value="${esc(t.id)}"${t.id === so.winnerTeamId ? " selected" : ""}>${esc(t.name)}</option>`).join("");
+    const superOverBlock = d.resultType !== "tie" ? "" : `
+      <fieldset class="fx-scorebox fx-so-box">
+        <legend>⚡ Super Over</legend>
+        <label class="fx-check">
+          <input type="checkbox" id="fxSoPlayed"${soOn ? " checked" : ""} />
+          <span>A Super Over was played to decide this tie</span>
+        </label>
+        ${soOn ? `
+          <div class="fx-so-grid">
+            <label>${esc(teamName(m.homeTeamId))} runs<input type="number" min="0" id="fxSoHomeR" value="${esc(String((so.home && so.home.runs) || 0))}" /></label>
+            <label>${esc(teamName(m.homeTeamId))} wkts<input type="number" min="0" id="fxSoHomeW" value="${esc(String((so.home && so.home.wickets) || 0))}" /></label>
+            <label>${esc(teamName(m.awayTeamId))} runs<input type="number" min="0" id="fxSoAwayR" value="${esc(String((so.away && so.away.runs) || 0))}" /></label>
+            <label>${esc(teamName(m.awayTeamId))} wkts<input type="number" min="0" id="fxSoAwayW" value="${esc(String((so.away && so.away.wickets) || 0))}" /></label>
+          </div>
+          <label>Super Over winner<select id="fxSoWinner">${soWinOpts}</select></label>
+          <span class="hint fx-hint-so">⚡ The league records this as a <b>win and a loss</b> (${eng().CONFIG.points.superOverWin} / ${eng().CONFIG.points.superOverLoss} pts) — <b>not</b> a tie. Super Over runs don't affect net run rate.</span>
+        ` : `<span class="hint">Leave unticked for a true tie — ${eng().CONFIG.points.tie} point each.</span>`}
+      </fieldset>`;
+
     const body = `${banner}
       <div class="fx-form">
         ${scoreRow("home", teamName(m.homeTeamId) + " (home)")}
@@ -633,6 +677,7 @@
           <label>Result type<select id="fxResType">${typeOpts}</select></label>
           <label>Winner<select id="fxWinner">${winOpts}</select></label>
         </div>
+        ${superOverBlock}
         <div class="fx-form-row">
           <label>Margin <span class="fx-opt">(runs / wickets)</span>
             <input type="number" min="0" id="fxMargin" value="${esc(String(d.margin || 0))}" />
@@ -672,7 +717,52 @@
     }
     if (get("fxMargin")) d.margin = Math.max(0, parseInt(get("fxMargin").value, 10) || 0);
     if (get("fxPotm")) d.potm = get("fxPotm").value.trim();
-    if (get("fxSummary")) d.summary = get("fxSummary").value.trim();
+
+    // ---- Super Over (only offered on a tie) ----
+    if (d.resultType === "tie") {
+      const chk = get("fxSoPlayed");
+      const so = d.superOver || (d.superOver = { played: false, winnerTeamId: "", home: {}, away: {} });
+      if (chk) so.played = chk.checked;
+      if (so.played) {
+        so.home = { runs: n("fxSoHomeR"), wickets: n("fxSoHomeW") };
+        so.away = { runs: n("fxSoAwayR"), wickets: n("fxSoAwayW") };
+        if (get("fxSoWinner")) so.winnerTeamId = get("fxSoWinner").value;
+        const t = teamById(so.winnerTeamId);
+        so.winnerName = t ? t.name : "";
+      }
+    } else if (d.superOver) {
+      d.superOver.played = false;   // result type changed away from tie
+    }
+
+    // Re-write the summary from the (possibly edited) fields, unless the admin
+    // typed their own wording.
+    const auto = eng().summarize(buildResult(d));
+    const sum = get("fxSummary");
+    if (sum) {
+      const untouched = !sum.value.trim() || sum.value.trim() === (d.summary || "").trim();
+      d.summary = untouched ? auto : sum.value.trim();
+    } else {
+      d.summary = auto;
+    }
+  }
+
+  // Shape the draft into the resultData the engine/summary expect.
+  function buildResult(d) {
+    const decisive = d.resultType === "runs" || d.resultType === "wickets";
+    const so = d.superOver && d.superOver.played && d.superOver.winnerTeamId ? d.superOver : null;
+    return {
+      resultType: d.resultType,
+      winnerTeamId: decisive ? d.winnerTeamId : "",
+      winnerName: decisive ? ((teamById(d.winnerTeamId) || {}).name || "") : "",
+      margin: d.margin || 0,
+      potm: d.potm || "",
+      superOver: so ? {
+        winnerTeamId: so.winnerTeamId,
+        winnerName: (teamById(so.winnerTeamId) || {}).name || "",
+        home: { runs: (so.home && so.home.runs) || 0, wickets: (so.home && so.home.wickets) || 0 },
+        away: { runs: (so.away && so.away.runs) || 0, wickets: (so.away && so.away.wickets) || 0 },
+      } : null,
+    };
   }
 
   async function confirmImport() {
@@ -682,18 +772,18 @@
     const d = modal.draft;
     const decisive = d.resultType === "runs" || d.resultType === "wickets";
     if (decisive && !d.winnerTeamId) return toast("Pick the winning team", "bad");
+    // A ticked Super Over with no winner would silently score as a plain tie.
+    if (d.resultType === "tie" && d.superOver && d.superOver.played && !d.superOver.winnerTeamId)
+      return toast("Pick the Super Over winner (or untick Super Over)", "bad");
 
+    const base = buildResult(d);
     const next = { ...m };
     next.status = "completed";
     next.resultData = {
-      resultType: d.resultType,
-      winnerTeamId: decisive ? d.winnerTeamId : "",
-      winnerName: decisive ? (teamById(d.winnerTeamId) || {}).name || "" : "",
-      margin: d.margin || 0,
-      potm: d.potm || "",
+      ...base,
       home: { runs: d.home.runs, wickets: d.home.wickets, balls: d.home.balls, name: teamName(m.homeTeamId) },
       away: { runs: d.away.runs, wickets: d.away.wickets, balls: d.away.balls, name: teamName(m.awayTeamId) },
-      summary: d.summary || eng().summarize({ ...d, winnerName: (teamById(d.winnerTeamId) || {}).name || "" }),
+      summary: d.summary || eng().summarize(base),
     };
     if (modal.parsed) {
       next.scorecardData = { teams: modal.parsed.teams, players: modal.parsed.players };
@@ -772,10 +862,27 @@
   // re-renders so the "counts / doesn't count" note updates. Typed input is
   // read back into the draft first, so nothing is lost.
   function onChange(e) {
-    if (!modal || modal.type !== "form") return;
-    if (e.target.closest("#fxHome") || e.target.closest("#fxAway") || e.target.closest("#fxStage")) {
-      readForm();
-      renderModal();
+    if (!modal) return;
+    if (modal.type === "form") {
+      if (e.target.closest("#fxHome") || e.target.closest("#fxAway") || e.target.closest("#fxStage")) {
+        readForm();
+        renderModal();
+      }
+      return;
+    }
+    if (modal.type === "import" && modal.draft) {
+      // These two change the dialog's SHAPE ("Tied" reveals the Super Over
+      // section; ticking it reveals the score fields), so redraw it.
+      if (e.target.closest("#fxResType") || e.target.closest("#fxSoPlayed")) {
+        readImportForm();
+        renderModal();
+        return;
+      }
+      // Any other edit (winner, scores, margin): just refresh the auto-written
+      // summary in place. A full redraw here would steal focus mid-form.
+      readImportForm();
+      const sum = document.getElementById("fxSummary");
+      if (sum && sum !== e.target && sum.value !== modal.draft.summary) sum.value = modal.draft.summary || "";
     }
   }
 
