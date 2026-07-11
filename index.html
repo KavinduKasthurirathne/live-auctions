@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Russo+One&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/fantasy.css" />
+  <link rel="stylesheet" href="css/fixtures.css" />
 </head>
 <body>
 
@@ -27,6 +28,7 @@
       <button class="tab active" data-tab="home">🏠 Home</button>
       <button class="tab" data-tab="auctions">🔨 Auctions</button>
       <button class="tab" data-tab="squads">🏆 Squads</button>
+      <button class="tab" data-tab="fixtures">📅 Fixtures &amp; Results</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
       <button class="tab" data-tab="mvp">🏅 MVP</button>
       <button class="tab" data-tab="ranking">📈 Player Ranking</button>
@@ -140,6 +142,9 @@
       <div class="squads-grid" id="squadsGrid"></div>
     </section>
 
+    <!-- ============ FIXTURES & RESULTS (built by fixtures.js) ============ -->
+    <section class="view" id="view-fixtures"></section>
+
     <!-- ===================== SETUP ===================== -->
     <section class="view" id="view-setup">
       <div class="view-head"><h2>SETUP &amp; MANAGEMENT</h2></div>
@@ -161,6 +166,9 @@
           <label>Default purse (per team)
             <input type="number" id="setPurse" min="0" step="any" placeholder="100" />
           </label>
+          <label>Squad size (players per team)
+            <input type="number" id="setSquadSize" min="1" max="25" step="1" placeholder="5" />
+          </label>
           <label>Bid increment
             <input type="number" id="setIncrement" min="0" step="any" placeholder="1" />
           </label>
@@ -179,6 +187,9 @@
           </label>
           <label>Purse (leave blank for default)
             <input type="number" id="teamPurse" min="0" step="any" placeholder="100" />
+          </label>
+          <label>Squad size (leave blank for default)
+            <input type="number" id="teamMaxPlayers" min="1" max="25" step="1" placeholder="5" />
           </label>
           <label>Team logo
             <input type="file" id="teamLogoFile" accept="image/*" />
@@ -332,6 +343,10 @@
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
   <script src="js/mvp-engine.js"></script>
   <script src="js/mvp.js"></script>
+  <!-- Fixtures & Results: reuses the STUMPS parser (mvp-engine) + pdf.js text
+       extraction (mvp.js), so both must load first. -->
+  <script src="js/fixtures-engine.js"></script>
+  <script src="js/fixtures.js"></script>
   <!-- Auth + roles (Google sign-in); exposes window.HCCL -->
   <script type="module" src="firebase-init.js"></script>
 </body>

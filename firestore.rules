@@ -93,5 +93,14 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if canEdit();
     }
+
+    // Fixtures & Results: matches/{id} = one scheduled/played match (teams,
+    // date, venue, status, result + imported STUMPS scorecard).
+    // Editors create/edit/publish/delete; everyone signed in reads (the
+    // standings are computed client-side from these docs).
+    match /matches/{document=**} {
+      allow read: if signedIn();
+      allow write: if canEdit();
+    }
   }
 }

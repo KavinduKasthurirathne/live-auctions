@@ -19,9 +19,10 @@ function defaultState() {
       leagueLogo: "",
       currency: "Cr",
       defaultPurse: 100,
+      squadSize: 5,      // players per team; a team may override via team.maxPlayers
       bidIncrement: 1,
     },
-    teams: [],   // { id, name, logo, purse }
+    teams: [],   // { id, name, logo, purse, maxPlayers }
     players: [], // { id, name, role, basePrice, photo, status, soldTo, soldPrice }
     auction: { currentPlayerId: null, currentBid: 0, currentBidderId: null, soldStage: 0, bidLog: [], lastResult: null },
     lastAction: null, // { type, playerId }for Undo
@@ -116,7 +117,9 @@ function auDiffImages(coll, items, getImg, ops) {
 
 function auNormTeam(id, d) {
   return { id, name: d.name || "", logo: d.logo || "",
-    purse: (d.purse === undefined ? null : d.purse), order: d.order || 0 };
+    purse: (d.purse === undefined ? null : d.purse),
+    maxPlayers: (d.maxPlayers === undefined ? null : d.maxPlayers),
+    order: d.order || 0 };
 }
 function auNormPlayer(id, d) {
   const p = { id, name: d.name || "", role: d.role || "", basePrice: d.basePrice || 0,
@@ -293,12 +296,22 @@ function teamSpent(id)   { return state.players.filter(p => p.status === "sold" 
 function teamRemaining(t){ return teamPurse(t) - teamSpent(t.id); }
 function teamPlayers(id) { return state.players.filter(p => p.status === "sold" && p.soldTo === id); }
 
-/* Hard squad cap. Every team must end with exactly this many players. */
-const MAX_PLAYERS = 5;
+/* Squad cap. Configurable in Setup: settings.squadSize is the league default and a
+   team may override it with team.maxPlayers (null = use the league default). */
+const DEFAULT_SQUAD_SIZE = 5;
+/* Cap for one team, resolved against a state-like `s` (so the bid transaction can run
+   it against the SERVER snapshot). Falls back to 5 for data saved before this setting. */
+function squadCapOf(s, team) {
+  if (team && team.maxPlayers != null) return Math.max(1, Number(team.maxPlayers) || DEFAULT_SQUAD_SIZE);
+  const def = s && s.settings ? Number(s.settings.squadSize) : 0;
+  return Math.max(1, def || DEFAULT_SQUAD_SIZE);
+}
+/* Convenience for the render paths, which all read the global `state`. */
+function teamCap(t) { return squadCapOf(state, t); }
 
 /* Budget + slot math for one team - DERIVED ONLY (no writes). Takes a state-like `s`
    so the bid transaction can run it against the SERVER's live auction snapshot.
-     remainingSlots = MAX_PLAYERS - squad.length
+     remainingSlots = maxPlayers - squad.length
      reserve        = max(0, remainingSlots - 1) * minimumBasePrice (of available players)
      safeBid        = remainingPurse - reserve
    safeBid is the most a team can bid now and still afford to fill its empty slots. */
@@ -306,7 +319,8 @@ function squadInfo(s, teamId) {
   const team = s.teams.find(t => t.id === teamId);
   const sold = s.players.filter(p => p.status === "sold" && p.soldTo === teamId);
   const squadCount = sold.length;                                  // retained players count too
-  const slotsLeft = Math.max(0, MAX_PLAYERS - squadCount);
+  const maxPlayers = squadCapOf(s, team);
+  const slotsLeft = Math.max(0, maxPlayers - squadCount);
   const purse = (team && team.purse != null) ? team.purse : s.settings.defaultPurse;
   const spent = sold.filter(p => !p.retained).reduce((x, p) => x + (p.soldPrice || 0), 0);
   const remaining = purse - spent;
@@ -314,7 +328,7 @@ function squadInfo(s, teamId) {
   const minBase = avail.length ? Math.min(...avail) : 0;
   const reserve = Math.max(0, slotsLeft - 1) * minBase;
   const safeBid = remaining - reserve;
-  return { squadCount, slotsLeft, purse, spent, remaining, minBase, reserve, safeBid };
+  return { squadCount, maxPlayers, slotsLeft, purse, spent, remaining, minBase, reserve, safeBid };
 }
 
 /* turn an image File into a resized data URL so it fits in localStorage */
@@ -396,7 +410,20 @@ function renderAll() {
   renderSquads();
   renderSetup();
   renderInsights();
+  // Sibling modules (fixtures.js) read teams/squads through window.HCCLAuction;
+  // this tells them the underlying data just changed (cloud snapshot, edit, …).
+  document.dispatchEvent(new CustomEvent("hccl:data"));
 }
+
+/* Read-only view of the auction data for sibling modules. Keeps them decoupled
+   from `state` while still resolving squads from the SAME teams/players the
+   auction owns - in both cloud and localStorage mode. */
+window.HCCLAuction = {
+  teams:    () => state.teams.map(t => ({ id: t.id, name: t.name, logo: t.logo || "" })),
+  squad:    id => teamPlayers(id).map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained })),
+  team:     id => { const t = getTeam(id); return t ? { id: t.id, name: t.name, logo: t.logo || "" } : null; },
+  settings: () => ({ ...state.settings }),
+};
 
 function renderHeader() {
   const { seasonName, seasonNumber, leagueLogo } = state.settings;
@@ -525,7 +552,7 @@ function renderTeamButtons() {
     btn.className = "team-bid-btn" + (leading ? " leading" : "");
     btn.disabled = leading || full || overSafe;
     btn.title = leading ? "Currently leading"
-      : full ? "Squad full (5 players)"
+      : full ? `Squad full (${info.maxPlayers} players)`
       : overSafe ? "Cannot exceed Safe Bid and still complete squad"
       : `Bid ${money(next)} for ${t.name}`;
     btn.innerHTML = `
@@ -551,16 +578,16 @@ function renderSquadTracker() {
       const info = squadInfo(state, t.id);
       const bought = state.players.filter(p => p.status === "sold" && !p.retained && p.soldTo === t.id);
       const avg = bought.length ? info.spent / bought.length : 0;
-      const fillPct = (info.squadCount / MAX_PLAYERS) * 100;            // bar tracks squad completion
+      const fillPct = info.maxPlayers > 0 ? (info.squadCount / info.maxPlayers) * 100 : 0; // bar tracks squad completion
       const budgetPct = info.purse > 0 ? Math.max(0, Math.min(100, (info.remaining / info.purse) * 100)) : 0;
       const health = info.slotsLeft <= 0 ? "full" : budgetPct >= 50 ? "good" : budgetPct >= 25 ? "warn" : "bad";
-      const dots = Array.from({ length: MAX_PLAYERS }, (_, k) =>
+      const dots = Array.from({ length: info.maxPlayers }, (_, k) =>
         `<span class="dot${k < info.squadCount ? " on" : ""}"></span>`).join("");
       const leading = a.currentBidderId === t.id;
       return `<div class="tracker-card ${health}${leading ? " leading" : ""}">
         <div class="tc-head">${logoHTML("tc-logo", t.logo, t.name)}<span class="tc-name">${esc(t.name)}</span></div>
-        <div class="tc-dots" title="${info.squadCount} of ${MAX_PLAYERS} players">${dots}</div>
-        <div class="tc-players">${info.squadCount} / ${MAX_PLAYERS} Players</div>
+        <div class="tc-dots" title="${info.squadCount} of ${info.maxPlayers} players">${dots}</div>
+        <div class="tc-players">${info.squadCount} / ${info.maxPlayers} Players</div>
         <div class="tc-bar"><span style="width:${fillPct}%"></span></div>
         <div class="tc-stats">
           <div><span class="tc-k">Purse</span><span class="tc-v">${money(info.remaining)}</span></div>
@@ -639,7 +666,8 @@ function resetBidState() {
 }
 
 /* Pure bid rule. Returns the new auction object, or null if the bid isn't allowed.
-   Enforces the hard 5-player squad cap and the Safe Bid budget guard (see squadInfo). */
+   Enforces the configured squad cap (settings.squadSize / team.maxPlayers) and the
+   Safe Bid budget guard (see squadInfo). */
 function computeBidResult(s, teamId) {
   const a = s.auction;
   if (!a || a.lastResult) return null;                 // not while a SOLD/UNSOLD result is showing
@@ -651,7 +679,7 @@ function computeBidResult(s, teamId) {
   const team = s.teams.find(t => t.id === teamId);
   if (!team) return null;
   const info = squadInfo(s, teamId);
-  if (info.slotsLeft <= 0) return null;   // squad already full (5 players)
+  if (info.slotsLeft <= 0) return null;   // squad already full (at its squad cap)
   if (info.safeBid < amount) return null; // would break squad-completion budget
   return {
     currentPlayerId: a.currentPlayerId,
@@ -839,7 +867,7 @@ function renderInsights() {
       <div class="ins-table"><h3>Team Analytics</h3>
         <table><thead><tr><th>Team</th><th class="num">Players</th><th class="num">Spent</th><th class="num">Spent %</th><th class="num">Safe Bid</th></tr></thead><tbody>
           ${teamSpends.map(({ t, spent, info }) => { const purse = teamPurse(t); const pct = purse ? Math.round(spent / purse * 100) : 0;
-            return `<tr><td>${esc(t.name)}</td><td class="num">${info.squadCount}/${MAX_PLAYERS}</td><td class="num">${money(spent)}</td><td class="num">${pct}%</td><td class="num">${money(Math.max(0, info.safeBid))}</td></tr>`; }).join("") || `<tr><td colspan="5">No teams</td></tr>`}
+            return `<tr><td>${esc(t.name)}</td><td class="num">${info.squadCount}/${info.maxPlayers}</td><td class="num">${money(spent)}</td><td class="num">${pct}%</td><td class="num">${money(Math.max(0, info.safeBid))}</td></tr>`; }).join("") || `<tr><td colspan="5">No teams</td></tr>`}
         </tbody></table></div>
     </div>`;
 
@@ -980,6 +1008,7 @@ function fillSettingsInputs() {
   $("#setSeasonNumber").value = state.settings.seasonNumber;
   $("#setCurrency").value = state.settings.currency;
   $("#setPurse").value = state.settings.defaultPurse;
+  $("#setSquadSize").value = squadCapOf(state, null);
   $("#setIncrement").value = state.settings.bidIncrement;
 }
 
@@ -994,7 +1023,7 @@ function renderSetup() {
     row.innerHTML = `
       ${logoHTML("ml-logo", t.logo, t.name)}
       <span class="ml-name">${esc(t.name)}</span>
-      <span class="ml-sub">${money(teamPurse(t))}</span>
+      <span class="ml-sub">${money(teamPurse(t))} · ${teamCap(t)} players</span>
       <button class="icon-btn" data-edit-team="${t.id}" title="Edit">✎</button>
       <button class="icon-btn del" data-del-team="${t.id}" title="Delete">✕</button>`;
     tl.appendChild(row);
@@ -1052,6 +1081,7 @@ async function saveSettings() {
   s.seasonNumber = parseInt($("#setSeasonNumber").value) || 1;
   s.currency = $("#setCurrency").value.trim() || "Cr";
   s.defaultPurse = parseFloat($("#setPurse").value) || 0;
+  s.squadSize = Math.max(1, parseInt($("#setSquadSize").value) || DEFAULT_SQUAD_SIZE);
   s.bidIncrement = parseFloat($("#setIncrement").value) || 1;
   const f = $("#setLogoFile").files[0];
   if (f) { try { s.leagueLogo = await fileToDataURL(f, 220, "png"); } catch (e) { toast("Couldn't read logo image", "bad"); } }
@@ -1067,6 +1097,8 @@ async function saveTeam() {
   if (!name) { toast("Enter a team name", "bad"); return; }
   const purseVal = $("#teamPurse").value;
   const purse = purseVal === "" ? null : parseFloat(purseVal);
+  const capVal = $("#teamMaxPlayers").value;                 // blank = use the league default
+  const maxPlayers = capVal === "" ? null : Math.max(1, parseInt(capVal) || DEFAULT_SQUAD_SIZE);
   const f = $("#teamLogoFile").files[0];
   let logo = null;
   if (f) { try { logo = await fileToDataURL(f, 220, "png"); } catch (e) { toast("Couldn't read logo", "bad"); } }
@@ -1074,9 +1106,9 @@ async function saveTeam() {
   const editId = $("#teamEditId").value;
   if (editId) {
     const t = getTeam(editId);
-    if (t) { t.name = name; t.purse = purse; if (logo) t.logo = logo; }
+    if (t) { t.name = name; t.purse = purse; t.maxPlayers = maxPlayers; if (logo) t.logo = logo; }
   } else {
-    state.teams.push({ id: uid(), name, purse, logo: logo || "" });
+    state.teams.push({ id: uid(), name, purse, maxPlayers, logo: logo || "" });
   }
   clearTeamForm();
   save();
@@ -1088,6 +1120,7 @@ function editTeam(id) {
   $("#teamEditId").value = t.id;
   $("#teamName").value = t.name;
   $("#teamPurse").value = t.purse ?? "";
+  $("#teamMaxPlayers").value = t.maxPlayers ?? "";
   $("#teamFormTitle").textContent = "Edit Team";
   $("#btnSaveTeam").textContent = "Save Changes";
   $("#btnCancelTeam").classList.remove("hidden");
@@ -1095,7 +1128,8 @@ function editTeam(id) {
   $("#teamName").focus();
 }
 function clearTeamForm() {
-  $("#teamEditId").value = ""; $("#teamName").value = ""; $("#teamPurse").value = ""; $("#teamLogoFile").value = "";
+  $("#teamEditId").value = ""; $("#teamName").value = ""; $("#teamPurse").value = "";
+  $("#teamMaxPlayers").value = ""; $("#teamLogoFile").value = "";
   $("#teamFormTitle").textContent = "Add Team";
   $("#btnSaveTeam").textContent = "Add Team";
   $("#btnCancelTeam").classList.add("hidden");

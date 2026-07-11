@@ -281,6 +281,9 @@
       </div>`;
   }
 
+  // Shared with fixtures.js: one implementation of "STUMPS PDF -> text lines".
+  window.HCCLPdfText = { extractLines };
+
   /* ---------------------------- events ----------------------------- */
   function onClick(e) {
     const chip = e.target.closest("[data-mvp-match]");
