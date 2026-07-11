@@ -31,6 +31,10 @@
     // Abandoned matches still count as "played" in the table (they carry points).
     countAbandonedAsPlayed: true,
 
+    // How many teams qualify for the playoffs. The standings draw a cut-off line
+    // under this position (IPL-style top 4). Change it if the format changes.
+    playoffCutoff: 4,
+
     // A team is all out one wicket short of its batting strength. Used to work
     // out "won by N wickets"; falls back to this when the squad size is unknown.
     defaultWicketsPerSide: 10,

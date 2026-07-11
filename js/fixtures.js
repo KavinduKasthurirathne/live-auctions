@@ -233,6 +233,10 @@
   }
 
   /* ========================== RENDER: standings ====================== */
+  // "2 Points" / "1 Point" - read from CONFIG.points so the key under the table
+  // can never disagree with how the table is actually scored.
+  const pts = n => `${n} Point${n === 1 ? "" : "s"}`;
+
   function standingsTable() {
     const ts = teams();
     if (!ts.length) return emptyState("No teams yet", "Add teams in the ⚙️ Setup tab to build the standings.");
@@ -245,17 +249,20 @@
       const onlyKnockouts = mine.some(m => m.status === "completed" && m.resultData)
         && !mine.some(m => m.status === "completed" && m.resultData && eng().countsForStandings(m));
       return emptyState("No standings yet", onlyKnockouts
-        ? "Only knockout matches are completed so far — the table is built from group-stage results."
+        ? "Only knockout matches are completed so far  the table is built from group-stage results."
         : "The table fills up as soon as the first group-stage match is completed.");
     }
     const p = eng().CONFIG.points;
-    const soNote = (n, kind) => n ? ` title="includes ${n} Super Over ${kind}"` : "";
-    const body = rows.map(r => `<tr>
+    // Playoff cut-off: a yellow line under the last qualifying team. Only drawn
+    // when some team actually sits below it - otherwise it's a line under nothing.
+    const cutoff = eng().CONFIG.playoffCutoff;
+    const showCutoff = rows.length > cutoff;
+    const body = rows.map(r => `<tr class="${showCutoff && r.pos === cutoff ? "fx-cutoff" : ""}${r.pos <= cutoff && showCutoff ? " fx-qualified" : ""}">
       <td class="fx-pos">${r.pos}</td>
       <td class="fx-stname">${teamLogoHtml(r.teamId, "fx-logo sm")}<span>${esc(r.name)}</span></td>
       <td>${r.played}</td>
-      <td${soNote(r.superOverWins, "win")}>${r.wins}${r.superOverWins ? `<span class="fx-so-mark">⚡</span>` : ""}</td>
-      <td${soNote(r.superOverLosses, "loss")}>${r.losses}${r.superOverLosses ? `<span class="fx-so-mark">⚡</span>` : ""}</td>
+      <td>${r.wins}</td>
+      <td>${r.losses}</td>
       <td>${r.ties}</td>
       <td class="fx-pts">${r.points}</td>
       <td class="${r.nrr == null ? "fx-dim" : r.nrr >= 0 ? "fx-pos-nrr" : "fx-neg-nrr"}">${r.nrr == null ? "–" : (r.nrr > 0 ? "+" : "") + r.nrr.toFixed(2)}</td>
@@ -270,8 +277,7 @@
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="hint fx-points-note">Group-stage results only · Points: win ${p.win} · tie ${p.tie} · loss ${p.loss} · abandoned ${p.abandoned} each<br />
-      ⚡ A tie decided by a Super Over counts as a win (${p.superOverWin}) / loss (${p.superOverLoss}), not a tie.</p>`;
+    <p class="hint fx-points-note">W = ${pts(p.win)}, T = ${pts(p.tie)}, L = ${pts(p.loss)}, NR = ${pts(p.abandoned)} Per Team</p>`;
   }
 
   /* ============================ RENDER: view ========================= */
@@ -364,7 +370,7 @@
   function formModal() {
     const d = modal.draft;
     const ts = teams();
-    const opts = (sel, exclude) => `<option value="">— select team —</option>` + ts
+    const opts = (sel, exclude) => `<option value=""> select team </option>` + ts
       .filter(t => t.id !== exclude || !exclude)
       .map(t => `<option value="${esc(t.id)}"${t.id === sel ? " selected" : ""}>${esc(t.name)}</option>`).join("");
     const statusOpts = eng().STATUSES.map(s =>
@@ -376,8 +382,8 @@
       `<option value="${s.id}"${curStage === s.id ? " selected" : ""}>${esc(s.label)}</option>`).join("");
     // Spell out the consequence of the choice, right where it's made.
     const stageNote = eng().stageMeta(curStage).table
-      ? `<span class="hint">✅ Group stage — the result <b>counts</b> towards the standings.</span>`
-      : `<span class="hint fx-hint-knockout">🏆 Knockout — the result will <b>not</b> add points to the standings.</span>`;
+      ? `<span class="hint">✅ Group stage  the result <b>counts</b> towards the standings.</span>`
+      : `<span class="hint fx-hint-knockout">🏆 Knockout  the result will <b>not</b> add points to the standings.</span>`;
 
     const body = `
       <div class="fx-form">
@@ -463,7 +469,7 @@
     const rows = players.filter(p => p.team === team && p.batting && p.batting.batted);
     if (!rows.length) return "";
     return `<div class="fx-table-wrap"><table class="fx-table fx-card-table">
-      <thead><tr><th class="fx-stname">${esc(team)} — Batting</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead>
+      <thead><tr><th class="fx-stname">${esc(team)}  Batting</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead>
       <tbody>${rows.map(p => `<tr>
         <td class="fx-stname">${esc(p.name)}${p.batting.out ? "" : `<span class="fx-no">not out</span>`}</td>
         <td class="fx-pts">${p.batting.runs}</td><td>${p.batting.balls}</td>
@@ -475,7 +481,7 @@
     const rows = players.filter(p => p.team === team && p.bowling && p.bowling.bowled);
     if (!rows.length) return "";
     return `<div class="fx-table-wrap"><table class="fx-table fx-card-table">
-      <thead><tr><th class="fx-stname">${esc(team)} — Bowling</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th></tr></thead>
+      <thead><tr><th class="fx-stname">${esc(team)}  Bowling</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th></tr></thead>
       <tbody>${rows.map(p => `<tr>
         <td class="fx-stname">${esc(p.name)}</td>
         <td>${p.bowling.overs}</td><td>${p.bowling.maidens}</td><td>${p.bowling.runs}</td>
@@ -530,11 +536,11 @@
     const facts = `<dl class="fx-facts">
       <div><dt>Stage</dt><dd>${esc(stage.label)}</dd></div>
       <div><dt>Date &amp; time</dt><dd>${esc(fmtDate(m.scheduledAt))}</dd></div>
-      <div><dt>Venue</dt><dd>${esc(m.venue || "—")}</dd></div>
-      <div><dt>Format</dt><dd>${esc(m.format || "—")}</dd></div>
-      <div><dt>Toss</dt><dd>${esc(m.toss || "—")}</dd></div>
+      <div><dt>Venue</dt><dd>${esc(m.venue || "")}</dd></div>
+      <div><dt>Format</dt><dd>${esc(m.format || "")}</dd></div>
+      <div><dt>Toss</dt><dd>${esc(m.toss || "")}</dd></div>
     </dl>
-    ${stage.table ? "" : `<p class="hint fx-hint-knockout">🏆 Knockout match — this result does not count towards the standings.</p>`}`;
+    ${stage.table ? "" : `<p class="hint fx-hint-knockout">🏆 Knockout match  this result does not count towards the standings.</p>`}`;
 
     const cards = sc && sc.players && sc.players.length
       ? (sc.teams || []).map(t => battingCard(sc.players, t.name) + bowlingCard(sc.players, t.name)).join("")
@@ -623,7 +629,7 @@
     }
     const d = modal.draft;
     const ts = teams();
-    const winOpts = `<option value="">— none —</option>` + ts.map(t =>
+    const winOpts = `<option value=""> none </option>` + ts.map(t =>
       `<option value="${esc(t.id)}"${t.id === d.winnerTeamId ? " selected" : ""}>${esc(t.name)}</option>`).join("");
     const typeOpts = eng().RESULT_TYPES.map(r =>
       `<option value="${r}"${d.resultType === r ? " selected" : ""}>${
@@ -631,7 +637,7 @@
           : r === "tie" ? "Tied" : r === "abandoned" ? "Abandoned" : "No result"}</option>`).join("");
 
     const banner = modal.partial
-      ? `<div class="fx-warn">⚠️ The scorecard couldn't be read automatically. Enter the result below — it saves exactly the same way.</div>`
+      ? `<div class="fx-warn">⚠️ The scorecard couldn't be read automatically. Enter the result below  it saves exactly the same way.</div>`
       : `<div class="fx-ok">✅ Parsed <b>${esc(modal.file.name)}</b>. Check every value, edit anything that's off, then save.</div>`;
 
     const scoreRow = (side, label) => {
@@ -648,7 +654,7 @@
     // reliably, so it's entered here - optional, since not every tie goes to one.
     const so = d.superOver || {};
     const soOn = !!so.played;
-    const soWinOpts = `<option value="">— select winner —</option>` + ts.map(t =>
+    const soWinOpts = `<option value=""> select winner </option>` + ts.map(t =>
       `<option value="${esc(t.id)}"${t.id === so.winnerTeamId ? " selected" : ""}>${esc(t.name)}</option>`).join("");
     const superOverBlock = d.resultType !== "tie" ? "" : `
       <fieldset class="fx-scorebox fx-so-box">
@@ -665,8 +671,8 @@
             <label>${esc(teamName(m.awayTeamId))} wkts<input type="number" min="0" id="fxSoAwayW" value="${esc(String((so.away && so.away.wickets) || 0))}" /></label>
           </div>
           <label>Super Over winner<select id="fxSoWinner">${soWinOpts}</select></label>
-          <span class="hint fx-hint-so">⚡ The league records this as a <b>win and a loss</b> (${eng().CONFIG.points.superOverWin} / ${eng().CONFIG.points.superOverLoss} pts) — <b>not</b> a tie. Super Over runs don't affect net run rate.</span>
-        ` : `<span class="hint">Leave unticked for a true tie — ${eng().CONFIG.points.tie} point each.</span>`}
+          <span class="hint fx-hint-so">⚡ The league records this as a <b>win and a loss</b> (${eng().CONFIG.points.superOverWin} / ${eng().CONFIG.points.superOverLoss} pts)  <b>not</b> a tie. Super Over runs don't affect net run rate.</span>
+        ` : `<span class="hint">Leave unticked for a true tie  ${eng().CONFIG.points.tie} point each.</span>`}
       </fieldset>`;
 
     const body = `${banner}

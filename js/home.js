@@ -64,7 +64,7 @@
       } },
     // Ongoing: fill slots in as they're decided. "" (or "TBD") renders a TBD
     // placeholder, so a partly-known bracket is fine - name teams as they qualify.
-    { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "SASINDU MADUSHAN", mostWickets: "CHAMIKA KAUSHILA",
+    { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "", runnerUp: "", mvp: "", mostRuns: "SASINDU MADUSHAN", mostWickets: "CHAMIKA KAUSHILA",
       playoffs: {
         q1:    { a: "VELOCITY REAPERS", b: "INVINCIBLE LORDS", winner: "" },
         elim:  { a: "SILENTEARZ", b: "SUPER FIRE DRAGONS", winner: "" },
@@ -114,7 +114,7 @@
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
     return BUBBLE_COLORS[Math.abs(h) % BUBBLE_COLORS.length];
   }
-  const firstInitial = s => { const t = String(s || "").trim(); return t && t !== "—" ? t[0].toUpperCase() : "?"; };
+  const firstInitial = s => { const t = String(s || "").trim(); return t && t !== "" ? t[0].toUpperCase() : "?"; };
 
   // Committed asset files (exact names; extensions vary between .png/.jpeg).
   // A team/player NAME resolves to its file via a lookup keyed by the lowercased
@@ -190,7 +190,7 @@
   // consistent. Any slot we can't resolve renders as a "TBD" placeholder, which
   // is what an ongoing season (no `playoffs` key) shows for every slot.
   // Tokens an author may use for "not decided yet" - all normalise to "" (TBD).
-  const UNKNOWN_TEAM = new Set(["", "TBD", "TBA", "-", "--", "—", "?", "N/A"]);
+  const UNKNOWN_TEAM = new Set(["", "TBD", "TBA", "-", "--", "", "?", "N/A"]);
   function resolvePlayoffs(s) {
     const p = (s && s.playoffs) || null;
     const t = v => {
@@ -373,7 +373,7 @@
   }
 
   // "4-11" style figure; blank / "0" (never bowled) shows as an em dash.
-  const bbf = v => { const t = String(v || "").trim(); return (!t || t === "0") ? "—" : t; };
+  const bbf = v => { const t = String(v || "").trim(); return (!t || t === "0") ? "" : t; };
   // "30s/50s" and "4s/6s" combined cells.
   const slash = (a, b) => `${esc(a)}/${esc(b)}`;
 
@@ -510,8 +510,8 @@
     // Derived from this season's stats sheet, so importing a new CSV for the
     // ongoing season re-crowns these automatically. The authored SEASONS values
     // are only a fallback for a season with no sheet (or no runs/wickets yet).
-    const mostRuns = seasonLeader(rows, byRuns, COL.runs) || s.mostRuns || "—";
-    const mostWickets = seasonLeader(rows, byWickets, COL.wickets) || s.mostWickets || "—";
+    const mostRuns = seasonLeader(rows, byRuns, COL.runs) || s.mostRuns || "";
+    const mostWickets = seasonLeader(rows, byWickets, COL.wickets) || s.mostWickets || "";
     return `
       <article class="season-card">
         <div class="season-card-head">

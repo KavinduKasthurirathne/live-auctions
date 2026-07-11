@@ -3,7 +3,8 @@
    --yellow, --border, …) so the tab matches the rest of the site.
    ============================================================== */
 
-.fx-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+/* 60 / 40: matches get the room, the standings table gets space to breathe. */
+.fx-layout { display: grid; grid-template-columns: minmax(0, 60fr) minmax(0, 40fr); gap: 24px; align-items: start; }
 .fx-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 .fx-side { position: sticky; top: 90px; }
 
@@ -47,7 +48,6 @@
 .fx-hint-knockout b { color: var(--gold); }
 /* Super Over: a tie settled by one is a WIN/LOSS in the table, not a tie. */
 .fx-so { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
-.fx-so-mark { font-size: 9px; margin-left: 2px; opacity: .85; }
 .fx-hint-so { color: var(--yellow); }
 .fx-hint-so b { color: var(--yellow); }
 @keyframes fxPulse { 50% { opacity: .55; } }
@@ -101,7 +101,12 @@
 /* ------------------------------ tables ------------------------------ */
 .fx-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
 .fx-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 340px; }
-.fx-table th, .fx-table td { padding: 9px 10px; text-align: center; white-space: nowrap; }
+.fx-table th, .fx-table td { padding: 11px 10px; text-align: center; white-space: nowrap; }
+/* The standings sit in the 40% column, so the team name takes the slack and the
+   stat columns stay tight and aligned rather than drifting apart. */
+.fx-side .fx-table .fx-stname { width: 99%; }
+.fx-side .fx-table th:not(.fx-stname):not(.fx-pos),
+.fx-side .fx-table td:not(.fx-stname):not(.fx-pos) { width: 1%; padding-left: 12px; padding-right: 12px; }
 .fx-table thead th {
   color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
   border-bottom: 1px solid var(--border); background: var(--panel-2);
@@ -111,6 +116,17 @@
 .fx-pos { width: 34px; color: var(--muted); font-weight: 800; }
 .fx-stname { text-align: left !important; display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .fx-card-table .fx-stname { display: table-cell; }
+/* Playoff cut-off: everything above the line qualifies (IPL-style top 4). */
+.fx-table tbody tr.fx-qualified td { background: rgba(255, 204, 0, .045); }
+.fx-table tbody tr.fx-qualified:hover td { background: rgba(255, 204, 0, .085); }
+.fx-table tbody tr.fx-cutoff td {
+  border-bottom: 2px solid var(--yellow);
+  box-shadow: 0 1px 8px rgba(255, 204, 0, .28);
+}
+/* Kill the next row's top border so the yellow line reads as a single crisp rule. */
+.fx-table tbody tr.fx-cutoff + tr td { border-top: none; }
+.fx-table tbody tr.fx-qualified .fx-pos { color: var(--yellow); }
+
 .fx-pts { font-weight: 800; color: var(--yellow); }
 .fx-pos-nrr { color: var(--green); }
 .fx-neg-nrr { color: var(--red); }
