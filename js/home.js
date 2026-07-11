@@ -127,7 +127,7 @@
   ];
   const PLAYER_PHOTO_FILES = [
     "Chathuka Lakshan.jpeg", "Hasitha Lakmal.png", "Sasindu Madushan.png", "Thenu Pabeesha.png",
-    "Udara Perera.jpeg", "Yasitha Nawod.jpeg", "Yathish Leyon.png", "Chamika Kaushila.jpeg",
+    "Udara Perera.jpeg", "Yasitha Nawod.jpeg", "Yathish Leyon.png", "Chamika Kaushila.jpeg", "Binura Yeshan.jpeg",
   ];
   const SEASON_LOGO_FILES = {
     1: "S1 LOGO.png", 2: "S2 LOGO.png", 3: "S3 LOGO.png",
@@ -149,7 +149,7 @@
   }
   function playerPhoto(name) {
     const f = PLAYER_PHOTO_INDEX[String(name || "").trim().toLowerCase()];
-    return f ? assetUrl(`assets/Key Players/${f}`) : "";
+    return f ? assetUrl(`assets/Players/${f}`) : "";
   }
   function seasonLogo(no) {
     const f = SEASON_LOGO_FILES[no];
