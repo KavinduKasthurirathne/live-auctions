@@ -36,15 +36,15 @@
       } },
     { no: 2, year: "DEC 2025", champion: "ZYCO KINGS", runnerUp: "WIZARD TITANS", mvp: "UDARA PERERA", mostRuns: "YASITHA NAWOD", mostWickets: "UDARA PERERA",
       playoffs: {
-        q1:    { a: "ZYCO KINGS", b: "WIZARD TITANS", winner: "ZYCO KINGS" },
-        elim:  { a: "SUPER FIRE DRAGONS", b: "MIND GAMERS", winner: "SUPER FIRE DRAGONS" },
+        q1:    { a: "WIZARD TITANS", b: "ZYCO KINGS", winner: "ZYCO KINGS" },
+        elim:  { a: "MIND GAMERS", b: "SUPER FIRE DRAGONS", winner: "SUPER FIRE DRAGONS" },
         q2:    { winner: "WIZARD TITANS" },
         final: { winner: "ZYCO KINGS" },
       } },
     { no: 3, year: "JAN 2026", champion: "MIND GAMERS", runnerUp: "INVINCIBLE LORDS", mvp: "THENU PABEESHA", mostRuns: "THENU PABEESHA", mostWickets: "UDARA PERERA",
       playoffs: {
         q1:    { a: "MIND GAMERS", b: "WIZARD TITANS", winner: "MIND GAMERS" },
-        elim:  { a: "INVINCIBLE LORDS", b: "MATRIX", winner: "INVINCIBLE LORDS" },
+        elim:  { a: "MATRIX", b: "INVINCIBLE LORDS", winner: "INVINCIBLE LORDS" },
         q2:    { winner: "INVINCIBLE LORDS" },
         final: { winner: "MIND GAMERS" },
       } },
@@ -57,8 +57,8 @@
       } },
     { no: 5, year: "APR 2026 - MAY 2026", champion: "SUPER FIRE DRAGONS", runnerUp: "WIZARD TITANS", mvp: "YATHISH LEYON", mostRuns: "SASINDU MADUSHAN", mostWickets: "UDARA PERERA",
       playoffs: {
-        q1:    { a: "WIZARD TITANS", b: "MIND GAMERS", winner: "WIZARD TITANS" },
-        elim:  { a: "SUPER FIRE DRAGONS", b: "MATRIX", winner: "SUPER FIRE DRAGONS" },
+        q1:    { a: "MIND GAMERS", b: "WIZARD TITANS", winner: "WIZARD TITANS" },
+        elim:  { a: "MATRIX", b: "SUPER FIRE DRAGONS", winner: "SUPER FIRE DRAGONS" },
         q2:    { winner: "SUPER FIRE DRAGONS" },
         final: { winner: "SUPER FIRE DRAGONS" },
       } },
@@ -67,7 +67,7 @@
     { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "—", runnerUp: "—", mvp: "—", mostRuns: "SASINDU MADUSHAN", mostWickets: "CHAMIKA KAUSHILA",
       playoffs: {
         q1:    { a: "VELOCITY REAPERS", b: "INVINCIBLE LORDS", winner: "" },
-        elim:  { a: "SUPER FIRE DRAGONS", b: "SILENTEARZ", winner: "" },
+        elim:  { a: "SILENTEARZ", b: "SUPER FIRE DRAGONS", winner: "" },
         q2:    { winner: "" },
         final: { winner: "" },
       } },
