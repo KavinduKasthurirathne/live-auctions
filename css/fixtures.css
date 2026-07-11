@@ -127,10 +127,20 @@
 .fx-pos-nrr { color: var(--green); }
 .fx-neg-nrr { color: var(--red); }
 .fx-dim { color: var(--muted); }
-.fx-points-note { margin-top: 2px; }
+/* Points key: one rule per line, under the table. */
+.fx-points-note { margin-top: 4px; list-style: none; display: flex; flex-direction: column; gap: 3px; }
 .fx-no { color: var(--green); font-size: 11px; margin-left: 6px; font-weight: 600; }
-.fx-card-table { margin-bottom: 0; }
-.fx-modal-body .fx-table-wrap { margin-bottom: 12px; }
+/* ---- scorecard tables (batting / bowling, inside the match modal) ---- */
+.fx-card-table { margin-bottom: 0; min-width: 0; }             /* never force a sideways scroll */
+.fx-card-table .fx-stname { width: 99%; }                       /* player name takes the slack */
+.fx-card-table th:not(.fx-stname), .fx-card-table td:not(.fx-stname) {
+  width: 1%; padding-left: 12px; padding-right: 12px;           /* stat columns stay tight */
+}
+.fx-card-table thead th.fx-stname {
+  color: var(--yellow); font-size: 11px; letter-spacing: .8px;  /* "TEAM - Batting" reads as a title */
+}
+.fx-card-table tbody td { padding-top: 10px; padding-bottom: 10px; }
+.fx-modal-body .fx-table-wrap { margin-bottom: 0; }
 
 /* --------------------------- empty states --------------------------- */
 .fx-empty {
@@ -159,6 +169,12 @@
 .fx-modal-head h3 { font-family: "Russo One", sans-serif; font-size: 17px; letter-spacing: .5px; }
 .fx-modal-foot { justify-content: flex-end; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .fx-modal-body { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+/* Children must NOT shrink. This is a column flexbox with a capped height, so the
+   default flex-shrink:1 squashes each scorecard down to ~1 visible row - and since
+   .fx-table-wrap sets overflow-x:auto (which forces computed overflow-y:auto too),
+   the squashed table turns into its own little scroll box. Let them keep their
+   natural height and scroll the modal body as a whole instead. */
+.fx-modal-body > * { flex: 0 0 auto; }
 
 /* ------------------------------ forms ------------------------------- */
 .fx-form { display: flex; flex-direction: column; gap: 14px; }
@@ -209,10 +225,6 @@
 .fx-facts dt { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 4px; }
 .fx-facts dd { font-size: 13px; font-weight: 600; }
 
-.fx-noscore {
-  border: 1px dashed var(--border); border-radius: 12px; padding: 18px;
-  text-align: center; color: var(--muted); font-size: 13px;
-}
 .fx-notes { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .fx-notes h5 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 6px; }
 .fx-notes p { font-size: 13px; line-height: 1.55; white-space: pre-wrap; }

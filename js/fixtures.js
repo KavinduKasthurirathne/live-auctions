@@ -277,7 +277,12 @@
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="hint fx-points-note">W = ${pts(p.win)}, T = ${pts(p.tie)}, L = ${pts(p.loss)}, NR = ${pts(p.abandoned)} Per Team</p>`;
+    <ul class="hint fx-points-note">
+      <li>W = ${pts(p.win)}</li>
+      <li>T = ${pts(p.tie)}</li>
+      <li>L = ${pts(p.loss)}</li>
+      <li>NR = ${pts(p.abandoned)} Per Team</li>
+    </ul>`;
   }
 
   /* ============================ RENDER: view ========================= */
@@ -542,11 +547,11 @@
     </dl>
     ${stage.table ? "" : `<p class="hint fx-hint-knockout">🏆 Knockout match  this result does not count towards the standings.</p>`}`;
 
+    // No scorecard yet: show nothing here. The "Result pending" state above
+    // already says where the match stands, and the squads are listed below.
     const cards = sc && sc.players && sc.players.length
       ? (sc.teams || []).map(t => battingCard(sc.players, t.name) + bowlingCard(sc.players, t.name)).join("")
-      : `<div class="fx-noscore">${isDone(m)
-        ? "No scorecard was imported for this match."
-        : "The scorecard appears here once the Stumps report is imported."}</div>`;
+      : "";
 
     const lineups = (!sc || !sc.players || !sc.players.length)
       ? `<div class="fx-squads">
