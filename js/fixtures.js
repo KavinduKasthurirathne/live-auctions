@@ -142,6 +142,7 @@
       id: uid(),
       homeTeamId: "", awayTeamId: "",
       scheduledAt: 0, venue: "", format: "Last Man Stands",
+      stage: eng() ? eng().DEFAULT_STAGE : "group",
       status: "scheduled", toss: "", notes: "",
       homeSquad: [], awaySquad: [],
       published: true,
@@ -163,6 +164,13 @@
   }
   function draftChip(m) {
     return m.published === false ? `<span class="fx-chip fx-draft">Draft</span>` : "";
+  }
+  // Playoff matches are visually distinct - they don't feed the points table.
+  function stageChip(m) {
+    const s = eng().stageMeta(eng().stageOf(m));
+    const knock = !s.table;
+    return `<span class="fx-chip fx-stage${knock ? " fx-knockout" : ""}"
+      title="${knock ? "Knockout - does not count towards the standings" : "Group stage - counts towards the standings"}">${knock ? "🏆 " : ""}${esc(s.label)}</span>`;
   }
 
   function scoreLine(m, side) {
@@ -196,7 +204,7 @@
 
     return `<article class="fx-card" data-fx-open="${esc(m.id)}" tabindex="0" role="button" aria-label="Open match details">
       <header class="fx-card-head">
-        <div class="fx-chips">${statusChip(m)}${draftChip(m)}</div>
+        <div class="fx-chips">${stageChip(m)}${statusChip(m)}${draftChip(m)}</div>
         <time class="fx-when">${esc(fmtDate(m.scheduledAt))}</time>
       </header>
       <div class="fx-teams">
@@ -226,9 +234,18 @@
   function standingsTable() {
     const ts = teams();
     if (!ts.length) return emptyState("No teams yet", "Add teams in the ⚙️ Setup tab to build the standings.");
-    const rows = eng().standings(matches.filter(visible), ts);
+    const mine = matches.filter(visible);
+    const rows = eng().standings(mine, ts);
     const anyPlayed = rows.some(r => r.played > 0);
-    if (!anyPlayed) return emptyState("No standings yet", "The table fills up as soon as the first match is completed.");
+    if (!anyPlayed) {
+      // Distinguish "nothing played" from "only playoffs played" - otherwise an
+      // admin who imported a Final would think the table was broken.
+      const onlyKnockouts = mine.some(m => m.status === "completed" && m.resultData)
+        && !mine.some(m => m.status === "completed" && m.resultData && eng().countsForStandings(m));
+      return emptyState("No standings yet", onlyKnockouts
+        ? "Only knockout matches are completed so far — the table is built from group-stage results."
+        : "The table fills up as soon as the first group-stage match is completed.");
+    }
     const p = eng().CONFIG.points;
     const body = rows.map(r => `<tr>
       <td class="fx-pos">${r.pos}</td>
@@ -247,7 +264,7 @@
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p class="hint fx-points-note">Points: win ${p.win} · tie ${p.tie} · loss ${p.loss} · abandoned ${p.abandoned} each</p>`;
+    <p class="hint fx-points-note">Group-stage results only · Points: win ${p.win} · tie ${p.tie} · loss ${p.loss} · abandoned ${p.abandoned} each</p>`;
   }
 
   /* ============================ RENDER: view ========================= */
@@ -347,6 +364,13 @@
       `<option value="${s}"${d.status === s ? " selected" : ""}>${eng().STATUS_LABEL[s]}</option>`).join("");
     const fmtOpts = eng().FORMATS.map(f =>
       `<option value="${esc(f)}"${d.format === f ? " selected" : ""}>${esc(f)}</option>`).join("");
+    const curStage = eng().stageOf(d);
+    const stageOpts = eng().STAGES.map(s =>
+      `<option value="${s.id}"${curStage === s.id ? " selected" : ""}>${esc(s.label)}</option>`).join("");
+    // Spell out the consequence of the choice, right where it's made.
+    const stageNote = eng().stageMeta(curStage).table
+      ? `<span class="hint">✅ Group stage — the result <b>counts</b> towards the standings.</span>`
+      : `<span class="hint fx-hint-knockout">🏆 Knockout — the result will <b>not</b> add points to the standings.</span>`;
 
     const body = `
       <div class="fx-form">
@@ -358,6 +382,10 @@
             <select id="fxAway">${opts(d.awayTeamId, d.homeTeamId)}</select>
           </label>
         </div>
+        <label>Match stage
+          <select id="fxStage">${stageOpts}</select>
+          ${stageNote}
+        </label>
         <div class="fx-form-row">
           <label>Date &amp; time
             <input type="datetime-local" id="fxWhen" value="${esc(toLocalInput(d.scheduledAt))}" />
@@ -400,6 +428,7 @@
     if (get("fxWhen")) d.scheduledAt = fromLocalInput(get("fxWhen").value);
     if (get("fxVenue")) d.venue = get("fxVenue").value.trim();
     if (get("fxFormat")) d.format = get("fxFormat").value;
+    if (get("fxStage")) d.stage = get("fxStage").value;
     if (get("fxStatus")) d.status = get("fxStatus").value;
     if (get("fxToss")) d.toss = get("fxToss").value.trim();
     if (get("fxNotes")) d.notes = get("fxNotes").value.trim();
@@ -478,12 +507,15 @@
       ${rd && rd.potm ? `<div class="fx-potm">⭐ Player of the Match: <b>${esc(rd.potm)}</b></div>` : ""}
     </div>`;
 
+    const stage = eng().stageMeta(eng().stageOf(m));
     const facts = `<dl class="fx-facts">
+      <div><dt>Stage</dt><dd>${esc(stage.label)}</dd></div>
       <div><dt>Date &amp; time</dt><dd>${esc(fmtDate(m.scheduledAt))}</dd></div>
       <div><dt>Venue</dt><dd>${esc(m.venue || "—")}</dd></div>
       <div><dt>Format</dt><dd>${esc(m.format || "—")}</dd></div>
       <div><dt>Toss</dt><dd>${esc(m.toss || "—")}</dd></div>
-    </dl>`;
+    </dl>
+    ${stage.table ? "" : `<p class="hint fx-hint-knockout">🏆 Knockout match — this result does not count towards the standings.</p>`}`;
 
     const cards = sc && sc.players && sc.players.length
       ? (sc.teams || []).map(t => battingCard(sc.players, t.name) + bowlingCard(sc.players, t.name)).join("")
@@ -736,10 +768,12 @@
     if (open) { modal = { type: "detail", matchId: open.getAttribute("data-fx-open") }; renderModal(); }
   }
 
-  // Picking a team re-renders the form so its squad loads (keeping typed input).
+  // Picking a team re-renders the form so its squad loads; picking a stage
+  // re-renders so the "counts / doesn't count" note updates. Typed input is
+  // read back into the draft first, so nothing is lost.
   function onChange(e) {
     if (!modal || modal.type !== "form") return;
-    if (e.target.closest("#fxHome") || e.target.closest("#fxAway")) {
+    if (e.target.closest("#fxHome") || e.target.closest("#fxAway") || e.target.closest("#fxStage")) {
       readForm();
       renderModal();
     }

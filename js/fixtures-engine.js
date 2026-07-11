@@ -32,6 +32,28 @@
     defaultWicketsPerSide: 10,
   };
 
+  /* ---- MATCH STAGES ----
+     `table: true` means results from that stage feed the points table. Only the
+     group stage does: once the league phase is over, the playoffs decide the
+     title, not the standings - so a Qualifier/Eliminator/Final win must NOT add
+     points. Flip a flag here (or add a stage) if the format changes; the table,
+     the form and the badges all read from this one list.
+     The playoff names match the IPL-style bracket on the Home page. */
+  const STAGES = [
+    { id: "group", label: "Group Stage", short: "Group", table: true },
+    { id: "qualifier1", label: "Qualifier 1", short: "Q1", table: false },
+    { id: "eliminator", label: "Eliminator", short: "Elim", table: false },
+    { id: "qualifier2", label: "Qualifier 2", short: "Q2", table: false },
+    { id: "final", label: "Final", short: "Final", table: false },
+    { id: "friendly", label: "Friendly / Warm-up", short: "Friendly", table: false },
+  ];
+  const DEFAULT_STAGE = "group";
+  const stageOf = m => (m && m.stage) || DEFAULT_STAGE;   // matches saved before stages existed = group
+  const stageMeta = id => STAGES.find(s => s.id === id) || STAGES[0];
+  // The single question the standings asks of a match.
+  const countsForStandings = m => stageMeta(stageOf(m)).table === true;
+  const isKnockout = m => !countsForStandings(m);
+
   const STATUSES = ["scheduled", "live", "completed", "postponed", "abandoned"];
   const STATUS_LABEL = {
     scheduled: "Scheduled", live: "Live", completed: "Completed",
@@ -171,8 +193,9 @@
   }
 
   // matches: our stored match docs. teams: our team records.
-  // Only 'completed' matches with resultData count. NRR needs balls faced on
-  // both sides; a team missing them anywhere gets NRR = null ("-").
+  // Only COMPLETED, GROUP-STAGE matches with resultData count. Playoff results
+  // (Qualifier / Eliminator / Final) are excluded entirely - no points AND no
+  // runs, so they can't skew net run rate either.
   function standings(matches, teams) {
     const rows = new Map();
     const seed = t => {
@@ -187,6 +210,7 @@
 
     (matches || []).forEach(m => {
       if (!m || m.status !== "completed" || !m.resultData) return;
+      if (!countsForStandings(m)) return;   // playoffs don't move the table
       const home = findTeamById(teams, m.homeTeamId);
       const away = findTeamById(teams, m.awayTeamId);
       if (!home || !away) return;
@@ -242,6 +266,7 @@
 
   root.HCCLFixtures = {
     CONFIG, STATUSES, STATUS_LABEL, FORMATS, RESULT_TYPES,
+    STAGES, DEFAULT_STAGE, stageOf, stageMeta, countsForStandings, isKnockout,
     deriveResult, summarize, standings, findTeam, oversToBalls, ballsToOvers,
   };
 })();

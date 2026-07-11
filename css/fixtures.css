@@ -36,6 +36,15 @@
 .fx-st-completed { color: var(--green); border-color: rgba(34, 197, 94, .45); }
 .fx-st-postponed, .fx-st-abandoned { color: var(--gold); border-color: rgba(245, 179, 1, .45); }
 .fx-draft { color: #1a1300; background: var(--yellow); border-color: transparent; }
+/* Stage: group stage is quiet; knockouts get the gold treatment (and are the
+   ones that DON'T feed the points table). */
+.fx-stage { color: var(--muted); }
+.fx-knockout {
+  color: var(--gold); border-color: rgba(245, 179, 1, .5);
+  background: rgba(245, 179, 1, .1);
+}
+.fx-hint-knockout { color: var(--gold); }
+.fx-hint-knockout b { color: var(--gold); }
 @keyframes fxPulse { 50% { opacity: .55; } }
 
 .fx-teams { display: flex; align-items: center; gap: 12px; }
