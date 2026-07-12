@@ -142,6 +142,7 @@
       id: uid(),
       homeTeamId: "", awayTeamId: "",
       scheduledAt: 0, venue: "", format: "Last Man Stands",
+      oversPerSide: 0,         // per-side over quota; drives the official NRR rule
       stage: eng() ? eng().DEFAULT_STAGE : "group",
       status: "scheduled", toss: "", notes: "",
       homeSquad: [], awaySquad: [],
@@ -420,6 +421,11 @@
             <select id="fxStatus">${statusOpts}</select>
           </label>
         </div>
+        <label>Overs per side <span class="fx-opt">(used for net run rate)</span>
+          <input type="number" min="0" step="1" id="fxOvers" placeholder="e.g. 6"
+            value="${esc(String(d.oversPerSide || eng().oversFromFormat(d.format) || ""))}" />
+          <span class="hint">A side bowled out early is charged its <b>full quota</b> in the NRR, per official rules. Imported Stumps reports fill this in automatically.</span>
+        </label>
         <label>Toss <span class="fx-opt">(optional)</span>
           <input type="text" id="fxToss" placeholder="e.g. Zyco Kings won the toss and chose to bat" value="${esc(d.toss)}" />
         </label>
@@ -446,6 +452,7 @@
     if (get("fxWhen")) d.scheduledAt = fromLocalInput(get("fxWhen").value);
     if (get("fxVenue")) d.venue = get("fxVenue").value.trim();
     if (get("fxFormat")) d.format = get("fxFormat").value;
+    if (get("fxOvers")) d.oversPerSide = Math.max(0, parseInt(get("fxOvers").value, 10) || 0);
     if (get("fxStage")) d.stage = get("fxStage").value;
     if (get("fxStatus")) d.status = get("fxStatus").value;
     if (get("fxToss")) d.toss = get("fxToss").value.trim();
@@ -543,6 +550,7 @@
       <div><dt>Date &amp; time</dt><dd>${esc(fmtDate(m.scheduledAt))}</dd></div>
       <div><dt>Venue</dt><dd>${esc(m.venue || "")}</dd></div>
       <div><dt>Format</dt><dd>${esc(m.format || "")}</dd></div>
+      <div><dt>Overs per side</dt><dd>${esc(String(m.oversPerSide || eng().oversFromFormat(m.format) || ""))}</dd></div>
       <div><dt>Toss</dt><dd>${esc(m.toss || "")}</dd></div>
     </dl>
     ${stage.table ? "" : `<p class="hint fx-hint-knockout">🏆 Knockout match  this result does not count towards the standings.</p>`}`;
@@ -603,6 +611,10 @@
         home: { runs: 0, wickets: 0, balls: 0 }, away: { runs: 0, wickets: 0, balls: 0 },
       };
       rd.summary = eng().summarize(rd);
+      // Over quota: from the report ("Overs 6"), else the match's own value, else
+      // its format label. Always shown in the dialog so a parse miss is visible.
+      rd.oversPerSide = (ok && parsed.oversPerSide)
+        || m.oversPerSide || eng().oversFromFormat(m.format) || 0;
 
       modal = {
         type: "import", matchId: m.id, loading: false,
@@ -678,10 +690,21 @@
         ` : `<span class="hint">Leave unticked for a true tie  ${eng().CONFIG.points.tie} point each.</span>`}
       </fieldset>`;
 
+    // The over quota drives the official NRR rule, so it must never be silently
+    // wrong: show it, say where it came from, and warn loudly when it's missing.
+    const quotaNote = d.oversPerSide
+      ? `<span class="hint">A side bowled out early is charged the full ${esc(String(d.oversPerSide))} overs in the NRR, per official rules.</span>`
+      : `<span class="hint fx-hint-so">⚠️ Couldn't read the over quota from this report — enter it, or net run rate falls back to the overs actually faced.</span>`;
+    const quotaRow = `<label>Overs per side <span class="fx-opt">(used for net run rate)</span>
+        <input type="number" min="0" step="1" id="fxOversQuota" placeholder="e.g. 6" value="${esc(String(d.oversPerSide || ""))}" />
+        ${quotaNote}
+      </label>`;
+
     const body = `${banner}
       <div class="fx-form">
         ${scoreRow("home", teamName(m.homeTeamId) + " (home)")}
         ${scoreRow("away", teamName(m.awayTeamId) + " (away)")}
+        ${quotaRow}
         <div class="fx-form-row">
           <label>Result type<select id="fxResType">${typeOpts}</select></label>
           <label>Winner<select id="fxWinner">${winOpts}</select></label>
@@ -726,6 +749,7 @@
     }
     if (get("fxMargin")) d.margin = Math.max(0, parseInt(get("fxMargin").value, 10) || 0);
     if (get("fxPotm")) d.potm = get("fxPotm").value.trim();
+    if (get("fxOversQuota")) d.oversPerSide = Math.max(0, parseInt(get("fxOversQuota").value, 10) || 0);
 
     // ---- Super Over (only offered on a tie) ----
     if (d.resultType === "tie") {
@@ -765,6 +789,8 @@
       winnerName: decisive ? ((teamById(d.winnerTeamId) || {}).name || "") : "",
       margin: d.margin || 0,
       potm: d.potm || "",
+      battedFirstSide: d.battedFirstSide || "",   // NRR needs the batting order
+      oversPerSide: d.oversPerSide || 0,          // and the per-side quota
       superOver: so ? {
         winnerTeamId: so.winnerTeamId,
         winnerName: (teamById(so.winnerTeamId) || {}).name || "",
@@ -788,6 +814,9 @@
     const base = buildResult(d);
     const next = { ...m };
     next.status = "completed";
+    // Keep the quota on the match itself too, so the create/edit form and the
+    // standings can read it without digging into resultData.
+    if (d.oversPerSide) next.oversPerSide = d.oversPerSide;
     next.resultData = {
       ...base,
       home: { runs: d.home.runs, wickets: d.home.wickets, balls: d.home.balls, name: teamName(m.homeTeamId) },

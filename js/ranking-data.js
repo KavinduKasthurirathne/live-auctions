@@ -393,5 +393,5 @@ DNB, POTM NO",56,774
 P043,Navindu Pamod,AURA,2,23,9,11.5,255.6,0,0,0,1,50,"1. 8 runs, 200 SR, Highest scorer No, Not out No, POTM No
 2. 15 runs, 300 SR, Highest scorer Yes, Not out No, POTM Yes",1,12,16,8,0,0,12,50,"1. 0 Wickets, 14 Eco, POTM NO
 2. 1 Wickets, 2 Eco, POTM YES",2,16
-P044,Anupama,REAPERS,1,0,1,0,0,0,0,1,0,0,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",1,6,6,6,0,0,6,0,"1. 1 Wickets, 6 Eco, POTM NO",1,6
+P044,Anupam Rivisara,REAPERS,1,0,1,0,0,0,0,1,0,0,"1. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No",1,6,6,6,0,0,6,0,"1. 1 Wickets, 6 Eco, POTM NO",1,6
 `;

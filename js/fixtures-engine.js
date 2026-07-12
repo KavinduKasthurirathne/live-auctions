@@ -89,6 +89,75 @@
     return `${Math.floor(b / 6)}.${b % 6}`;
   }
 
+  /* ======================= OVER QUOTA / OFFICIAL NRR =======================
+     Official ICC/IPL rule: a side bowled out before using its full quota of overs
+     is charged the FULL QUOTA in the NRR calculation, not the overs it actually
+     faced. Otherwise getting skittled would flatter your run rate.
+
+     Rather than detect "all out" (which needs the squad size and gets murky under
+     Last Man Stands), the rule reduces to something format-agnostic:
+
+       • the side batting FIRST  -> always the full quota
+         (bowled out early or batted it out: either way the answer is the quota)
+       • the side batting SECOND -> the ACTUAL overs if it WON the chase,
+         otherwise the full quota
+         (a chasing side only stops early because it won, or was bowled out)
+
+     Needs just three things: the quota, who batted first, and who won.
+     If the quota is unknown we fall back to the actual overs faced (the old
+     behaviour) rather than publish a wrong number. */
+
+  // Pull the quota out of a free-text format label: "T10"->10, "10 Overs"->10.
+  // "Last Man Stands" / "Custom" have no number -> 0 (unknown).
+  function oversFromFormat(format) {
+    const m = String(format == null ? "" : format).match(/(\d+(?:\.\d+)?)/);
+    return m ? num(m[1]) : 0;
+  }
+  // The match's own quota wins; otherwise fall back to the format label.
+  function quotaBallsOf(match) {
+    if (!match) return 0;
+    const rd = match.resultData || {};
+    const overs = num(match.oversPerSide) || num(rd.oversPerSide) || oversFromFormat(match.format);
+    return overs > 0 ? Math.round(overs * 6) : 0;
+  }
+  // Which side batted first: "home" | "away" | "". Prefer what the import stored;
+  // otherwise infer from scorecardData.teams - that array is in BATTING order, so
+  // teams[0] batted first. This is what lets already-imported matches get the
+  // official treatment without being re-imported.
+  function battedFirstSide(match, teams) {
+    const rd = (match && match.resultData) || {};
+    if (rd.battedFirstSide === "home" || rd.battedFirstSide === "away") return rd.battedFirstSide;
+    const sc = match && match.scorecardData;
+    const first = sc && sc.teams && sc.teams[0] && sc.teams[0].name;
+    if (!first) return "";
+    // Match the STUMPS name against this match's home/away sides.
+    const home = (rd.home && rd.home.name) || "";
+    const away = (rd.away && rd.away.name) || "";
+    if (home && norm(home) === norm(first)) return "home";
+    if (away && norm(away) === norm(first)) return "away";
+    const list = teams || [];
+    const t = findTeam(first, list);
+    if (t && match.homeTeamId && t.id === match.homeTeamId) return "home";
+    if (t && match.awayTeamId && t.id === match.awayTeamId) return "away";
+    return "";
+  }
+  // Effective balls for one side's innings, per the rule above.
+  function nrrBallsFor(match, side, teams) {
+    const rd = (match && match.resultData) || {};
+    const inn = rd[side] || {};
+    const actual = num(inn.balls);
+    const quota = quotaBallsOf(match);
+    if (!quota) return actual;                       // unknown quota -> old behaviour
+    const first = battedFirstSide(match, teams);
+    if (!first) return Math.min(actual, quota) || actual;  // unknown order -> be conservative
+    if (side === first) return quota;                // batted first -> always the quota
+    // Batted second: actual overs only if it actually won the chase.
+    const wonId = effectiveWinnerId(match);
+    const myId = side === "home" ? match.homeTeamId : match.awayTeamId;
+    const chasedAndWon = wonId && myId && wonId === myId;
+    return chasedAndWon ? Math.min(actual, quota) : quota;
+  }
+
   /* Match a STUMPS team name ("SUPER FIRE DRAGONS") to one of our team records.
      Exact-normalised first, then a containment fallback for minor spelling drift. */
   function findTeam(name, teams) {
@@ -182,8 +251,20 @@
 
     const winnerTeam = winnerName ? findTeam(winnerName, teams || []) : null;
 
+    // Which of OUR sides batted first (parsed.teams is in batting order). NRR needs
+    // this to apply the full-quota rule; store it so it survives on the match doc.
+    let firstSide = "";
+    if (first) {
+      if (homeTeam && norm(homeTeam.name) === norm(first.name)) firstSide = "home";
+      else if (awayTeam && norm(awayTeam.name) === norm(first.name)) firstSide = "away";
+      else if (home && home.name && norm(home.name) === norm(first.name)) firstSide = "home";
+      else if (away && away.name && norm(away.name) === norm(first.name)) firstSide = "away";
+    }
+
     return {
       resultType,
+      battedFirstSide: firstSide,
+      oversPerSide: num(parsed && parsed.oversPerSide),   // per-side quota from the report
       // Prefer OUR team's display name over the shouty STUMPS one ("ZYCO KINGS"),
       // so the summary reads like the rest of the site.
       winnerName: (winnerTeam && winnerTeam.name) || winnerName || "",
@@ -290,13 +371,16 @@
         }
       }
 
-      // Net run rate inputs.
+      // Net run rate inputs. Runs are as scored; the OVERS are the "effective"
+      // ones - a side bowled out early is charged its full quota (see nrrBallsFor).
       const hs = rd.home || {}, as = rd.away || {};
+      const hBalls = nrrBallsFor(m, "home", teams);
+      const aBalls = nrrBallsFor(m, "away", teams);
       H.runsFor += num(hs.runs); H.runsAgainst += num(as.runs);
       A.runsFor += num(as.runs); A.runsAgainst += num(hs.runs);
-      H.ballsFor += num(hs.balls); H.ballsAgainst += num(as.balls);
-      A.ballsFor += num(as.balls); A.ballsAgainst += num(hs.balls);
-      if (!num(hs.balls) || !num(as.balls)) { H.nrrKnown = false; A.nrrKnown = false; }
+      H.ballsFor += hBalls; H.ballsAgainst += aBalls;
+      A.ballsFor += aBalls; A.ballsAgainst += hBalls;
+      if (!hBalls || !aBalls) { H.nrrKnown = false; A.nrrKnown = false; }
     });
 
     const out = Array.from(rows.values()).map(r => {
@@ -321,6 +405,7 @@
     CONFIG, STATUSES, STATUS_LABEL, FORMATS, RESULT_TYPES,
     STAGES, DEFAULT_STAGE, stageOf, stageMeta, countsForStandings, isKnockout,
     superOverOf, hasSuperOver, effectiveWinnerId,
+    oversFromFormat, quotaBallsOf, battedFirstSide, nrrBallsFor,
     deriveResult, summarize, standings, findTeam, oversToBalls, ballsToOvers,
   };
 })();

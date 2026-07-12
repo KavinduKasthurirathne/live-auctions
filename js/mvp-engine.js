@@ -128,6 +128,9 @@
   const RE_BAT_ROW = /^(.+?)\s+(-?\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)$/;
   const RE_BOWL_ROW = /^(.+?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$/;
   const RE_TOTAL = /\bTotal\s+(\d+)\s*\/\s*(\d+)/i;
+  // "Overs 6" ALONE on the line (Match Information). End-anchored on purpose - see
+  // the note at the call site: the Over Comparison rows also start with "Overs".
+  const RE_OVERS_QUOTA = /^Overs\s+(\d+(?:\.\d+)?)\s*$/i;
   const RE_WON = /\bwon by\b/i;                 // just detects the result line
   const RE_POTM_LABEL = /Player Of The Match/i;
   // Stop scanning for the POTM value once the Match Information block begins.
@@ -178,6 +181,7 @@
     let mode = null;                 // 'batting' | 'bowling' | null
     let curTeam = null;              // current batting team
     let matchId = "", title = "", dateText = "", winner = "", potm = "";
+    let oversPerSide = 0, playingPerSide = 0;   // Match Information: "Overs 6", "Playing 5 Per Side (LMS)"
     let wonByLine = "";              // raw "... won by ..." line (winner tie fallback)
     let collectingPotm = 0;          // lines left to scan after the POTM label
     const potmCandidates = [];       // POTM name candidates, resolved vs players later
@@ -205,6 +209,13 @@
       if (!matchId) { const m = line.match(/Match ID\s+(\S+)/i); if (m) matchId = m[1]; }
       if (!title) { const m = line.match(/Match Title\s+(.+)/i); if (m) title = m[1].trim(); }
       if (!dateText) { const m = line.match(/Date & Time\s+(.+)/i); if (m) dateText = m[1].trim(); }
+      // Match Information block: "Overs 6" = the per-side over quota (NOT the overs
+      // actually bowled). MUST be end-anchored: the "Over Comparison" section further
+      // down has lines like "Overs 1 Runs 18 Score 18-0", and a loose match there would
+      // silently overwrite the quota with the over number.
+      if (!oversPerSide) { const m = line.match(RE_OVERS_QUOTA); if (m) oversPerSide = num(m[1]); }
+      // "Playing 5 Per Side (LMS)" = players per side (true batting strength).
+      if (!playingPerSide) { const m = line.match(/^Playing\s+(\d+)\b/i); if (m) playingPerSide = int(m[1]); }
       if (!wonByLine && RE_WON.test(line)) wonByLine = line;
       const tot = line.match(RE_TOTAL);
       if (tot && curTeam) teamTotals[curTeam] = { total: int(tot[1]), wickets: int(tot[2]) };
@@ -285,6 +296,9 @@
     return {
       matchId: matchId || "", title, dateText, ts,
       teams, winner, potm,
+      // `teams` is in BATTING order, so teams[0] batted first.
+      oversPerSide,      // per-side over quota (0 if the report didn't say)
+      playingPerSide,    // players per side (0 if unknown)
       players: Array.from(players.values()),
     };
   }
