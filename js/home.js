@@ -66,8 +66,8 @@
     // placeholder, so a partly-known bracket is fine - name teams as they qualify.
     { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "", runnerUp: "", mvp: "", mostRuns: "SASINDU MADUSHAN", mostWickets: "CHAMIKA KAUSHILA",
       playoffs: {
-        q1:    { a: "VELOCITY REAPERS", b: "INVINCIBLE LORDS", winner: "" },
-        elim:  { a: "SILENTEARZ", b: "SUPER FIRE DRAGONS", winner: "" },
+        q1:    { a: "VELOCITY REAPERS", b: "INVINCIBLE LORDS", winner: "VELOCITY REAPERS" },
+        elim:  { a: "SILENTEARZ", b: "SUPER FIRE DRAGONS", winner: "SILENTEARZ" },
         q2:    { winner: "" },
         final: { winner: "" },
       } },
