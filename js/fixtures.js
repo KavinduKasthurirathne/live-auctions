@@ -560,8 +560,6 @@
         </div>` : "";
 
     const notes = m.notes ? `<div class="fx-notes"><h5>Match notes</h5><p>${esc(m.notes)}</p></div>` : "";
-    const report = m.importedReport
-      ? `<p class="hint">Imported from <b>${esc(m.importedReport.name)}</b>${m.importedReport.importedAt ? ` · ${esc(fmtDate(m.importedReport.importedAt))}` : ""}</p>` : "";
 
     const foot = canEdit()
       ? `<button class="btn btn-dark" data-fx-import="${esc(m.id)}">⬆ Import Stumps Report</button>
@@ -569,7 +567,7 @@
          <button class="btn btn-yellow" data-fx-close="1">Done</button>`
       : `<button class="btn btn-yellow" data-fx-close="1">Close</button>`;
 
-    return shell("Match Details", head + facts + cards + lineups + notes + report, foot);
+    return shell("Match Details", head + facts + cards + lineups + notes, foot);
   }
 
   /* --------------------- import Stumps report (PDF) ------------------- */
