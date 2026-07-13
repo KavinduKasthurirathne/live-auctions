@@ -61,10 +61,14 @@
   let pendingRender = false;           // defer re-render while an editor is typing
   let fsSyncing = false, fsSyncAgain = false;
   let fsFellBack = false, fsFellBackMsg = "";  // cloud unreachable -> local-only
+  let fsGen = 0;      // subscription generation (bumped on every (re)subscribe)
+  let fanTid = null;  // tournament id the current subscriptions belong to
 
   const fsDb = () => window.HCCL && window.HCCL.db;
   const fsApi = () => window.HCCL && window.HCCL.fs;
-  function fsRef(coll, id) { return fsApi().doc(fsDb(), "fantasy", "league", coll, id); }
+  // Tournament namespace (js/series.js): [] = legacy roots, else ["tournaments", tid].
+  const fsPrefix = () => (window.HCCLSeries ? window.HCCLSeries.prefix() : []);
+  function fsRef(coll, id) { return fsApi().doc(fsDb(), ...fsPrefix(), "fantasy", "league", coll, id); }
   function stripId(o) { const c = Object.assign({}, o); delete c.id; return c; }
   function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
@@ -91,14 +95,16 @@
     fsFellBack = true; fsFellBackMsg = msg;
     fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
     usingFirestore = false;
-    F = loadF();
+    // The local backup only holds the LEGACY tournament's fantasy data.
+    F = (!window.HCCLSeries || window.HCCLSeries.isLegacy()) ? loadF() : defaultFantasy();
     ftoast(msg, "bad");
     renderFantasy();
   }
   function startFantasySync() {
     const api = fsApi(), db = fsDb();
+    const gen = ++fsGen;
     FS_COLLS.forEach(coll => {
-      const unsub = api.onSnapshot(api.collection(db, "fantasy", "league", coll),
+      const unsub = api.onSnapshot(api.collection(db, ...fsPrefix(), "fantasy", "league", coll),
         snap => {
           const items = snap.docs.map(docSnap => normItem(coll, docSnap.id, docSnap.data()));
           fsMirror[coll] = clone(items);
@@ -118,8 +124,38 @@
       );
       fsUnsubs.push(unsub);
     });
-    // If Firestore just hangs (blocked/offline, no error fired), don't sit on "Loading…".
-    setTimeout(() => fallbackToLocal("Live sync unavailable - this device only"), 6000);
+    // If Firestore just hangs (blocked/offline, no error fired), don't sit on
+    // "Loading…". Generation-tagged so a timer armed before a tournament
+    // switch can't trip a bogus fallback against the NEW subscriptions.
+    setTimeout(() => { if (gen === fsGen) fallbackToLocal("Live sync unavailable - this device only"); }, 6000);
+  }
+
+  /* Start syncing once BOTH auth (HCCL) and the tournament registry
+     (HCCLSeries) are ready - the registry decides which paths to read. */
+  function fanMaybeStartSync() {
+    const H = window.HCCL, S = window.HCCLSeries;
+    if (!H || !H.configured || !H.user || usingFirestore || fsFellBack || !fsDb() || !fsApi()) return;
+    if (S && !S.ready) return;
+    fanTid = S ? S.viewingId() : null;
+    usingFirestore = true;
+    startFantasySync();
+  }
+
+  /* Viewed tournament changed: drop the old listeners and resubscribe. */
+  function fanOnSeriesChange(S) {
+    if (!S.ready) return;
+    const tid = S.viewingId();
+    if (!usingFirestore) { fanMaybeStartSync(); return; }
+    if (tid === fanTid) return;
+    fanTid = tid;
+    fsGen++; // disarm any pending fallback timer
+    fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+    fsReady = false; fsLoaded.clear(); fsFellBack = false; fsFellBackMsg = "";
+    fsMirror.teams = []; fsMirror.players = []; fsMirror.contestants = []; fsMirror.days = [];
+    F = defaultFantasy();
+    UI.dayId = null; UI.editEntryId = null; UI.editTeamId = null; UI.editPlayerId = null;
+    renderFantasy();
+    startFantasySync();
   }
 
   function onRemoteChange() {
@@ -893,14 +929,13 @@
     // Real-time data: mirror Firestore into F, but only once SIGNED IN (reads
     // require auth). Without Firebase we stay on localStorage as before.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
-      window.HCCL.onChange(H => {
-        if (H.configured && H.user && !usingFirestore && !fsFellBack && fsDb() && fsApi()) {
-          usingFirestore = true;
-          startFantasySync();
-        }
+      window.HCCL.onChange(() => {
+        fanMaybeStartSync();
         renderFantasy(); // re-render so gating + live data apply
       });
     }
+    // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
+    if (window.HCCLSeries) window.HCCLSeries.onChange(fanOnSeriesChange);
     renderFantasy();
   }
   if (typeof document !== "undefined") {

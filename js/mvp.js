@@ -25,6 +25,10 @@
   let matches = [];        // parsed match docs from Firestore, sorted oldest->newest
   let selectedId = null;   // match chip currently shown
   let syncStarted = false;
+  let mvpUnsub = null;     // active snapshot listener (dropped on tournament switch)
+  let mvpTid = null;       // tournament id the listener belongs to
+  // Tournament namespace (js/series.js): [] = legacy root, else ["tournaments", tid].
+  const mvpPrefix = () => (window.HCCLSeries ? window.HCCLSeries.prefix() : []);
   let busy = false;        // an upload is being processed
   const ui = { expanded: false };
 
@@ -134,7 +138,7 @@
 
   async function saveMatch(match) {
     const H = window.HCCL, fs = H.fs;
-    const ref = fs.doc(H.db, "mvp", match.matchId);
+    const ref = fs.doc(H.db, ...mvpPrefix(), "mvp", match.matchId);
     await fs.setDoc(ref, {
       matchId: match.matchId, title: match.title || "", dateText: match.dateText || "",
       ts: match.ts || 0, teams: match.teams || [], winner: match.winner || "",
@@ -151,19 +155,21 @@
     if (!canEdit() || !(H && H.db && H.fs && H.fs.deleteDoc)) return;
     if (!window.confirm("Remove this match from the MVP rankings?")) return;
     try {
-      await H.fs.deleteDoc(H.fs.doc(H.db, "mvp", id));
+      await H.fs.deleteDoc(H.fs.doc(H.db, ...mvpPrefix(), "mvp", id));
       toast("Match removed", "good");
     } catch (err) { console.error(err); toast("Couldn't remove the match", "bad"); }
   }
 
   /* --------------------------- firestore --------------------------- */
   function startSync() {
-    const H = window.HCCL;
+    const H = window.HCCL, S = window.HCCLSeries;
     if (syncStarted || !H || !H.configured || !H.user || !H.db || !H.fs) return;
+    if (S && !S.ready) return; // wait for the tournament registry
     const fs = H.fs;
     if (!fs.collection || !fs.onSnapshot) return;
     syncStarted = true;
-    fs.onSnapshot(fs.collection(H.db, "mvp"), snap => {
+    mvpTid = S ? S.viewingId() : null;
+    mvpUnsub = fs.onSnapshot(fs.collection(H.db, ...mvpPrefix(), "mvp"), snap => {
       const docs = [];
       snap.forEach(d => docs.push(d.data()));
       docs.sort((a, b) => sortKey(a) - sortKey(b));
@@ -172,6 +178,17 @@
         selectedId = matches.length ? matches[matches.length - 1].matchId : null;
       render();
     }, err => console.error("mvp snapshot error:", err));
+  }
+
+  /* Viewed tournament changed (js/series.js): drop the listener, resubscribe. */
+  function onSeriesChange(S) {
+    if (!S.ready) return;
+    const tid = S.viewingId();
+    if (syncStarted && tid === mvpTid) return;
+    if (mvpUnsub) { try { mvpUnsub(); } catch (e) {} mvpUnsub = null; }
+    if (syncStarted) { matches = []; selectedId = null; render(); }
+    syncStarted = false;
+    startSync();
   }
 
   /* --------------------------- rendering --------------------------- */
@@ -318,6 +335,8 @@
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
       window.HCCL.onChange(() => { startSync(); render(); });
     }
+    // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
+    if (window.HCCLSeries) window.HCCLSeries.onChange(onSeriesChange);
     render();
   }
 

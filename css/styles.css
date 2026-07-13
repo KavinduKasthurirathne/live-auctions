@@ -1004,6 +1004,50 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   .subtab, .season-tab { flex: none; white-space: nowrap; }
 }
 
+/* ===================== SERIES & TOURNAMENTS ===================== */
+.series-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 16px; }
+.series-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+  padding: 16px; transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.series-card:hover { transform: translateY(-2px); border-color: #4a4a52; box-shadow: var(--shadow); }
+.series-card.viewing { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(245, 179, 1, 0.25), var(--shadow); }
+.series-logo {
+  width: 58px; height: 58px; border-radius: 14px; flex: none;
+  background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat;
+  display: grid; place-items: center;
+  font-family: "Russo One", sans-serif; font-size: 16px; color: #fff;
+}
+.series-meta { flex: 1; min-width: 0; }
+.series-meta h3 { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.series-dur { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.series-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.series-chip {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted);
+}
+.series-chip.st-live { color: #fff; background: var(--red); border-color: transparent; animation: seriesPulse 1.4s infinite; }
+.series-chip.st-completed { color: var(--green); border-color: rgba(34, 197, 94, 0.45); }
+.series-chip.st-upcoming { color: var(--gold); border-color: rgba(245, 179, 1, 0.45); }
+.series-chip.st-default { color: var(--yellow); border-color: rgba(255, 204, 0, 0.4); }
+.series-chip.st-viewing { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+@keyframes seriesPulse { 50% { opacity: 0.55; } }
+.series-actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; flex: none; }
+.series-actions .btn { padding: 8px 14px; font-size: 12.5px; }
+.series-admin-row { display: flex; gap: 5px; justify-content: center; }
+.series-form { max-width: 560px; margin-top: 18px; }
+.series-hint { margin-bottom: 14px; }
+
+/* App-wide banner while viewing a non-default tournament. */
+.series-banner {
+  display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+  background: rgba(245, 179, 1, 0.10); border-bottom: 1px solid rgba(245, 179, 1, 0.35);
+  color: var(--gold); padding: 8px 14px; font-size: 13px; font-weight: 600; text-align: center;
+}
+.series-banner b { color: var(--yellow); }
+.series-banner .btn { padding: 6px 12px; font-size: 12px; }
+
 /* Respect users who turn animations off. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

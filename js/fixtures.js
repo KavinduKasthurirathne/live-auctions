@@ -29,6 +29,11 @@
   let matches = [];            // all match docs
   let cloud = false;           // Firestore-backed?
   let syncStarted = false;
+  let fxUnsub = null;          // active snapshot listener (dropped on tournament switch)
+  let fxTid = null;            // tournament id the listener belongs to
+  // Tournament namespace (js/series.js): [] = legacy root, else ["tournaments", tid].
+  const fxPrefix = () => (window.HCCLSeries ? window.HCCLSeries.prefix() : []);
+  const fxIsLegacy = () => !window.HCCLSeries || window.HCCLSeries.isLegacy();
   let busy = false;            // a PDF import is being processed
   let modal = null;            // { type: "form"|"detail"|"import", ... }
 
@@ -94,12 +99,14 @@
   }
 
   function startSync() {
-    const H = window.HCCL;
+    const H = window.HCCL, S = window.HCCLSeries;
     if (syncStarted || !H || !H.configured || !H.user || !H.db || !H.fs) return;
+    if (S && !S.ready) return; // wait for the tournament registry
     const fs = H.fs;
     if (!fs.collection || !fs.onSnapshot) return;
     syncStarted = true; cloud = true;
-    fs.onSnapshot(fs.collection(H.db, "matches"), snap => {
+    fxTid = S ? S.viewingId() : null;
+    fxUnsub = fs.onSnapshot(fs.collection(H.db, ...fxPrefix(), "matches"), snap => {
       const docs = [];
       snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
       matches = docs;
@@ -107,10 +114,22 @@
     }, err => {
       console.error("matches snapshot error:", err);
       cloud = false; syncStarted = false;
-      loadLocal();
+      // The local backup only holds the LEGACY tournament's matches.
+      if (fxIsLegacy()) loadLocal(); else matches = [];
       toast("Match sync unavailable - this device only", "bad");
       render();
     });
+  }
+
+  /* Viewed tournament changed (js/series.js): drop the listener, resubscribe. */
+  function onSeriesChange(S) {
+    if (!S.ready) return;
+    const tid = S.viewingId();
+    if (syncStarted && tid === fxTid) return;
+    if (fxUnsub) { try { fxUnsub(); } catch (e) {} fxUnsub = null; }
+    syncStarted = false;
+    if (cloud) { matches = []; render(); }
+    startSync();
   }
 
   async function putMatch(m) {
@@ -119,7 +138,7 @@
       const H = window.HCCL, fs = H.fs;
       const data = { ...m }; delete data.id;
       data.updatedBy = H.user ? (H.user.email || H.user.uid || "") : "";
-      await fs.setDoc(fs.doc(H.db, "matches", m.id), data);
+      await fs.setDoc(fs.doc(H.db, ...fxPrefix(), "matches", m.id), data);
     } else {
       const i = matches.findIndex(x => x.id === m.id);
       if (i >= 0) matches[i] = m; else matches.push(m);
@@ -129,7 +148,7 @@
   async function removeMatch(id) {
     if (cloud) {
       const H = window.HCCL;
-      await H.fs.deleteDoc(H.fs.doc(H.db, "matches", id));
+      await H.fs.deleteDoc(H.fs.doc(H.db, ...fxPrefix(), "matches", id));
     } else {
       matches = matches.filter(m => m.id !== id);
       saveLocal(); render();
@@ -947,6 +966,8 @@
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
       window.HCCL.onChange(() => { startSync(); render(); });
     }
+    // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
+    if (window.HCCLSeries) window.HCCLSeries.onChange(onSeriesChange);
     render();
   }
 

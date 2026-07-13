@@ -102,5 +102,15 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if canEdit();
     }
+
+    // Series & tournaments: tournaments/{tid} = meta (name, logo, duration,
+    // status) + tournaments/_config = { activeId }. Each NON-legacy
+    // tournament's data lives under tournaments/{tid}/{auction|fantasy|
+    // matches|mvp}/... - the legacy tournament (HCCL S6) keeps using the
+    // original top-level roots above. Editors manage; signed-in users read.
+    match /tournaments/{document=**} {
+      allow read: if signedIn();
+      allow write: if canEdit();
+    }
   }
 }

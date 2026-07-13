@@ -59,6 +59,9 @@ function save() {
   // Cloud mode: Firestore is the source of truth; don't touch the local backup
   // (KEY) so a one-time "upload to cloud" can still recover this device's data.
   if (auUsingFirestore) { if (auCanEdit()) auctionSyncDiff(); return; }
+  // The local backup only ever mirrors the legacy tournament - other
+  // tournaments are cloud-only, so an offline reload never shows their data.
+  if (window.HCCLSeries && !window.HCCLSeries.isLegacy()) return;
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
   catch (e) { toast("Storage full - export a backup and use smaller images", "bad"); }
 }
@@ -80,13 +83,18 @@ const auUnsubs = [];
 let auPendingRender = false;
 let auSyncing = false, auSyncAgain = false;
 let auFellBack = false;
+let auGen = 0;      // subscription generation (bumped on every (re)subscribe)
+let auTid = null;   // tournament id the current subscriptions belong to
 
 function auCanEdit() { const H = window.HCCL; return !H || !H.configured || H.canEdit(); }
 const auApi = () => window.HCCL && window.HCCL.fs;
 const auDb  = () => window.HCCL && window.HCCL.db;
-const auCollRef  = coll     => auApi().collection(auDb(), "auction", "league", coll);
-const auItemRef  = (coll, id) => auApi().doc(auDb(), "auction", "league", coll, id);
-const auStateRef = name     => auApi().doc(auDb(), "auction", "league", "state", name);
+// Tournament namespace (js/series.js): [] for the legacy tournament (original
+// roots), ["tournaments", tid] for every other tournament.
+const auPrefix = () => (window.HCCLSeries ? window.HCCLSeries.prefix() : []);
+const auCollRef  = coll     => auApi().collection(auDb(), ...auPrefix(), "auction", "league", coll);
+const auItemRef  = (coll, id) => auApi().doc(auDb(), ...auPrefix(), "auction", "league", coll, id);
+const auStateRef = name     => auApi().doc(auDb(), ...auPrefix(), "auction", "league", "state", name);
 function auStrip(o) { const c = Object.assign({}, o); delete c.id; return c; }
 function auClone(x) { return JSON.parse(JSON.stringify(x)); }
 
@@ -155,7 +163,10 @@ function startAuctionSync() {
         if (!Array.isArray(state.auction.bidLog)) state.auction.bidLog = [];
         state.lastAction = d.lastAction || null; }
       else auMirror.live = null; auLoaded("live"); }, auErr));
-  setTimeout(() => auFallback("Live sync unavailable - this device only"), 6000);
+  // Generation-tagged so a timer armed before a tournament switch can't
+  // trigger a bogus fallback against the NEW subscriptions.
+  const gen = ++auGen;
+  setTimeout(() => { if (gen === auGen) auFallback("Live sync unavailable - this device only"); }, 6000);
 }
 function auLoaded(which) {
   auFsLoaded.add(which);
@@ -174,7 +185,9 @@ function auFallback(msg) {
   auFellBack = true;
   auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
   auUsingFirestore = false;
-  state = normalize(load());
+  // The local backup only holds the LEGACY tournament - never show it while
+  // another tournament is being viewed.
+  state = (!window.HCCLSeries || window.HCCLSeries.isLegacy()) ? normalize(load()) : normalize(null);
   toast(msg, "bad");
   fillSettingsInputs(); renderAll(); updateCloudUploadBtn();
 }
@@ -1397,7 +1410,8 @@ function reauctionUnsold() {
   toast(`${u.length} player(s) re-opened`, "good");
 }
 function resetAuction() {
-  if (!confirm("Reset all auction results?\n\nTeams and players stay (retained players are kept), but every auctioned player becomes Available and purses are restored.")) return;
+  const tn = window.HCCLSeries ? window.HCCLSeries.viewing().name : "this tournament";
+  if (!confirm(`[${tn}] Reset all auction results?\n\nTeams and players stay (retained players are kept), but every auctioned player becomes Available and purses are restored.\n\nOnly this tournament is affected.`)) return;
   state.players.forEach(p => {
     if (p.retained) return; // keep pre-auction retentions
     p.status = "available"; p.soldTo = null; p.soldPrice = null;
@@ -1409,7 +1423,8 @@ function resetAuction() {
   toast("Auction reset", "good");
 }
 function resetAll() {
-  if (!confirm("Erase EVERYTHING - teams, players and settings?")) return;
+  const tn = window.HCCLSeries ? window.HCCLSeries.viewing().name : "this tournament";
+  if (!confirm(`[${tn}] Erase EVERYTHING - teams, players and settings?\n\nOnly this tournament is affected.`)) return;
   if (!confirm("Are you absolutely sure? This cannot be undone.")) return;
   state = defaultState();
   save();
@@ -1549,6 +1564,35 @@ function wireEvents() {
 /* ============================================================
    INIT
    ============================================================ */
+/* Start the cloud sync once BOTH auth (HCCL) and the tournament registry
+   (HCCLSeries) are ready - the registry decides which paths to subscribe to. */
+function auMaybeStartSync() {
+  const H = window.HCCL, S = window.HCCLSeries;
+  if (!H || !H.configured || !H.user || auUsingFirestore || auFellBack || !auDb() || !auApi()) return;
+  if (S && !S.ready) return; // wait for the tournament registry
+  auTid = S ? S.viewingId() : null;
+  auUsingFirestore = true;
+  startAuctionSync();
+}
+
+/* The viewed tournament changed: drop the old listeners, blank the board,
+   and resubscribe under the new tournament's paths. */
+function auOnSeriesChange(S) {
+  if (!S.ready) return;
+  const tid = S.viewingId();
+  if (!auUsingFirestore) { auMaybeStartSync(); return; }
+  if (tid === auTid) return;
+  auTid = tid;
+  auGen++; // disarm any pending fallback timer from the old subscriptions
+  auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+  auFsReady = false; auFsLoaded.clear(); auFellBack = false;
+  auMirror.teams = []; auMirror.players = []; auMirror.settings = null; auMirror.live = null;
+  auImg.playerPhotos = new Map(); auImg.teamLogos = new Map();
+  state = normalize(null); // blank while the new tournament streams in
+  fillSettingsInputs(); renderAll(); updateCloudUploadBtn();
+  startAuctionSync();
+}
+
 function init() {
   wireEvents();
   fillSettingsInputs();
@@ -1559,16 +1603,15 @@ function init() {
   let wasSignedIn = false;
   if (window.HCCL && typeof window.HCCL.onChange === "function") {
     window.HCCL.onChange(H => {
-      if (H.configured && H.user && !auUsingFirestore && !auFellBack && auDb() && auApi()) {
-        auUsingFirestore = true;
-        startAuctionSync();
-      }
+      auMaybeStartSync();
       // On the just-signed-in edge, land the user on the Home page.
       if (H.configured && H.user && !wasSignedIn) switchTab("home");
       wasSignedIn = !!(H.configured && H.user);
       renderAll(); updateCloudUploadBtn(); // re-render so gating applies live
     });
   }
+  // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
+  if (window.HCCLSeries) window.HCCLSeries.onChange(auOnSeriesChange);
 }
 // Defer to DOMContentLoaded so the firebase-init.js MODULE (deferred) has already run
 // and exposed window.HCCL - otherwise the onChange hook above never registers and the
