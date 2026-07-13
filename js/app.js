@@ -1444,6 +1444,7 @@ function wireEvents() {
     if (!tab) return;
     switchTab(tab.dataset.tab);
     if (tab.dataset.tab === "auctions") switchSubTab("auction"); // land on Auction Room by default
+    if (tab.dataset.tab === "rankings") switchSubTab("ranking"); // land on Player Ranking by default
   });
   // Sub-tab bars - the Auction and Rankings sections share the same
   // .subtab pattern; switchSubTab scopes the toggle to the right section.

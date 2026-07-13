@@ -304,19 +304,21 @@
     <!-- ===================== FANTASY (built by fantasy.js) ===================== -->
     <section class="view" id="view-fantasy"></section>
 
-    <!-- ============ RANKINGS: MVP (mvp.js) / Player Ranking (ranking.js) ============
-         The inner #view-mvp / #view-ranking ids are what those modules render into;
-         only the tab-level visibility moved up to this wrapper section. -->
+    <!-- ============ RANKINGS: Player Ranking (ranking.js) / MVP (mvp.js) ============
+         The inner #view-ranking / #view-mvp ids are what those modules render into;
+         only the tab-level visibility moved up to this wrapper section.
+         Player Ranking is the default sub-tab: switchTab("rankings") does not pick
+         a sub-tab, so the one marked `active` here is what opens. -->
     <section class="view" id="view-rankings">
       <nav class="subtabs" id="rankingsSubtabs">
-        <button class="subtab active" data-subtab="mvp">🏅 MVP</button>
-        <button class="subtab" data-subtab="ranking">📈 Player Ranking</button>
+        <button class="subtab active" data-subtab="ranking">📈 Player Ranking</button>
+        <button class="subtab" data-subtab="mvp">🏅 MVP</button>
       </nav>
-      <div class="subview active" id="subview-mvp">
-        <div id="view-mvp"></div>
-      </div>
-      <div class="subview" id="subview-ranking">
+      <div class="subview active" id="subview-ranking">
         <div id="view-ranking"></div>
+      </div>
+      <div class="subview" id="subview-mvp">
+        <div id="view-mvp"></div>
       </div>
     </section>
 
