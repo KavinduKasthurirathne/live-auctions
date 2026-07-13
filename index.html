@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hand Cricket League</title>
-  <!-- Default tab icon; replaced with the live league logo by renderHeader() after sign-in -->
+  <title>HC Leagues</title>
   <link rel="icon" type="image/jpeg" href="assets/brand-logo.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,10 +17,10 @@
   <!-- ===================== HEADER ===================== -->
   <header class="app-header">
     <div class="brand">
-      <div class="brand-logo" id="brandLogo">HCCL</div>
+      <div class="brand-logo" id="brandLogo" style="background-image:url('assets/brand-logo.jpg')"></div>
       <div class="brand-text">
-        <h1 id="seasonTitle">HCCL Season 06</h1>
-        <p class="brand-sub">Champions League</p>
+        <h1 id="seasonTitle">HC Leagues</h1>
+        <p class="brand-sub">Where Hand Cricket Champions Shine</p>
       </div>
     </div>
     <nav class="tabs" id="tabs">
@@ -345,9 +344,16 @@
   <!-- Series & tournaments registry (exposes window.HCCLSeries) - must load
        before the data modules below, which ask it for their Firestore paths. -->
   <script src="js/series.js"></script>
-  <!-- Home page (hero + per-season honors & leaderboards) -->
+  <!-- HCCL season archive (honors, playoffs, leaderboards) - a mountable module
+       (window.HCCLSeasonArchive) shown inside the Series tournament hub and
+       queried by home.js for the champions carousel. Needs the bundled season
+       CSVs (season-stats-data.js) and must load before home.js. -->
   <script src="js/season-stats-data.js"></script>
+  <script src="js/season-archive.js"></script>
+  <!-- Home page (hero + champions carousel + news shell) -->
   <script src="js/home.js"></script>
+  <!-- HC News feed (renders into the #homeNews shell home.js builds) -->
+  <script src="js/news.js"></script>
   <!-- DOM-to-PNG for the leaderboard share cards (exposes window.htmlToImage) -->
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js"></script>
   <!-- Charts for the 📊 Insights tab (exposes window.Chart). Degrades gracefully if blocked. -->

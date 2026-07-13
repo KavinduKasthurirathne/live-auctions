@@ -1050,6 +1050,145 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .series-banner b { color: var(--yellow); }
 .series-banner .btn { padding: 6px 12px; font-size: 12px; }
 
+/* ===================== CHAMPIONS CAROUSEL (Home) ===================== */
+.champs { margin-bottom: 28px; }
+.champs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.champs-title {
+  font-family: "Russo One", sans-serif; font-weight: 700;
+  font-size: clamp(17px, 3vw, 21px); letter-spacing: 1px;
+}
+.champs-nav { display: flex; gap: 8px; }
+.champs-arrow {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  transition: all 0.15s ease;
+}
+.champs-arrow:hover { border-color: var(--gold); color: var(--yellow); }
+
+/* Native scroll-snap track: swipeable on touch, JS only nudges scrollLeft. */
+.champs-track {
+  display: flex; gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.champs-track::-webkit-scrollbar { display: none; }
+
+.champs-card {
+  flex: 0 0 100%; min-width: 0;
+  scroll-snap-align: start; scroll-snap-stop: always;
+  display: grid; grid-template-columns: minmax(220px, 1fr) 1.5fr; gap: 18px; align-items: center;
+  border: 1px solid var(--border); border-radius: 18px; padding: 22px clamp(16px, 3vw, 30px);
+  background:
+    radial-gradient(500px 220px at 0% 0%, rgba(225, 6, 0, 0.14), transparent 60%),
+    linear-gradient(rgba(16, 16, 18, 0.82), rgba(16, 16, 18, 0.9)),
+    url('../assets/home-hero bg image.jpg') center/100% 100% no-repeat var(--panel);
+}
+.champs-card.live { border-color: rgba(225, 6, 0, 0.55); box-shadow: 0 0 0 1px rgba(225, 6, 0, 0.2); }
+
+.champs-left { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.champs-logo {
+  flex: none; width: 96px; height: 96px; border-radius: 20px;
+  background: #0d0d0f center/cover no-repeat; border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.champs-logo.fallback {
+  display: grid; place-items: center;
+  font-family: "Russo One", sans-serif; font-size: 26px; color: #fff;
+  background: linear-gradient(135deg, var(--red), var(--gold));
+}
+.champs-meta { min-width: 0; }
+.champs-league { display: block; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); }
+.champs-name { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(20px, 2.6vw, 28px); letter-spacing: .5px; margin-top: 3px; }
+.champs-dur { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
+.champs-live { display: inline-block; margin-top: 8px; font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #fff; background: var(--red); border-radius: 999px; padding: 3px 9px; animation: seriesPulse 1.4s infinite; }
+
+/* Right side: the podium, sized down so a card stays a card. */
+.champs-card .podium { margin-bottom: 0; }
+.champs-card .bubble { width: 64px; height: 64px; font-size: 22px; }
+.champs-card .podium-item.champion .bubble { width: 94px; height: 94px; font-size: 32px; }
+.champs-card .podium-item.mvp, .champs-card .podium-item.runner { margin-top: 24px; }
+.champs-card .podium-name { font-size: 12.5px; }
+.champs-card .podium-item.champion .podium-name { font-size: 15px; }
+/* LIVE card: the Most Runs / Most Wickets race instead of a podium. */
+.champs-race { display: grid; gap: 10px; max-width: 340px; margin: 0 auto; }
+.champs-progress { text-align: center; font-family: "Russo One", sans-serif; font-size: 19px; letter-spacing: .5px; }
+.champs-progress span { display: block; font-family: "Inter", sans-serif; color: var(--muted); font-size: 12.5px; margin-top: 8px; letter-spacing: 0; }
+
+.champs-dots { display: flex; gap: 7px; justify-content: center; margin-top: 14px; }
+.champs-dot {
+  width: 9px; height: 9px; border-radius: 999px; padding: 0; cursor: pointer;
+  background: var(--panel-3); border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+.champs-dot.active { width: 24px; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+
+@media (max-width: 760px) {
+  .champs-card { grid-template-columns: 1fr; gap: 16px; }
+  .champs-left { justify-content: center; text-align: left; }
+  .champs-logo { width: 74px; height: 74px; border-radius: 16px; }
+  .champs-card .bubble { width: 54px; height: 54px; font-size: 18px; }
+  .champs-card .podium-item.champion .bubble { width: 78px; height: 78px; font-size: 26px; }
+}
+
+/* ===================== HC NEWS FEED (Home) ===================== */
+.home-news { max-width: 780px; margin: 0 auto; }
+.news-head { margin-bottom: 12px; }
+.news-title { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(17px, 3vw, 21px); letter-spacing: 1px; }
+
+.news-avatar {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  background: #0d0d0f center/cover no-repeat; border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 16px; color: #fff;
+}
+.news-avatar.fallback { background: linear-gradient(135deg, var(--red), var(--gold)); }
+
+.news-composer { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px; margin-bottom: 16px; }
+/* Belt & braces: rules already reject non-editors; never even show them the box. */
+body:not(.can-edit) .news-composer { display: none; }
+.news-composer-head { display: flex; align-items: flex-start; gap: 10px; }
+.news-input {
+  flex: 1; min-height: 64px; resize: vertical;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+  color: var(--text); font: inherit; font-size: 14px; padding: 10px 12px;
+}
+.news-input:focus { outline: none; border-color: var(--gold); }
+.news-attach { position: relative; margin-top: 10px; display: inline-block; }
+.news-attach img { display: block; max-width: 100%; max-height: 180px; border-radius: 12px; border: 1px solid var(--border); }
+.news-attach .icon-btn { position: absolute; top: 6px; right: 6px; }
+.news-composer-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.news-composer-bar .btn { padding: 9px 18px; font-size: 13px; }
+
+.news-feed { display: flex; flex-direction: column; gap: 12px; }
+.news-item { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; }
+.news-item-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.news-item-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.news-author { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.news-time { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+.news-del { flex: none; }
+.news-text { font-size: 14.5px; line-height: 1.55; overflow-wrap: break-word; }
+.news-img { display: block; max-width: 100%; max-height: 340px; border-radius: 12px; border: 1px solid var(--border); margin-top: 10px; }
+.news-empty {
+  color: var(--muted); text-align: center; font-size: 13.5px;
+  padding: 20px 14px; border: 1px dashed var(--border); border-radius: 14px;
+}
+
+/* ===================== SERIES DETAIL (tournament hub) ===================== */
+/* The whole list card opens the hub - signal it. */
+.series-card[data-series-open] { cursor: pointer; }
+.series-detail-head { justify-content: flex-start; }
+.series-back { flex: none; padding: 8px 14px; font-size: 13px; }
+.series-detail-card { cursor: default; margin-bottom: 18px; }
+.series-detail-card:hover { transform: none; box-shadow: none; border-color: var(--border); }
+.series-detail-card.viewing:hover,
+.series-detail-card.viewing { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(245, 179, 1, 0.25); }
+.series-honors { max-width: 680px; margin-bottom: 16px; }
+.series-honors .podium { margin: 14px 0 6px; }
+.series-coming { max-width: 680px; }
+.series-archive { margin-top: 6px; }
+
 /* Respect users who turn animations off. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
