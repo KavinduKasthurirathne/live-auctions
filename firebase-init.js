@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp,
-  collection, getDocs, writeBatch,
+  collection, getDocs, writeBatch, query, orderBy, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const listeners = new Set();
@@ -185,8 +185,8 @@ function renderAuthGate() {
   authGateEl.innerHTML = `
     <div class="gate-hero">
       ${gateLogoHtml()}
-      <h1 class="gate-title">HC CHAMPIONS LEAGUE</h1>
-      <p class="gate-tagline">THE HOME OF HAND CRICKET CHAMPIONS</p>
+      <h1 class="gate-title">HC LEAGUES</h1>
+      <p class="gate-tagline">WHERE HAND CRICKET CHAMPIONS SHINE</p>
       <p class="gate-tags">Live Auctions · Fantasy League · Player Rankings</p>
     </div>
     <div class="gate-panel"><div class="gate-panel-card">${panel}</div></div>`;
@@ -220,7 +220,7 @@ try {
 
     window.HCCL.configured = true;
     window.HCCL.db = db;
-    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection, getDocs, writeBatch };
+    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection, getDocs, writeBatch, query, orderBy, limit };
     window.HCCL.listMembers = async () => {
       const snap = await getDocs(collection(db, "users"));
       return snap.docs.map(d => ({ uid: d.id, ...d.data() }));

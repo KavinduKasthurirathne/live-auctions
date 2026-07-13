@@ -112,5 +112,20 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if canEdit();
     }
+
+    // HC News (Home page feed): news/{postId} = { text, image, authorUid,
+    // authorName, authorPhoto, createdAt }. Moderators/admins post (only as
+    // themselves); everyone signed in reads; the author or an admin deletes.
+    // Posts are never edited - delete and repost instead.
+    match /news/{postId} {
+      allow read: if signedIn();
+      allow create: if canEdit()
+                    && request.resource.data.authorUid == request.auth.uid
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() <= 2000;
+      allow delete: if isAdmin() || (canEdit() && resource.data.authorUid == request.auth.uid);
+      allow update: if false;
+    }
   }
 }
