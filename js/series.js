@@ -27,10 +27,15 @@
 
   const LEGACY_ID = "hccl-s6";
   const VIEW_KEY = "hccl_viewing_tournament";
+  // The legacy entry represents the WHOLE HC Champions League (its data roots
+  // hold the ongoing season; the S1-S6 archive renders inside its detail hub).
   const LEGACY_META = {
-    id: LEGACY_ID, name: "HCCL Season 06", short: "HCCL S6", logo: "",
-    duration: "JUN 2026 - JUL 2026", status: "live", legacy: true, order: 0, createdAt: 0,
+    id: LEGACY_ID, name: "HC Champions League", short: "HCCL", logo: "",
+    duration: "NOV 2025 - PRESENT", status: "live", legacy: true, order: 0, createdAt: 0,
   };
+  // The stored name this entry had before the rebrand - used to migrate the
+  // cloud doc exactly once without ever clobbering a later admin rename.
+  const LEGACY_OLD_NAME = "HCCL Season 06";
 
   const H = () => window.HCCL;
   const db = () => (window.HCCL ? window.HCCL.db : null);
@@ -46,10 +51,16 @@
   let viewingId = null;
   let busy = false;           // a create/copy/delete is running
   const listeners = [];
-  const UI = { form: null };  // null | { mode:"create" } | { mode:"edit", id }
+  // form: null | { mode:"create" } | { mode:"edit", id }
+  // detail: null | tournament id whose hub page is open (list ⇄ detail)
+  const UI = { form: null, detail: null };
 
   /* ---------------- registry helpers ---------------- */
   const metaOf = id => tournaments.find(t => t.id === id) || null;
+
+  // Tournaments whose detail hub shows the HCCL season archive: the legacy
+  // entry (it IS the league), plus anything explicitly tagged archive:"hccl".
+  const isHcclFamily = m => !!(m && (m.legacy || m.archive === "hccl"));
 
   function normMeta(id, d) {
     return {
@@ -57,6 +68,10 @@
       duration: d.duration || "", status: d.status || "completed",
       legacy: !!d.legacy, order: d.order == null ? 999 : d.order,
       createdAt: d.createdAt || 0,
+      archive: d.archive || "",
+      // { champion, runnerUp, mvp } - drives this tournament's card on the
+      // Home champions carousel (and its detail hub) once it's completed.
+      honors: d.honors || null,
     };
   }
 
@@ -128,6 +143,7 @@
       if (metas.length) {
         metas.sort((x, y) => (x.order - y.order) || (x.createdAt - y.createdAt));
         tournaments = metas;
+        maybeMigrateLegacyName(); // one-time rebrand of the seeded legacy entry
       } else {
         tournaments = [LEGACY_META];
         maybeSeed(); // first editor creates the registry
@@ -156,6 +172,22 @@
       await a.setDoc(a.doc(db(), "tournaments", LEGACY_ID), meta);
       await a.setDoc(a.doc(db(), "tournaments", "_config"), { activeId: LEGACY_ID });
     } catch (e) { console.warn("series seed failed:", e); }
+  }
+
+  // Registries seeded before the HC Leagues rebrand still say "HCCL Season 06".
+  // The first editor to load the page renames the entry to the league-level
+  // identity - guarded on the OLD name so a deliberate admin rename is final.
+  let renameTried = false;
+  async function maybeMigrateLegacyName() {
+    if (renameTried || !cloudOn() || !editorOn()) return;
+    const m = metaOf(LEGACY_ID);
+    if (!m || m.name !== LEGACY_OLD_NAME) return;
+    renameTried = true;
+    try {
+      await fsa().updateDoc(fsa().doc(db(), "tournaments", LEGACY_ID), {
+        name: LEGACY_META.name, short: LEGACY_META.short, duration: LEGACY_META.duration,
+      });
+    } catch (e) { console.warn("legacy tournament rename failed:", e); renameTried = false; }
   }
 
   /* ---------------- admin: create / edit / copy / delete ---------------- */
@@ -228,6 +260,13 @@
       let logo = "";
       if (file) { try { logo = await fileToDataURL(file, 220, "png"); } catch (e) { toast("Couldn't read the logo image", "bad"); } }
 
+      // Honors (all optional). Leaving every field blank clears them - the
+      // setDoc below replaces the whole meta doc, so an omitted key is removed.
+      const champion = ($("#serChampion").value || "").trim();
+      const runnerUp = ($("#serRunnerUp").value || "").trim();
+      const mvp = ($("#serMvp").value || "").trim();
+      const honors = (champion || runnerUp || mvp) ? { champion, runnerUp, mvp } : null;
+
       if (UI.form && UI.form.mode === "edit") {
         const cur = metaOf(UI.form.id);
         if (!cur) throw new Error("tournament vanished");
@@ -235,6 +274,8 @@
           name, short, duration, status,
           logo: logo || cur.logo || "",
           legacy: !!cur.legacy, order: cur.order, createdAt: cur.createdAt || Date.now(),
+          ...(cur.archive ? { archive: cur.archive } : {}),
+          ...(honors ? { honors } : {}),
         });
         toast("Tournament updated", "good");
       } else {
@@ -243,6 +284,7 @@
         await a.setDoc(a.doc(d, "tournaments", id), {
           name, short, duration, status, logo,
           order: tournaments.length, createdAt: Date.now(),
+          ...(honors ? { honors } : {}),
         });
         if (srcId) {
           toast("Copying teams & players…");
@@ -312,7 +354,7 @@
         ${(!m.legacy && m.id !== activeId) ? `<button class="icon-btn del" data-series-del="${esc(m.id)}" title="Delete (only while empty)">🗑</button>` : ""}
       </div>` : "";
     return `
-      <div class="series-card${isViewing ? " viewing" : ""}">
+      <div class="series-card${isViewing ? " viewing" : ""}" data-series-open="${esc(m.id)}">
         ${logoHtml(m)}
         <div class="series-meta">
           <h3>${esc(m.name)}</h3>
@@ -323,6 +365,7 @@
           ${isViewing
             ? `<button class="btn btn-dark" disabled>✓ Viewing</button>`
             : `<button class="btn btn-yellow" data-series-view="${esc(m.id)}">View</button>`}
+          <button class="btn btn-dark" data-series-open="${esc(m.id)}">Details ›</button>
           ${admin}
         </div>
       </div>`;
@@ -353,6 +396,18 @@
         <label>Tournament logo${editing && editing.logo ? " (leave empty to keep current)" : ""}
           <input type="file" id="serLogoFile" accept="image/*" />
         </label>
+        <details class="stats-fieldset"${editing && editing.honors ? " open" : ""}>
+          <summary>Honors (optional) - shown on the Home champions carousel once completed</summary>
+          <label>Champion (team)
+            <input type="text" id="serChampion" placeholder="e.g. Super Fire Dragons" value="${editing && editing.honors ? esc(editing.honors.champion || "") : ""}" />
+          </label>
+          <label>Runner-up (team)
+            <input type="text" id="serRunnerUp" placeholder="e.g. Matrix" value="${editing && editing.honors ? esc(editing.honors.runnerUp || "") : ""}" />
+          </label>
+          <label>MVP (player)
+            <input type="text" id="serMvp" placeholder="e.g. Sasindu Madushan" value="${editing && editing.honors ? esc(editing.honors.mvp || "") : ""}" />
+          </label>
+        </details>
         ${editing ? "" : `
         <label>Start from
           <select id="serCopyFrom">
@@ -368,9 +423,72 @@
       </div>`;
   }
 
+  /* -------- tournament detail hub (list ⇄ detail inside #view-series) -------- */
+  function detailBodyHtml(m) {
+    // HCCL-family tournaments carry the full season archive (season tabs,
+    // podium, playoffs bracket, leaderboards) - mounted after innerHTML below.
+    if (isHcclFamily(m)) return `<div class="series-archive"></div>`;
+    const A = window.HCCLSeasonArchive;
+    const h = m.honors || {};
+    const hasHonors = !!(h.champion || h.runnerUp || h.mvp);
+    return `
+      <div class="card series-honors">
+        <h3>Honors</h3>
+        ${hasHonors && A ? A.podiumHtml(h) : `<p class="hint">${m.status === "completed"
+          ? "Honors not recorded yet - an admin can add Champion / Runner-up / MVP via ✎ Edit."
+          : "Honors appear here once the tournament finishes."}</p>`}
+      </div>
+      <div class="card series-coming">
+        <h3>Season stats</h3>
+        <p class="hint">Detailed stats for this tournament are coming soon. Meanwhile, hit <strong>View</strong> above and the 🔨 Auction, 📅 Fixtures and 🏅 MVP tabs follow its live data.</p>
+      </div>`;
+  }
+
+  function renderDetail(view, m) {
+    const admin = editorOn() && cloudOn();
+    const isViewing = m.id === (viewingId || LEGACY_ID);
+    const chips = [
+      `<span class="series-chip st-${esc(m.status)}">${STATUS_LABEL[m.status] || esc(m.status)}</span>`,
+      m.id === activeId ? `<span class="series-chip st-default">DEFAULT</span>` : "",
+      isViewing ? `<span class="series-chip st-viewing">VIEWING</span>` : "",
+    ].join("");
+    view.innerHTML = `
+      <div class="view-head series-detail-head">
+        <button class="btn btn-dark series-back" data-series-back>‹ All Series</button>
+        <h2>${esc(m.short || m.name).toUpperCase()}</h2>
+      </div>
+      <div class="series-card series-detail-card${isViewing ? " viewing" : ""}">
+        ${logoHtml(m)}
+        <div class="series-meta">
+          <h3>${esc(m.name)}</h3>
+          ${m.duration ? `<div class="series-dur">${esc(m.duration)}</div>` : ""}
+          <div class="series-chips">${chips}</div>
+        </div>
+        <div class="series-actions">
+          ${isViewing
+            ? `<button class="btn btn-dark" disabled>✓ Viewing</button>`
+            : `<button class="btn btn-yellow" data-series-view="${esc(m.id)}">View</button>`}
+          ${admin ? `
+          <div class="series-admin-row">
+            <button class="icon-btn" data-series-edit="${esc(m.id)}" title="Edit tournament">✎</button>
+            ${m.id !== activeId ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament">★</button>` : ""}
+          </div>` : ""}
+        </div>
+      </div>
+      ${UI.form ? formHtml() : ""}
+      ${detailBodyHtml(m)}`;
+    const holder = view.querySelector(".series-archive");
+    if (holder && window.HCCLSeasonArchive) window.HCCLSeasonArchive.mount(holder);
+    else if (window.HCCLSeasonArchive) window.HCCLSeasonArchive.unmount();
+  }
+
   function render() {
     const view = document.getElementById("view-series");
     if (!view) return;
+    // Detail mode - unless the tournament vanished from the registry.
+    if (UI.detail && !metaOf(UI.detail)) UI.detail = null;
+    if (UI.detail) { renderDetail(view, metaOf(UI.detail)); return; }
+    if (window.HCCLSeasonArchive) window.HCCLSeasonArchive.unmount();
     const admin = editorOn() && cloudOn();
     const offlineHint = !cloudOn()
       ? `<p class="hint series-hint">Multi-tournament browsing works through the shared cloud - sign in to see and switch tournaments.</p>` : "";
@@ -420,6 +538,15 @@
     if (dflt) { setDefault(dflt.getAttribute("data-series-default")); return; }
     if (t.closest("[data-series-save]")) { submitForm(); return; }
     if (t.closest("[data-series-cancel]")) { UI.form = null; render(); return; }
+    if (t.closest("[data-series-back]")) { UI.detail = null; UI.form = null; render(); return; }
+    // Checked LAST: the whole list card is clickable, but its buttons
+    // (View / edit / delete / default) must win over "open the hub".
+    const open = t.closest("[data-series-open]");
+    if (open) {
+      const id = open.getAttribute("data-series-open");
+      if (metaOf(id)) { UI.detail = id; UI.form = null; render(); }
+      return;
+    }
   }
 
   /* ---------------- init ---------------- */

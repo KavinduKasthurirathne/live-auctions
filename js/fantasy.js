@@ -517,8 +517,11 @@
   // The branded off-screen card shell shared by every share image: season title,
   // subtitle, date, divider, the row body, and the footer. `innerHtml` is the table.
   function buildShareShell(subTitle, dateStr, innerHtml) {
-    const seasonEl = document.getElementById("seasonTitle");
-    const seasonTitle = (seasonEl && seasonEl.textContent.trim()) || "HCCL";
+    // Brand the share card with the VIEWED tournament (the header now carries
+    // the site-wide "HC Leagues" brand, which would be wrong on a per-league card).
+    const series = window.HCCLSeries;
+    const viewing = series && series.viewing ? series.viewing() : null;
+    const seasonTitle = (viewing && (viewing.short || viewing.name)) || "HCCL";
     const card = document.createElement("div");
     // Lay out at the origin (NOT off-screen via a huge negative offset - the
     // node's own position is copied onto html-to-image's clone, so left:-99999px
