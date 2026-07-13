@@ -112,6 +112,7 @@
   /* ----------------------- upload / persist ------------------------ */
   async function handleFile(file) {
     if (!file) return;
+    if (!canEdit()) return toast("Only admins/moderators can upload match reports", "bad");
     if (!eng()) return toast("MVP engine not loaded", "bad");
     if (!window.pdfjsLib) return toast("PDF reader didn't load (connection or ad-blocker?)", "bad");
     const H = window.HCCL;

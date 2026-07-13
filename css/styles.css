@@ -498,6 +498,8 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 body:not(.can-edit) .auctioneer-bar,           /* SOLD / Unsold / Undo / Reset */
 body:not(.can-edit) #teamsBidGrid,             /* per-team bid buttons */
 body:not(.can-edit) .tab[data-tab="setup"],    /* auction Setup tab */
+body:not(.can-edit) #view-setup,               /* the ENTIRE Setup section (even if reached) */
+body:not(.can-edit) [data-goto="setup"],       /* "Open Setup" shortcut buttons */
 body:not(.can-edit) [data-auction],            /* "Auction now" buttons */
 body:not(.can-edit) .fan-tab[data-fan-sub="matchday"],  /* fantasy Match Day */
 body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */

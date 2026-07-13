@@ -409,6 +409,9 @@ const TAB_ALIASES = {
 function switchTab(name) {
   const alias = TAB_ALIASES[name];
   if (alias) { switchTab(alias.tab); switchSubTab(alias.sub); return; }
+  // Viewers never get the Setup surface - not via the tab, not via any
+  // [data-goto="setup"] shortcut, not via a direct switchTab call.
+  if (name === "setup" && !auCanEdit()) name = "home";
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
   // Open the new view at the top - otherwise it keeps the old view's scroll
@@ -499,16 +502,20 @@ function renderAuction() {
     stage.classList.add("hidden");
     empty.classList.remove("hidden");
     if (state.players.length === 0) {
-      empty.innerHTML = `<h2>No players to auction yet</h2>
-        <p>Go to the <strong>⚙️ Setup</strong> tab to add teams and players, or load the sample data to try it out.</p>
-        <button class="btn btn-yellow" data-goto="setup">Open Setup</button>`;
+      // Editors get the Setup shortcut; viewers just get a friendly notice.
+      empty.innerHTML = auCanEdit()
+        ? `<h2>No players to auction yet</h2>
+          <p>Go to the <strong>⚙️ Setup</strong> tab to add teams and players, or load the sample data to try it out.</p>
+          <button class="btn btn-yellow" data-goto="setup">Open Setup</button>`
+        : `<h2>No players to auction yet</h2>
+          <p>The auction for this tournament hasn't been set up - check back soon!</p>`;
     } else {
       const sold = state.players.filter(p => p.status === "sold").length;
       const unsold = state.players.filter(p => p.status === "unsold").length;
       empty.innerHTML = `<h2>🏆 Auction Complete</h2>
         <p>${sold} sold · ${unsold} unsold.</p>
         <div class="form-row" style="justify-content:center">
-          ${unsold ? `<button class="btn btn-yellow" id="btnReauction2">Re-open ${unsold} unsold</button>` : ""}
+          ${(unsold && auCanEdit()) ? `<button class="btn btn-yellow" id="btnReauction2">Re-open ${unsold} unsold</button>` : ""}
           <button class="btn btn-dark" data-goto="squads">View Squads</button>
         </div>`;
       const rb = $("#btnReauction2");
@@ -1608,6 +1615,9 @@ function init() {
       // On the just-signed-in edge, land the user on the Home page.
       if (H.configured && H.user && !wasSignedIn) switchTab("home");
       wasSignedIn = !!(H.configured && H.user);
+      // If the role drops to viewer while Setup is open, kick back to Home.
+      const setupView = $("#view-setup");
+      if (!auCanEdit() && setupView && setupView.classList.contains("active")) switchTab("home");
       renderAll(); updateCloudUploadBtn(); // re-render so gating applies live
     });
   }

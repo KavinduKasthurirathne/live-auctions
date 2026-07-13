@@ -215,6 +215,7 @@
 
   async function submitForm() {
     if (busy) return;
+    if (!editorOn() || !cloudOn()) { toast("You don't have permission to manage tournaments", "bad"); return; }
     const name = ($("#serName").value || "").trim();
     if (!name) { toast("Give the tournament a name", "bad"); return; }
     const short = ($("#serShort").value || "").trim();
@@ -261,6 +262,7 @@
 
   async function removeTournament(id) {
     if (busy) return;
+    if (!editorOn() || !cloudOn()) return;
     const m = metaOf(id);
     if (!m || m.legacy) return;
     if (id === activeId) { toast("Can't delete the active tournament - set another as default first", "bad"); return; }
@@ -280,6 +282,7 @@
 
   async function setDefault(id) {
     if (busy || !metaOf(id)) return;
+    if (!editorOn() || !cloudOn()) return;
     try {
       await fsa().setDoc(fsa().doc(db(), "tournaments", "_config"), { activeId: id });
       toast(`${metaOf(id).name} is now the default tournament`, "good");
