@@ -4,12 +4,11 @@
    Landing view after sign-in:
      1. Branded hero (site logo + "HC LEAGUES" + tagline).
      2. Champions carousel - auto-advancing cards, ONE PER SERIES in
-        the 🏆 Series tab (window.HCCLSeries): each card is logo |
-        name + duration | Champion/Runner-up/MVP podium | Most Runs +
-        Most Wickets. A LIVE series leads with an "in progress" card.
-        Shows THIS YEAR's tournaments (the year comes from the duration
-        typed when the tournament was created) - every year's full
-        record stays in the Series tab.
+        the 🏆 Series tab (window.HCCLSeries), nothing filtered out:
+        each card is logo | name + duration | Champion/Runner-up/MVP
+        podium | Most Runs + Most Wickets, in tournament-date order.
+        The LIVE one leads with an "in progress" card; one that hasn't
+        been played yet says so instead of showing an empty podium.
      3. News shell (#homeNews) - filled by js/news.js.
 
    The per-season honors & leaderboards that used to live here moved
@@ -60,7 +59,9 @@
     return new Date(+h[3], MONTH_IDX[h[2]], h[1] ? +h[1] : 1).getTime();
   }
   // Recency key: the LAST date ("MAR 2026 - APR 2026" -> 30 Apr; "JAN 2026" ->
-  // 31 Jan; day 0 of the next month IS the last day of this one).
+  // 31 Jan; day 0 of the next month IS the last day of this one). Used to pick
+  // the lead card when nothing is live. Undated -> -Infinity, so a "COMING
+  // SOON" tournament can never be mistaken for the most recent one.
   function endStamp(duration) {
     const hits = monthHits(duration);
     const h = hits[hits.length - 1];
@@ -70,9 +71,6 @@
       ? new Date(y, mo, +h[1], 23, 59, 59).getTime()
       : new Date(y, mo + 1, 0, 23, 59, 59).getTime();
   }
-  // Every year the duration names ("DEC 2026 - JAN 2027" -> [2026, 2027], so a
-  // season straddling New Year belongs to both).
-  const yearsOf = duration => monthHits(duration).map(h => +h[3]);
 
   // Four zones in one row: logo | name + duration | Champion/Runner-up/MVP
   // podium | Most Runs & Most Wickets. Cards without a leaders zone drop it.
@@ -146,49 +144,44 @@
         mvp: rh.mvp || (s && s.mvp) || "",
       };
       const live = t.status === "live";
-      // Skip what has nothing to celebrate: upcoming seasons, and finished ones
-      // whose champion nobody has recorded yet.
-      if (!live && !honors.champion) return;
+      const what = no ? "Season" : "Tournament";
+      // The mid zone: the podium once a champion is recorded, otherwise a note
+      // saying where this one is in its life - nothing is left out of the Hall.
+      const note = (head, sub) => `<div class="champs-progress">${esc(head)}<span>${esc(sub)}</span></div>`;
+      const midHtml = honors.champion
+        ? A.podiumHtml(honors, t.solo ? "player" : "team")
+        : live
+          ? note(`${what} in progress`, no ? "Champion crowned soon - follow it in 🏆 Series"
+            : "Follow it in the 🏆 Series tab")
+          : t.status === "upcoming"
+            ? note("Coming soon", `This ${what.toLowerCase()} hasn't been played yet`)
+            : note("Champion to be confirmed", "The honors for this one aren't recorded yet");
       const lead = leadersOf(t);
       cards.push({
         live,
         start: startStamp(t.duration),
         end: endStamp(t.duration),
-        years: yearsOf(t.duration),
         logo: t.logo || (no ? A.seasonLogo(no) : (A.tournamentLogo && A.tournamentLogo(t.name))) || "",
         league: no ? "HC Champions League" : "",
         title: no ? `Season ${pad2(no)}` : t.name,
         duration: t.duration || "",
-        midHtml: live
-          ? `<div class="champs-progress">${no ? "Season" : "Tournament"} in progress<span>${no ? "Champion crowned soon - follow it in 🏆 Series" : "Follow it in the 🏆 Series tab"}</span></div>`
-          : A.podiumHtml(honors, t.solo ? "player" : "team"),
+        midHtml,
         rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
       });
     });
 
-    // THIS YEAR's tournaments - the year comes from the duration an admin types
-    // when creating one ("MAR 2026 - APR 2026"). Anything live is current by
-    // definition, whatever its dates say. Earlier years live on in the Series
-    // tab, which keeps the full record.
-    const thisYear = new Date().getFullYear();
-    let picked = cards.filter(c => c.live || c.years.includes(thisYear));
-    // Early in a new year nothing may have finished yet - fall back to the most
-    // recent year that HAS champions rather than showing an empty Hall.
-    if (!picked.length) {
-      const latest = cards.reduce((y, c) => Math.max(y, ...c.years), -Infinity);
-      if (isFinite(latest)) picked = cards.filter(c => c.years.includes(latest));
-    }
-
-    // Order: LIVE tournaments lead (that's the default view). With none live,
-    // the newest champion takes the lead card instead. The rest then run
+    // No filtering: every series in the 🏆 Series tab gets a card here.
+    // Order: the LIVE one leads (it's the default view). With none live, the
+    // most recently finished takes the lead card instead. The rest then run
     // oldest -> newest, so the carousel walks the story forward and wraps back
-    // round to the current one.
-    const live = picked.filter(c => c.live).sort((a, b) => a.start - b.start);
-    const done = picked.filter(c => !c.live).sort((a, b) => a.start - b.start);
+    // round to the current one. A tournament with no dates at all ("COMING
+    // SOON") has no place in the chronology, so it sits at the end.
+    const live = cards.filter(c => c.live).sort((a, b) => a.start - b.start);
+    const rest = cards.filter(c => !c.live).sort((a, b) => a.start - b.start);
     const lead = [];
-    if (!live.length && done.length) {
-      const newest = done.reduce((best, c) => (c.end > best.end ? c : best), done[0]);
-      lead.push(...done.splice(done.indexOf(newest), 1));
+    if (!live.length && rest.length) {
+      const newest = rest.reduce((best, c) => (c.end > best.end ? c : best), rest[0]);
+      lead.push(...rest.splice(rest.indexOf(newest), 1));
     }
 
     // Belt & braces: if the same tournament somehow exists twice (a seeded
@@ -200,7 +193,7 @@
       seen.add(k);
       return true;
     };
-    return [...live, ...lead, ...done].filter(uniq);
+    return [...live, ...lead, ...rest].filter(uniq);
   }
 
   /* ---------------------- carousel behaviour ---------------------- */
