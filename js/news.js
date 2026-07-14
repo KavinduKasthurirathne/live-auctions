@@ -200,7 +200,7 @@
     const text = body(p);
     return `<div class="news-modal" role="dialog" aria-modal="true" aria-label="${esc(headline(p))}">
       <header class="news-modal-head">
-        <h3>📰 HC Top Stories</h3>
+        <h3>📰 Top Stories</h3>
         <button class="btn btn-dark btn-mini" data-news-close>✕ Close</button>
       </header>
       <div class="news-modal-body">
@@ -247,7 +247,7 @@
       feed = `<div class="news-list">${posts.map(rowHtml).join("")}</div>`;
     }
     el.innerHTML = `
-      <div class="news-head"><h2 class="news-title">📰 HC Top Stories</h2></div>
+      <div class="news-head"><h2 class="news-title">📰 Top Stories</h2></div>
       ${canPost() ? composerHtml() : ""}
       <div class="news-feed">${feed}</div>`;
     // A snapshot may have deleted the open story out from under the popup.
@@ -302,7 +302,7 @@
         createdAt: fs.serverTimestamp ? fs.serverTimestamp() : Date.now(),
       });
       draftTitle = ""; draftText = ""; draftImages = [];
-      notify("Published to HC Top Stories.", "good");
+      notify("Published to Top Stories.", "good");
     } catch (e) {
       console.error("news post failed:", e);
       notify("Couldn't publish - need moderator/admin + published rules.", "bad");
