@@ -145,7 +145,7 @@
     "assets/Mini IPL Logos": [
       "Chennai Super Kings.png", "Delhi Capitals.jpg", "Gujarat Titans.jpg", "Kolkata Knight Riders.jpg",
       "Lucknow Super Giants.jpg", "Mumbai Indians.jpg", "Punjab Kings.jpg", "Rajasthan Royals.jpg",
-      "Royal Challengers Bangaluru.png", "Sunrisers Hyderabad.jpg",
+      "Royal Challengers Bengaluru.png", "Sunrisers Hyderabad.jpg",
     ],
   };
   const PLAYER_PHOTO_FILES = [
