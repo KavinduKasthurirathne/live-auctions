@@ -125,6 +125,31 @@
   /* ---------------- registry helpers ---------------- */
   const metaOf = id => tournaments.find(t => t.id === id) || null;
 
+  // Identity of a tournament, independent of the id and of small naming
+  // differences - so a hand-created entry and its bundled seed are recognised
+  // as ONE tournament: "HC Mini IPL 2026" == "Mini IPL 2026",
+  // "HCCL Season 05" == "HCCL S5" == the seeded hccl-s5.
+  // Used to stop the seeds duplicating an admin's entry, to flag existing
+  // twins on the Series page, and (via api.identityKey) to fold duplicates
+  // into one Hall of Champions card on Home.
+  function identityKey(m) {
+    if (!m) return "";
+    const name = String(m.name || "");
+    const flat = name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    // An HCCL season: the season number IS the identity.
+    let no = m.season || (m.legacy ? 6 : 0);
+    if (!no && /hccl|champions\s*league/i.test(name)) {
+      const hit = name.match(/season\s*0*(\d+)/i) || name.match(/\bs0*(\d+)\b/i);
+      if (hit) no = +hit[1];
+    }
+    if (no) return `hccl-s${no}`;
+    // Anything else: the name, minus punctuation and a leading "hc"/"hccl"
+    // (the seeds carry the prefix, hand-made entries often don't).
+    return flat.replace(/^hccl/, "").replace(/^hc/, "") || flat || String(m.id || "");
+  }
+  // Registry entries that are the same tournament as `m` but a different doc.
+  const twinsOf = m => tournaments.filter(t => t.id !== m.id && identityKey(t) === identityKey(m));
+
   // Tournaments whose detail hub shows the HCCL season archive: the legacy
   // entry (Season 06), plus the seeded per-season entries tagged archive:"hccl".
   const isHcclFamily = m => !!(m && (m.legacy || m.archive === "hccl"));
@@ -172,6 +197,9 @@
     viewingId: () => viewingId || LEGACY_ID,
     viewing: () => metaOf(viewingId) || LEGACY_META,
     activeId: () => activeId,
+    // Same-tournament identity, so Home can fold duplicate registry entries
+    // into a single Hall of Champions card.
+    identityKey: m => identityKey(m),
     isLegacy(id) {
       const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
       return !m || !!m.legacy;
@@ -297,13 +325,11 @@
     if (cfg && cfg.seasonSeedVersion === SEASON_SEED_VERSION) return;
     seasonSeedTried = true;
     const a = fsa(), d = db();
-    const norm = s => String(s || "").trim().toLowerCase();
-    const byName = name => tournaments.find(t => norm(t.name) === norm(name));
     try {
       for (const seed of allSeeds()) {
         // Never overwrite - and never DUPLICATE a tournament an admin already
-        // created by hand under a different id but the same name.
-        if (metaOf(seed.id) || byName(seed.name)) continue;
+        // created by hand, whatever id or near-name they gave it.
+        if (metaOf(seed.id) || tournaments.some(t => identityKey(t) === identityKey(seed))) continue;
         const meta = { ...seed, createdAt: Date.now() };
         delete meta.id;
         if (!meta.honors) delete meta.honors;
@@ -324,10 +350,9 @@
     if (normalizeTried || !cloudOn() || !editorOn()) return;
     const a = fsa(), d = db();
     if (!a.updateDoc) return;
-    const norm = s => String(s || "").trim().toLowerCase();
     const patches = [];
     for (const seed of TOURNEY_SEEDS) {
-      const m = metaOf(seed.id) || tournaments.find(t => norm(t.name) === norm(seed.name));
+      const m = metaOf(seed.id) || tournaments.find(t => identityKey(t) === identityKey(seed));
       if (!m) continue;
       const patch = {};
       if (!m.statsOnly) patch.statsOnly = true;
@@ -406,27 +431,33 @@
   async function submitForm() {
     if (busy) return;
     if (!editorOn() || !cloudOn()) { toast("You don't have permission to manage tournaments", "bad"); return; }
-    const name = ($("#serName").value || "").trim();
+    // Read EVERY field up front: the render() below replaces #view-series's
+    // innerHTML, which rebuilds the form from the STORED meta - so anything
+    // read after it would come back as the old value, not what was typed.
+    const val = sel => { const el = $(sel); return el ? (el.value || "").trim() : ""; };
+    const name = val("#serName");
     if (!name) { toast("Give the tournament a name", "bad"); return; }
-    const short = ($("#serShort").value || "").trim();
-    const duration = ($("#serDuration").value || "").trim();
+    const short = val("#serShort");
+    const duration = val("#serDuration");
     const status = $("#serStatus").value || "upcoming";
     const file = $("#serLogoFile").files[0];
+    const srcId = $("#serCopyFrom") ? $("#serCopyFrom").value : "";
+
+    // Honors (all optional). Leaving every field blank clears them - the
+    // setDoc below replaces the whole meta doc, so an omitted key is removed.
+    const champion = val("#serChampion");
+    const runnerUp = val("#serRunnerUp");
+    const mvp = val("#serMvp");
+    const mostRuns = val("#serMostRuns");
+    const mostWickets = val("#serMostWickets");
+    const honors = (champion || runnerUp || mvp || mostRuns || mostWickets)
+      ? { champion, runnerUp, mvp, mostRuns, mostWickets } : null;
+
     const a = fsa(), d = db();
     busy = true; render();
     try {
       let logo = "";
       if (file) { try { logo = await fileToDataURL(file, 220, "png"); } catch (e) { toast("Couldn't read the logo image", "bad"); } }
-
-      // Honors (all optional). Leaving every field blank clears them - the
-      // setDoc below replaces the whole meta doc, so an omitted key is removed.
-      const champion = ($("#serChampion").value || "").trim();
-      const runnerUp = ($("#serRunnerUp").value || "").trim();
-      const mvp = ($("#serMvp").value || "").trim();
-      const mostRuns = ($("#serMostRuns").value || "").trim();
-      const mostWickets = ($("#serMostWickets").value || "").trim();
-      const honors = (champion || runnerUp || mvp || mostRuns || mostWickets)
-        ? { champion, runnerUp, mvp, mostRuns, mostWickets } : null;
 
       if (UI.form && UI.form.mode === "edit") {
         const cur = metaOf(UI.form.id);
@@ -445,7 +476,6 @@
         toast("Tournament updated", "good");
       } else {
         const id = slugify(name);
-        const srcId = $("#serCopyFrom") ? $("#serCopyFrom").value : "";
         await a.setDoc(a.doc(d, "tournaments", id), {
           name, short, duration, status, logo,
           order: tournaments.length, createdAt: Date.now(),
@@ -467,6 +497,23 @@
     busy = false; render();
   }
 
+  // An imported stats sheet lives at tournaments/{tid}/stats/sheet - a
+  // SUBcollection, which deleting the meta doc would leave orphaned rather than
+  // remove. That matters most for the very case the DUPLICATE chip invites: two
+  // entries for one tournament, where the sheet may sit on the one being
+  // deleted. Say so plainly instead of losing it quietly.
+  async function confirmSheetLoss(m) {
+    const a = fsa(), d = db();
+    if (!a.getDoc) return true;
+    let has = false;
+    try { has = (await a.getDoc(a.doc(d, "tournaments", m.id, "stats", "sheet"))).exists(); } catch (e) {}
+    if (!has) return true;
+    return confirm(
+      `"${m.name}" has an imported stats sheet, and deleting the tournament discards it.\n\n` +
+      `If you're clearing a DUPLICATE, check the entry you're KEEPING already shows the stats ` +
+      `(open its Details page) - if it doesn't, import the sheet there first.\n\nDelete anyway?`);
+  }
+
   async function removeTournament(id) {
     if (busy) return;
     if (!editorOn() || !cloudOn()) return;
@@ -478,6 +525,8 @@
     try {
       if (!(await tournamentIsEmpty(id))) {
         toast(`"${m.name}" has data (auction/fixtures/MVP/fantasy) - it can't be deleted`, "bad");
+      } else if (!(await confirmSheetLoss(m))) {
+        toast("Deletion cancelled", "bad");
       } else {
         await fsa().deleteDoc(fsa().doc(db(), "tournaments", id));
         if (viewingId === id) api.setViewing(activeId);
@@ -512,10 +561,17 @@
   function cardHtml(m) {
     const isViewing = m.id === (viewingId || LEGACY_ID);
     const archiveOnly = isArchiveOnly(m);
+    // Two registry entries for the same tournament (a hand-made one alongside
+    // the bundled seed). Home merges them into one card; here we flag both so
+    // an editor can delete the spare with 🗑.
+    const twins = twinsOf(m);
     const chips = [
       `<span class="series-chip st-${esc(m.status)}">${STATUS_LABEL[m.status] || esc(m.status)}</span>`,
       m.id === activeId ? `<span class="series-chip st-default">DEFAULT</span>` : "",
       isViewing ? `<span class="series-chip st-viewing">VIEWING</span>` : "",
+      twins.length
+        ? `<span class="series-chip st-dup" title="Also listed as &quot;${esc(twins.map(t => t.name).join('", "'))}&quot; - the same tournament twice. Delete the spare entry (🗑) to tidy the list.">DUPLICATE</span>`
+        : "",
     ].join("");
     const admin = (editorOn() && cloudOn()) ? `
       <div class="series-admin-row">
@@ -565,8 +621,8 @@
         <label>Tournament logo${editing && editing.logo ? " (leave empty to keep current)" : ""}
           <input type="file" id="serLogoFile" accept="image/*" />
         </label>
-        <details class="stats-fieldset"${editing && (editing.honors || editing.status === "live") ? " open" : ""}>
-          <summary>Honors - the podium shown in the Home page's Hall of Champions</summary>
+        <details class="stats-fieldset"${editing ? " open" : ""}>
+          <summary>🏆 Honors / Podium - shown on this tournament's Hall of Champions card</summary>
           ${editing && editing.status === "live" ? `<p class="hint">Finished? Set <b>Status: Completed</b> above and fill in the champion, runner-up and MVP. The LIVE badges come off everywhere and this tournament's podium joins the Hall of Champions - for everyone, straight away.</p>` : ""}
           <label>Champion (team, or player for solo events)
             <input type="text" id="serChampion" placeholder="e.g. Super Fire Dragons" value="${editing && editing.honors ? esc(editing.honors.champion || "") : ""}" />

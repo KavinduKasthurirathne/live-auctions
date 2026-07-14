@@ -92,6 +92,42 @@
   // seasons and the other HC tournaments alike - so a tournament an admin adds
   // there shows up here the moment its champion is recorded. One card per
   // entry: LIVE ones carry an "in progress" note, finished ones the podium.
+  // A tournament can end up in the registry TWICE - a hand-created entry plus
+  // the bundled seed for the same event ("Mini IPL 2026" / "HC Mini IPL 2026").
+  // The Hall of Champions shows one card per tournament, so fold each such pair
+  // into a single entry: field by field, the first twin that actually HAS a
+  // value wins, and a twin carrying a champion leads (the honors or the stats
+  // import may have landed on either doc). The Series tab still lists both, with
+  // a DUPLICATE chip, so an editor can delete the spare.
+  function mergeTwins(list, S) {
+    if (!S || !S.identityKey) return list;
+    const groups = new Map();
+    list.forEach(t => {
+      const k = S.identityKey(t) || t.id;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(t);
+    });
+    const pick = (...vals) => vals.find(v => v !== "" && v != null && v !== false) ?? "";
+    return [...groups.values()].map(g => {
+      if (g.length === 1) return g[0];
+      // Lead with the entry that already names a champion, else a finished/live
+      // one, else the first - then let the others fill in its gaps.
+      const rank = t => ((t.honors && t.honors.champion) ? 0 : 2) + (t.status === "upcoming" ? 1 : 0);
+      const sorted = g.slice().sort((a, b) => rank(a) - rank(b));
+      const [head, ...restT] = sorted;
+      const merged = { ...head };
+      const hon = { ...(head.honors || {}) };
+      restT.forEach(t => {
+        ["name", "short", "logo", "duration", "archive", "season", "solo", "statsOnly", "legacy"]
+          .forEach(f => { if (!merged[f] && t[f]) merged[f] = t[f]; });
+        Object.entries(t.honors || {}).forEach(([f, v]) => { if (!hon[f] && v) hon[f] = v; });
+      });
+      merged.honors = Object.keys(hon).length ? hon : null;
+      merged.status = pick(...sorted.map(t => (t.status === "upcoming" ? "" : t.status)), "upcoming");
+      return merged;
+    });
+  }
+
   function buildCards() {
     const A = archive();
     const S = series();
@@ -102,12 +138,13 @@
 
     // The registry is the source of truth. If it never loaded (script error),
     // fall back to the bundled archive so Home still tells the story.
-    const list = S ? S.list() : A.seasons().map(s => ({
+    const raw = S ? S.list() : A.seasons().map(s => ({
       id: `hccl-s${s.no}`, name: `HCCL Season ${pad2(s.no)}`,
       archive: "hccl", season: s.no, duration: s.year || "",
       status: s.ongoing ? "live" : "completed",
       honors: { champion: s.champion, runnerUp: s.runnerUp, mvp: s.mvp },
     }));
+    const list = mergeTwins(raw, S);
 
     const leadersHtml = (mostRuns, mostWickets) => (mostRuns || mostWickets) ? `<div class="champs-race">
       ${A.extraItem("🏏", "Most Runs", mostRuns || "TBD")}
@@ -184,8 +221,8 @@
       lead.push(...rest.splice(rest.indexOf(newest), 1));
     }
 
-    // Belt & braces: if the same tournament somehow exists twice (a seeded
-    // entry AND a hand-created twin in the registry), only one card shows.
+    // Belt & braces behind mergeTwins(): two entries that still land on the
+    // same league+title (identical names) collapse to a single card.
     const seen = new Set();
     const uniq = c => {
       const k = `${c.league || ""}|${c.title}`.trim().toLowerCase();

@@ -1131,6 +1131,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .series-chip.st-upcoming { color: var(--gold); border-color: rgba(245, 179, 1, 0.45); }
 .series-chip.st-default { color: var(--yellow); border-color: rgba(255, 204, 0, 0.4); }
 .series-chip.st-viewing { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+/* Two registry entries for the SAME tournament - delete the spare with 🗑. */
+.series-chip.st-dup { color: #fff; background: var(--red); border-color: transparent; cursor: help; }
 @keyframes seriesPulse { 50% { opacity: 0.55; } }
 .series-actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; flex: none; }
 .series-actions .btn { padding: 8px 14px; font-size: 12.5px; }

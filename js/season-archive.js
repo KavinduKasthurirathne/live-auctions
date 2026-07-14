@@ -214,6 +214,7 @@
     "hc mini ipl 2026": "HC Mini IPL S1.png",
     "solo knockout championship s01": "Solo Knockout S1.png",
     "hc county rising league s01": "HC County Rising League S1.png",
+    "hc county legends league s01": "HC County Legends League S1.jpeg",
   };
   function fileIndex(files) {
     const m = {};
