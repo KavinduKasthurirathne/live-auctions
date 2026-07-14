@@ -71,7 +71,8 @@ Keep the offline `firebase-config.js` as well — `firebase-init.js` still sets
    clean run has zero console errors and zero 404s.
 
 Flows worth driving after a change: home (hero, the Hall of Champions carousel —
-registry-driven, 6-month window, live card first — auto-advance ~6.5s, dots),
+registry-driven, this-year-only, live card first — auto-advance ~6.5s, dots;
+roll the clock with an `addInitScript` Date override to test the year rule),
 the news list (`.news-card` rows) + story popup (`[data-news-open]`, Escape /
 backdrop close), Series list → Details hubs (no View button: the card and
 `[data-series-open]` open the hub; S1-S5 archive-only, S6 live with quick links,
@@ -82,11 +83,22 @@ render, 390px mobile viewport, `reducedMotion: "reduce"` context (no autoplay).
 More gotchas:
 - Don't pass multi-line JS to `node -e` from PowerShell - the quoting gets
   mangled. Write driver scripts to files and `node file.js`.
-- On mobile (≤900px) the nav is a hamburger drawer: click `#navToggle` first,
-  then the `[data-tab]` buttons inside `#tabs`; a closed drawer's tabs are
-  translated off-screen and unclickable.
-- The nav drawer lives inside the sticky header's stacking context (z-index
-  30) - any overlay meant to sit UNDER it must use z-index < 30.
+- On mobile (≤900px) the nav is an off-canvas drawer: click `#navToggle` first,
+  then the `[data-tab]` buttons inside `#tabs`; a closed drawer is
+  `visibility: hidden` and off-canvas, so its tabs are unclickable. Close paths:
+  `#navClose`, `#navBackdrop`, Escape.
+- **`.app-header` has `backdrop-filter`, which makes it the containing block for
+  `position: fixed` DESCENDANTS** (same trap as `transform`/`filter`/
+  `will-change`), and `position: sticky` makes it a stacking context. Anything
+  meant to overlay the page must therefore NOT be a child of the header — app.js
+  relocates `<nav id="tabs">` to `<body>` below 900px for exactly this reason.
+  Assert drawer/overlay **geometry** (`getBoundingClientRect().height ≈ innerHeight`),
+  not just that clicks land: a fixed child trapped in the header still clicks
+  fine, it's just the size of the navbar. That bug shipped once.
+- Scroll-locking the page: put `overflow: hidden` on `<html>` only. On `<body>`
+  (or both) the viewport clamps scrollY to 0 and the page jumps to the top;
+  `position: fixed` on `<body>` robs the sticky header of its scrollport and
+  sends it off-screen. Measured, not guessed.
 - Full-page mobile screenshots come out wider than the viewport (the clipped
   off-screen drawer inflates CDP's content-size); check real overflow with
   `document.documentElement.scrollWidth <= clientWidth`, not screenshot width.

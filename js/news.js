@@ -142,7 +142,6 @@
         </label>
         <button class="btn btn-yellow" data-news-post ${busy ? "disabled" : ""}>${busy ? "Posting…" : "Publish"}</button>
       </div>
-      <p class="hint">The first image becomes the story's thumbnail.</p>
     </div>`;
   }
 

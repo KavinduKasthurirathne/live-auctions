@@ -23,7 +23,16 @@
         <p class="brand-sub">Where Hand Cricket Champions Shine</p>
       </div>
     </div>
-    <nav class="tabs" id="tabs">
+    <!-- Desktop: a pill row inside the header. Mobile (<=900px): app.js moves
+         this very node to <body>, where it becomes the off-canvas drawer - it
+         cannot be a viewport-level drawer while it sits inside the header
+         (a backdrop-filter ancestor is the containing block for fixed
+         children, and a sticky ancestor is a stacking context). -->
+    <nav class="tabs" id="tabs" aria-label="Main">
+      <div class="tabs-head">
+        <span class="tabs-title" id="navTitle">Menu</span>
+        <button class="nav-close" id="navClose" aria-label="Close menu">✕</button>
+      </div>
       <button class="tab active" data-tab="home">🏠 Home</button>
       <button class="tab" data-tab="series">🏆 Series</button>
       <button class="tab" data-tab="auctions">🔨 Auction</button>
@@ -33,13 +42,14 @@
       <button class="tab" data-tab="setup">⚙️ Setup</button>
     </nav>
     <div class="auth-box" id="authBox"></div>
-    <!-- Mobile only: opens the slide-in nav drawer (the .tabs list above). -->
-    <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="tabs">
+    <!-- Mobile only: opens the drawer. While it's open the drawer's own ✕ sits
+         in this exact spot, so the icon reads as a hamburger that became a close. -->
+    <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="tabs">
       <span></span><span></span><span></span>
     </button>
   </header>
-  <!-- Dimmed backdrop behind the mobile nav drawer; clicking it closes the menu. -->
-  <div class="nav-backdrop" id="navBackdrop"></div>
+  <!-- Dimmed page behind the open drawer; clicking it closes the menu. -->
+  <div class="nav-backdrop" id="navBackdrop" aria-hidden="true"></div>
 
   <main class="app-main">
 

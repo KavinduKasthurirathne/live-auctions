@@ -1439,26 +1439,109 @@ function wireEvents() {
   $("#tabs").addEventListener("click", e => {
     const tab = e.target.closest(".tab");
     if (!tab) return;
+    // Close FIRST: unlocking the page restores the scroll offset it was frozen
+    // at, and switchTab's scroll-to-top has to be the one that wins.
+    closeNav();
     switchTab(tab.dataset.tab);
     if (tab.dataset.tab === "auctions") switchSubTab("auction"); // land on Auction Room by default
     if (tab.dataset.tab === "rankings") switchSubTab("ranking"); // land on Player Ranking by default
-    closeNav(); // picking a destination dismisses the mobile drawer
   });
 
-  // Mobile nav drawer: the hamburger toggles it; the backdrop, the Escape
-  // key, or choosing a tab (above) closes it. Desktop never sets nav-open.
+  /* ---------------- mobile off-canvas nav drawer ----------------
+     The drawer CANNOT live inside .app-header: the header has a
+     backdrop-filter, which makes it the containing block for `position: fixed`
+     descendants (a fixed child is then sized against the ~70px header, not the
+     viewport - the "menu expands inside the navbar" bug), and `position: sticky`
+     makes it a stacking context, which caps anything inside it at the header's
+     own z-index. So below 900px we relocate the very same <nav id="tabs"> node
+     to <body> - same element, same id, same listeners (fantasy.js, fixtures.js
+     and series.js all hold references to it) - and hand it back to the header
+     on desktop, where the layout is untouched. */
+  const mq = window.matchMedia("(max-width: 900px)");
+  const header = document.querySelector(".app-header");
+  const nav = $("#tabs");
   const navToggle = $("#navToggle");
-  function closeNav() {
-    document.body.classList.remove("nav-open");
-    if (navToggle) navToggle.setAttribute("aria-expanded", "false");
-  }
-  if (navToggle) navToggle.addEventListener("click", () => {
-    const open = document.body.classList.toggle("nav-open");
-    navToggle.setAttribute("aria-expanded", String(open));
-  });
+  const navClose = $("#navClose");
   const navBackdrop = $("#navBackdrop");
-  if (navBackdrop) navBackdrop.addEventListener("click", closeNav);
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeNav(); });
+  const navSlot = document.createComment("tabs"); // marks the desktop home of the nav
+  if (header && nav) header.insertBefore(navSlot, nav);
+
+  let navReturnFocus = null; // control to hand focus back to when we close
+  const navIsOpen = () => document.body.classList.contains("nav-open");
+
+  // Freeze the page behind the drawer. The class goes on <html> ONLY - see the
+  // measured comparison next to `html.nav-locked` in styles.css: the same
+  // overflow:hidden on <body> makes the viewport clamp scrollY to 0, so the
+  // page would silently jump to the top and lose the reader's place.
+  const lockPage = on => document.documentElement.classList.toggle("nav-locked", on);
+
+  function placeNav() {
+    if (!header || !nav) return;
+    if (mq.matches) {
+      if (nav.parentElement !== document.body) document.body.appendChild(nav);
+      // Only a drawer is a dialog; the desktop pill row is just a nav.
+      nav.setAttribute("role", "dialog");
+      nav.setAttribute("aria-modal", "true");
+      nav.setAttribute("aria-labelledby", "navTitle");
+    } else {
+      closeNav({ restoreFocus: false }); // never leave a drawer open across the breakpoint
+      if (nav.parentElement !== header) header.insertBefore(nav, navSlot);
+      nav.removeAttribute("role");
+      nav.removeAttribute("aria-modal");
+      nav.removeAttribute("aria-labelledby");
+    }
+  }
+
+  function openNav() {
+    if (navIsOpen() || !mq.matches) return;
+    navReturnFocus = document.activeElement;
+    document.body.classList.add("nav-open");
+    lockPage(true);
+    if (navToggle) {
+      navToggle.setAttribute("aria-expanded", "true");
+      navToggle.setAttribute("aria-label", "Close menu");
+    }
+    if (navClose) navClose.focus(); // land the keyboard INSIDE the drawer
+  }
+
+  function closeNav(opts) {
+    if (!navIsOpen()) return;
+    document.body.classList.remove("nav-open");
+    lockPage(false);
+    if (navToggle) {
+      navToggle.setAttribute("aria-expanded", "false");
+      navToggle.setAttribute("aria-label", "Open menu");
+    }
+    // Focus returns to whatever opened the drawer (the hamburger), so keyboard
+    // users aren't dumped at the top of the document.
+    if (!opts || opts.restoreFocus !== false) {
+      const back = (navReturnFocus && document.contains(navReturnFocus)) ? navReturnFocus : navToggle;
+      if (back && back.focus) back.focus();
+    }
+    navReturnFocus = null;
+  }
+
+  // Tab must not walk out of an open drawer (aria-modal only tells AT that the
+  // rest is inert - it doesn't move focus).
+  function trapNavFocus(e) {
+    if (e.key !== "Tab" || !navIsOpen() || !nav) return;
+    const items = Array.from(nav.querySelectorAll("button"))
+      .filter(b => !b.disabled && b.offsetParent !== null); // skips role-hidden tabs (e.g. Setup)
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  if (navToggle) navToggle.addEventListener("click", () => (navIsOpen() ? closeNav() : openNav()));
+  if (navClose) navClose.addEventListener("click", () => closeNav());
+  if (navBackdrop) navBackdrop.addEventListener("click", () => closeNav());
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeNav();
+    else trapNavFocus(e);
+  });
+  mq.addEventListener("change", placeNav);
+  placeNav();
   // Sub-tab bars - the Auction and Rankings sections share the same
   // .subtab pattern; switchSubTab scopes the toggle to the right section.
   document.addEventListener("click", e => {

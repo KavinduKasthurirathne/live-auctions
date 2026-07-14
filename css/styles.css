@@ -78,6 +78,8 @@ body {
 .brand-sub { color: var(--muted); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
 
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Drawer chrome (title + ✕): mobile only - the desktop row is just pills. */
+.tabs-head { display: none; }
 .tab {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -368,45 +370,64 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .toast.bad { border-color: var(--red); }
 
 /* ===================== RESPONSIVE ===================== */
-/* Hamburger button: hidden on desktop; the 900px block below reveals it and
-   turns the .tabs row into a slide-in drawer. */
+/* ---- Mobile off-canvas navigation ----
+   Layering (page < backdrop < drawer). The drawer is a BODY-level element at
+   mobile widths (app.js relocates the node), so these z-indexes are compared
+   against the page itself - the sticky header (30), the auction overlay (100)
+   and the toast (200) all sit below it, while the true modals (1000) and the
+   sign-in gate (2000) still win, as they should. */
 .nav-toggle {
   display: none;
   width: 44px; height: 44px; flex: none;
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
   cursor: pointer; padding: 0;
   flex-direction: column; align-items: center; justify-content: center; gap: 5px;
-  /* Above the open drawer (same header stacking context), so the morphing
-     X stays visible and clickable as a close button. */
-  position: relative; z-index: 70;
+  /* Coming BACK: visible again immediately (with no delay here, focus can be
+     handed back to this button the instant the drawer closes - a delayed
+     `visibility` would swallow the .focus() call). */
+  transition: opacity 0.2s ease, visibility 0s;
 }
 .nav-toggle span {
   display: block; width: 20px; height: 2px; border-radius: 2px;
   background: var(--text);
   transition: transform 0.25s ease, opacity 0.2s ease;
 }
-/* The three bars morph into an X while the drawer is open. */
+/* The bars fold into an X as the button fades - and the drawer's own ✕ fades in
+   at exactly the same coordinates, so the icon reads as one morphing control.
+   Going AWAY, `visibility` waits for the fade to finish, then drops the button
+   out of the tab order while the drawer owns the focus. */
+body.nav-open .nav-toggle {
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+}
 body.nav-open .nav-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 body.nav-open .nav-toggle span:nth-child(2) { opacity: 0; }
 body.nav-open .nav-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-/* Dimmed page behind the open drawer; clicking it closes the menu (app.js).
-   NOTE: the drawer (.tabs) lives INSIDE the sticky header's stacking context
-   (z-index 30), so the backdrop must stay BELOW 30 - anything higher would
-   paint over the drawer and swallow its clicks. */
+/* Dimmed page behind the open drawer; clicking it closes the menu (app.js). */
 .nav-backdrop {
-  position: fixed; inset: 0; z-index: 25;
-  background: rgba(5, 5, 6, 0.6);
+  position: fixed; inset: 0; z-index: 890;
+  background: rgba(5, 5, 6, 0.62);
   opacity: 0; pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.28s ease;
 }
 body.nav-open .nav-backdrop { opacity: 1; pointer-events: auto; }
 
-/* Tablets & phones: hamburger + right-side slide-in nav drawer. */
+/* Page freeze while the drawer is open. Measured, because the options differ:
+     - position:fixed on <body>  -> the sticky header loses its scrollport and
+                                    flies off the top of the screen.
+     - overflow:hidden on <body> -> the viewport CLAMPS scrollY to 0, so the
+                                    page silently jumps to the top.
+     - overflow:hidden on <html> -> user scrolling stops, offset preserved. ✔
+   Paired with `overscroll-behavior: contain` on the drawer, so scrolling the
+   menu never chains out to the page behind it. */
+html.nav-locked { overflow: hidden; }
+
+/* Tablets & phones: hamburger + right-side off-canvas drawer. */
 @media (max-width: 900px) {
-  /* The closed drawer sits translated past the right edge; without this the
-     page gains ~320px of phantom horizontal scroll. `clip` (not `hidden`)
-     avoids creating a scroll container, so the sticky header keeps sticking. */
+  /* Belt & braces against a translated-off-screen drawer widening the page.
+     `clip` (not `hidden`) avoids creating a scroll container, so the sticky
+     header keeps sticking. */
   html, body { overflow-x: hidden; overflow-x: clip; }
   .auction-stage { grid-template-columns: 1fr; }
   .app-header { gap: 10px 12px; }
@@ -414,25 +435,50 @@ body.nav-open .nav-backdrop { opacity: 1; pointer-events: auto; }
   .brand-text { min-width: 0; }
   .brand-logo { width: 46px; height: 46px; border-radius: 12px; font-size: 15px; }
   .nav-toggle { display: flex; }
+
   .tabs {
-    position: fixed; top: 0; right: 0; bottom: 0; z-index: 60;
-    width: min(78vw, 320px);
+    /* --pad matches the header's own horizontal padding, so the drawer's ✕
+       lands exactly where the hamburger was at every width. */
+    --pad: clamp(14px, 3vw, 34px);
+    position: fixed; inset: 0 0 0 auto; z-index: 900;
+    width: min(84vw, 340px);
     flex-wrap: nowrap; flex-direction: column; align-items: stretch; gap: 6px;
-    padding: 86px 16px 24px;
+    padding: 0 var(--pad) 24px;
     background: rgba(15, 15, 17, 0.98);
     border-left: 1px solid var(--border);
-    box-shadow: -18px 0 40px rgba(0, 0, 0, 0.55);
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
-    transform: translateX(105%);
-    transition: transform 0.3s ease;
+    box-shadow: -18px 0 45px rgba(0, 0, 0, 0.55);
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    /* Closed: parked off-canvas AND hidden - `visibility` keeps its buttons out
+       of the tab order and off the screen-reader tree, which `transform` alone
+       would not do. It flips back only after the slide-out finishes. */
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.28s;
   }
-  body.nav-open .tabs { transform: translateX(0); }
-  .tabs::before {
-    content: "MENU";
-    position: absolute; top: 36px; left: 18px;
+  body.nav-open .tabs {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+  }
+  /* Drawer chrome: title + close, pinned while the tab list scrolls under it. */
+  .tabs-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    position: sticky; top: 0; z-index: 1;
+    margin: 0 calc(var(--pad) * -1) 12px;
+    padding: 12px var(--pad); min-height: 70px;
+    background: inherit; border-bottom: 1px solid var(--border);
+  }
+  .tabs-title {
     font-family: "Russo One", sans-serif; font-size: 13px; letter-spacing: 2px;
-    color: var(--muted);
+    text-transform: uppercase; color: var(--muted);
   }
+  .nav-close {
+    width: 44px; height: 44px; flex: none;
+    display: grid; place-items: center;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    color: var(--text); font-size: 16px; line-height: 1; cursor: pointer;
+  }
+  .nav-close:hover { border-color: var(--gold); color: var(--yellow); }
   .tab { flex: none; text-align: left; padding: 13px 16px; font-size: 15px; }
 }
 @media (max-width: 760px) {

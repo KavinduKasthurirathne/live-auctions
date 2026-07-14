@@ -7,8 +7,9 @@
         the 🏆 Series tab (window.HCCLSeries): each card is logo |
         name + duration | Champion/Runner-up/MVP podium | Most Runs +
         Most Wickets. A LIVE series leads with an "in progress" card.
-        Only what was played in the last RECENT_MONTHS shows here -
-        the full record stays in the Series tab.
+        Shows THIS YEAR's tournaments (the year comes from the duration
+        typed when the tournament was created) - every year's full
+        record stays in the Series tab.
      3. News shell (#homeNews) - filled by js/news.js.
 
    The per-season honors & leaderboards that used to live here moved
@@ -33,13 +34,6 @@
   const series = () => window.HCCLSeries || null;
 
   /* ---------------------- carousel cards ---------------------- */
-  // Hall of Champions window: only tournaments PLAYED in the last N months show
-  // on Home. Everything ever played stays in the 🏆 Series tab.
-  const RECENT_MONTHS = 6;
-  // …but a quiet stretch must never empty the Hall - if the window holds fewer
-  // than this, the most recent tournaments outside it top the carousel back up.
-  const MIN_CARDS = 3;
-
   // A tournament/season logo block: image when we have one, else initials.
   function cardLogo(img, name) {
     if (img) return `<div class="champs-logo" style="background-image:url('${img}')"></div>`;
@@ -66,8 +60,7 @@
     return new Date(+h[3], MONTH_IDX[h[2]], h[1] ? +h[1] : 1).getTime();
   }
   // Recency key: the LAST date ("MAR 2026 - APR 2026" -> 30 Apr; "JAN 2026" ->
-  // 31 Jan; day 0 of the next month IS the last day of this one). No date at
-  // all -> -Infinity, i.e. never inside the recent window.
+  // 31 Jan; day 0 of the next month IS the last day of this one).
   function endStamp(duration) {
     const hits = monthHits(duration);
     const h = hits[hits.length - 1];
@@ -77,10 +70,9 @@
       ? new Date(y, mo, +h[1], 23, 59, 59).getTime()
       : new Date(y, mo + 1, 0, 23, 59, 59).getTime();
   }
-  function windowStart() {
-    const n = new Date();
-    return new Date(n.getFullYear(), n.getMonth() - RECENT_MONTHS, n.getDate()).getTime();
-  }
+  // Every year the duration names ("DEC 2026 - JAN 2027" -> [2026, 2027], so a
+  // season straddling New Year belongs to both).
+  const yearsOf = duration => monthHits(duration).map(h => +h[3]);
 
   // Four zones in one row: logo | name + duration | Champion/Runner-up/MVP
   // podium | Most Runs & Most Wickets. Cards without a leaders zone drop it.
@@ -162,6 +154,7 @@
         live,
         start: startStamp(t.duration),
         end: endStamp(t.duration),
+        years: yearsOf(t.duration),
         logo: t.logo || (no ? A.seasonLogo(no) : (A.tournamentLogo && A.tournamentLogo(t.name))) || "",
         league: no ? "HC Champions League" : "",
         title: no ? `Season ${pad2(no)}` : t.name,
@@ -173,14 +166,17 @@
       });
     });
 
-    // Recent only: played within the last RECENT_MONTHS (a live tournament is
-    // by definition current). Older ones live on in the Series tab.
-    const cutoff = windowStart();
-    const recent = c => c.live || c.end >= cutoff;
-    let picked = cards.filter(recent);
-    if (picked.length < MIN_CARDS) {
-      const older = cards.filter(c => !recent(c)).sort((a, b) => b.end - a.end);
-      picked = picked.concat(older.slice(0, MIN_CARDS - picked.length));
+    // THIS YEAR's tournaments - the year comes from the duration an admin types
+    // when creating one ("MAR 2026 - APR 2026"). Anything live is current by
+    // definition, whatever its dates say. Earlier years live on in the Series
+    // tab, which keeps the full record.
+    const thisYear = new Date().getFullYear();
+    let picked = cards.filter(c => c.live || c.years.includes(thisYear));
+    // Early in a new year nothing may have finished yet - fall back to the most
+    // recent year that HAS champions rather than showing an empty Hall.
+    if (!picked.length) {
+      const latest = cards.reduce((y, c) => Math.max(y, ...c.years), -Infinity);
+      if (isFinite(latest)) picked = cards.filter(c => c.years.includes(latest));
     }
 
     // Order: LIVE tournaments lead (that's the default view). With none live,
