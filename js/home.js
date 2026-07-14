@@ -3,19 +3,20 @@
 
    Landing view after sign-in:
      1. Branded hero (site logo + "HC LEAGUES" + tagline).
-     2. Champions carousel - auto-advancing cards, one per finished
-        HCCL season (honors from window.HCCLSeasonArchive) plus one
-        per finished registry tournament that has honors recorded
-        (window.HCCLSeries). Left side: logo + title; right side:
-        Champion / Runner-up / MVP podium. Live seasons/tournaments
-        lead with a LIVE card (current Most Runs / Most Wickets).
+     2. Champions carousel - auto-advancing cards, ONE PER SERIES in
+        the 🏆 Series tab (window.HCCLSeries): each card is logo |
+        name + duration | Champion/Runner-up/MVP podium | Most Runs +
+        Most Wickets. A LIVE series leads with an "in progress" card.
+        Only what was played in the last RECENT_MONTHS shows here -
+        the full record stays in the Series tab.
      3. News shell (#homeNews) - filled by js/news.js.
 
    The per-season honors & leaderboards that used to live here moved
    to js/season-archive.js and are shown inside the Series tab's
-   HCCL tournament hub. This module only READS the archive (and the
-   series registry) to build carousel cards, and re-renders when
-   either reports a data change.
+   HCCL tournament hub. This module only READS the registry (for what
+   exists, its status and its honors) and the archive (for season
+   logos, stats-sheet leaders and the podium markup), and re-renders
+   when either reports a data change.
    ============================================================ */
 (function () {
   "use strict";
@@ -32,6 +33,13 @@
   const series = () => window.HCCLSeries || null;
 
   /* ---------------------- carousel cards ---------------------- */
+  // Hall of Champions window: only tournaments PLAYED in the last N months show
+  // on Home. Everything ever played stays in the 🏆 Series tab.
+  const RECENT_MONTHS = 6;
+  // …but a quiet stretch must never empty the Hall - if the window holds fewer
+  // than this, the most recent tournaments outside it top the carousel back up.
+  const MIN_CARDS = 3;
+
   // A tournament/season logo block: image when we have one, else initials.
   function cardLogo(img, name) {
     if (img) return `<div class="champs-logo" style="background-image:url('${img}')"></div>`;
@@ -39,15 +47,39 @@
     return `<div class="champs-logo fallback">${initials}</div>`;
   }
 
-  // Chronology key: the leading date of a duration string ("MAR 2026 - APR
-  // 2026", "13 MAY 2026 - …"). Unparseable strings ("COMING SOON") sink to
-  // the end, so a tournament without dates never jumps the queue.
+  /* ---- dates parsed out of the duration string an admin typed ---- */
   const MONTH_IDX = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
+  function monthHits(duration) {
+    const re = /(?:(\d{1,2})\s+)?(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?\s+(\d{4})/g;
+    const s = String(duration || "").toUpperCase();
+    const out = [];
+    let m;
+    while ((m = re.exec(s))) out.push(m);
+    return out;
+  }
+  // Chronology key: the FIRST date of a duration ("MAR 2026 - APR 2026" -> 1 Mar
+  // 2026). Unparseable strings ("COMING SOON") sink to the end, so a tournament
+  // without dates never jumps the queue.
   function startStamp(duration) {
-    const m = String(duration || "").toUpperCase()
-      .match(/(?:(\d{1,2})\s+)?(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?\s+(\d{4})/);
-    if (!m) return Infinity;
-    return new Date(+m[3], MONTH_IDX[m[2]], m[1] ? +m[1] : 1).getTime();
+    const h = monthHits(duration)[0];
+    if (!h) return Infinity;
+    return new Date(+h[3], MONTH_IDX[h[2]], h[1] ? +h[1] : 1).getTime();
+  }
+  // Recency key: the LAST date ("MAR 2026 - APR 2026" -> 30 Apr; "JAN 2026" ->
+  // 31 Jan; day 0 of the next month IS the last day of this one). No date at
+  // all -> -Infinity, i.e. never inside the recent window.
+  function endStamp(duration) {
+    const hits = monthHits(duration);
+    const h = hits[hits.length - 1];
+    if (!h) return -Infinity;
+    const y = +h[3], mo = MONTH_IDX[h[2]];
+    return h[1]
+      ? new Date(y, mo, +h[1], 23, 59, 59).getTime()
+      : new Date(y, mo + 1, 0, 23, 59, 59).getTime();
+  }
+  function windowStart() {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth() - RECENT_MONTHS, n.getDate()).getTime();
   }
 
   // Four zones in one row: logo | name + duration | Champion/Runner-up/MVP
@@ -66,94 +98,103 @@
     </article>`;
   }
 
-  // Card list: LIVE cards lead (the default view), then every finished
-  // tournament - HCCL seasons AND the other HC tournaments interleaved -
-  // in tournament-date order.
+  // EVERY series in the 🏆 Series tab feeds the Hall of Champions - HCCL
+  // seasons and the other HC tournaments alike - so a tournament an admin adds
+  // there shows up here the moment its champion is recorded. One card per
+  // entry: LIVE ones carry an "in progress" note, finished ones the podium.
   function buildCards() {
     const A = archive();
     const S = series();
-    const liveCards = [];
-    const doneCards = [];
+    if (!A) return [];
 
-    const leadersHtml = (mostRuns, mostWickets) => (A && (mostRuns || mostWickets)) ? `<div class="champs-race">
+    const isHccl = t => !!(t.legacy || t.archive === "hccl");
+    const seasonNoOf = t => t.season || (t.legacy ? 6 : 0);
+
+    // The registry is the source of truth. If it never loaded (script error),
+    // fall back to the bundled archive so Home still tells the story.
+    const list = S ? S.list() : A.seasons().map(s => ({
+      id: `hccl-s${s.no}`, name: `HCCL Season ${pad2(s.no)}`,
+      archive: "hccl", season: s.no, duration: s.year || "",
+      status: s.ongoing ? "live" : "completed",
+      honors: { champion: s.champion, runnerUp: s.runnerUp, mvp: s.mvp },
+    }));
+
+    const leadersHtml = (mostRuns, mostWickets) => (mostRuns || mostWickets) ? `<div class="champs-race">
       ${A.extraItem("🏏", "Most Runs", mostRuns || "TBD")}
       ${A.extraItem("🎯", "Most Wickets", mostWickets || "TBD")}
     </div>` : "";
 
-    // Ongoing HCCL season: champions aren't decided, so the mid zone carries
-    // an "in progress" note instead of a podium of TBDs.
-    const on = A && A.ongoing();
-    if (on) {
-      const lead = A.leaders(on.no);
-      liveCards.push({
-        live: true, stamp: startStamp(on.year),
-        logo: A.seasonLogo(on.no),
-        league: "HC Champions League",
-        title: `Season ${pad2(on.no)}`,
-        duration: on.year || "",
-        midHtml: `<div class="champs-progress">Season in progress<span>Champion crowned soon - follow it in 🏆 Series</span></div>`,
-        rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
-      });
-    }
-
-    // Registry tournaments - excluding the whole HCCL family: the legacy entry
-    // AND the seeded per-season entries (archive:"hccl") are already covered by
-    // the archive-derived cards, so they'd only duplicate.
-    const list = (S ? S.list() : []).filter(t => !t.legacy && t.archive !== "hccl");
-    // A registry tournament's leaders: derived from its stats sheet (bundled
-    // or cloud-lifted into honors), else the hand-entered honors fields.
-    const tournamentLead = t => {
+    // Most Runs / Most Wickets: an HCCL season derives them from its own stats
+    // sheet; any other tournament from its imported/bundled sheet, falling back
+    // to the honors fields an editor typed.
+    const leadersOf = t => {
+      const no = seasonNoOf(t);
+      if (isHccl(t) && no) return A.leaders(no);
       const h = t.honors || {};
-      let lead = { mostRuns: h.mostRuns || "", mostWickets: h.mostWickets || "" };
-      const csv = A && A.tournamentCsv ? A.tournamentCsv(t.id, t.name) : null;
+      const lead = { mostRuns: h.mostRuns || "", mostWickets: h.mostWickets || "" };
+      const csv = A.tournamentCsv ? A.tournamentCsv(t.id, t.name) : null;
       if (csv) {
         const der = A.leadersFromRows(A.rowsFromCsv(csv));
-        lead = { mostRuns: der.mostRuns || lead.mostRuns, mostWickets: der.mostWickets || lead.mostWickets };
+        lead.mostRuns = der.mostRuns || lead.mostRuns;
+        lead.mostWickets = der.mostWickets || lead.mostWickets;
       }
       return lead;
     };
-    const tournamentLogo = t => t.logo || (A && A.tournamentLogo && A.tournamentLogo(t.name)) || "";
 
-    list.filter(t => t.status === "live").forEach(t => {
-      const lead = tournamentLead(t);
-      liveCards.push({
-        live: true, stamp: startStamp(t.duration),
-        logo: tournamentLogo(t), title: t.name, duration: t.duration,
-        midHtml: `<div class="champs-progress">Tournament in progress<span>Follow it in the 🏆 Series tab</span></div>`,
+    const cards = [];
+    list.forEach(t => {
+      const no = isHccl(t) ? seasonNoOf(t) : 0;
+      const s = no ? (A.seasons().find(x => x.no === no) || null) : null;
+      // Honors as recorded in the Series entry; for an HCCL season the bundled
+      // archive fills anything the registry doesn't carry.
+      const rh = t.honors || {};
+      const honors = {
+        champion: rh.champion || (s && s.champion) || "",
+        runnerUp: rh.runnerUp || (s && s.runnerUp) || "",
+        mvp: rh.mvp || (s && s.mvp) || "",
+      };
+      const live = t.status === "live";
+      // Skip what has nothing to celebrate: upcoming seasons, and finished ones
+      // whose champion nobody has recorded yet.
+      if (!live && !honors.champion) return;
+      const lead = leadersOf(t);
+      cards.push({
+        live,
+        start: startStamp(t.duration),
+        end: endStamp(t.duration),
+        logo: t.logo || (no ? A.seasonLogo(no) : (A.tournamentLogo && A.tournamentLogo(t.name))) || "",
+        league: no ? "HC Champions League" : "",
+        title: no ? `Season ${pad2(no)}` : t.name,
+        duration: t.duration || "",
+        midHtml: live
+          ? `<div class="champs-progress">${no ? "Season" : "Tournament"} in progress<span>${no ? "Champion crowned soon - follow it in 🏆 Series" : "Follow it in the 🏆 Series tab"}</span></div>`
+          : A.podiumHtml(honors, t.solo ? "player" : "team"),
         rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
       });
     });
 
-    // Finished HCCL seasons (leaders derive from each season's stats sheet).
-    if (A) {
-      A.seasons().filter(s => !s.ongoing && s.champion).forEach(s => {
-        const lead = A.leaders(s.no);
-        doneCards.push({
-          stamp: startStamp(s.year),
-          logo: A.seasonLogo(s.no),
-          league: "HC Champions League",
-          title: `Season ${pad2(s.no)}`,
-          duration: s.year || "",
-          midHtml: A.podiumHtml(s),
-          rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
-        });
-      });
+    // Recent only: played within the last RECENT_MONTHS (a live tournament is
+    // by definition current). Older ones live on in the Series tab.
+    const cutoff = windowStart();
+    const recent = c => c.live || c.end >= cutoff;
+    let picked = cards.filter(recent);
+    if (picked.length < MIN_CARDS) {
+      const older = cards.filter(c => !recent(c)).sort((a, b) => b.end - a.end);
+      picked = picked.concat(older.slice(0, MIN_CARDS - picked.length));
     }
 
-    // Completed registry tournaments with a recorded champion. Leaders come
-    // from the bundled/imported stats sheet, else the honors fields.
-    list.filter(t => t.status === "completed" && t.honors && t.honors.champion).forEach(t => {
-      const lead = tournamentLead(t);
-      doneCards.push({
-        stamp: startStamp(t.duration),
-        logo: tournamentLogo(t), title: t.name, duration: t.duration,
-        midHtml: A ? A.podiumHtml(t.honors, t.solo ? "player" : "team") : "",
-        rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
-      });
-    });
+    // Order: LIVE tournaments lead (that's the default view). With none live,
+    // the newest champion takes the lead card instead. The rest then run
+    // oldest -> newest, so the carousel walks the story forward and wraps back
+    // round to the current one.
+    const live = picked.filter(c => c.live).sort((a, b) => a.start - b.start);
+    const done = picked.filter(c => !c.live).sort((a, b) => a.start - b.start);
+    const lead = [];
+    if (!live.length && done.length) {
+      const newest = done.reduce((best, c) => (c.end > best.end ? c : best), done[0]);
+      lead.push(...done.splice(done.indexOf(newest), 1));
+    }
 
-    liveCards.sort((a, b) => a.stamp - b.stamp);
-    doneCards.sort((a, b) => a.stamp - b.stamp);
     // Belt & braces: if the same tournament somehow exists twice (a seeded
     // entry AND a hand-created twin in the registry), only one card shows.
     const seen = new Set();
@@ -163,7 +204,7 @@
       seen.add(k);
       return true;
     };
-    return [...liveCards.filter(uniq), ...doneCards.filter(uniq)];
+    return [...live, ...lead, ...done].filter(uniq);
   }
 
   /* ---------------------- carousel behaviour ---------------------- */

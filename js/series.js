@@ -523,11 +523,8 @@
         ${(!archiveOnly && m.id !== activeId) ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament">★</button>` : ""}
         ${(!m.legacy && m.id !== activeId) ? `<button class="icon-btn del" data-series-del="${esc(m.id)}" title="Delete (only while empty)">🗑</button>` : ""}
       </div>` : "";
-    // Archive-only seasons have no auction/fixtures data to "View" - their
-    // Details hub IS the content.
-    const viewBtn = archiveOnly ? "" : (isViewing
-      ? `<button class="btn btn-dark" disabled>✓ Viewing</button>`
-      : `<button class="btn btn-yellow" data-series-view="${esc(m.id)}">View</button>`);
+    // No "View" button: tapping the card (or Details) opens the hub AND - for a
+    // tournament that has live data roots - points the rest of the app at it.
     return `
       <div class="series-card${isViewing ? " viewing" : ""}" data-series-open="${esc(m.id)}">
         ${logoHtml(m)}
@@ -537,7 +534,6 @@
           <div class="series-chips">${chips}</div>
         </div>
         <div class="series-actions">
-          ${viewBtn}
           <button class="btn btn-dark" data-series-open="${esc(m.id)}">Details ›</button>
           ${admin}
         </div>
@@ -569,8 +565,9 @@
         <label>Tournament logo${editing && editing.logo ? " (leave empty to keep current)" : ""}
           <input type="file" id="serLogoFile" accept="image/*" />
         </label>
-        <details class="stats-fieldset"${editing && editing.honors ? " open" : ""}>
-          <summary>Honors (optional) - shown on the Home champions carousel once completed</summary>
+        <details class="stats-fieldset"${editing && (editing.honors || editing.status === "live") ? " open" : ""}>
+          <summary>Honors - the podium shown in the Home page's Hall of Champions</summary>
+          ${editing && editing.status === "live" ? `<p class="hint">Finished? Set <b>Status: Completed</b> above and fill in the champion, runner-up and MVP. The LIVE badges come off everywhere and this tournament's podium joins the Hall of Champions - for everyone, straight away.</p>` : ""}
           <label>Champion (team, or player for solo events)
             <input type="text" id="serChampion" placeholder="e.g. Super Fire Dragons" value="${editing && editing.honors ? esc(editing.honors.champion || "") : ""}" />
           </label>
@@ -795,9 +792,6 @@
           <div class="series-chips">${chips}</div>
         </div>
         <div class="series-actions">
-          ${isArchiveOnly(m) ? "" : (isViewing
-            ? `<button class="btn btn-dark" disabled>✓ Viewing</button>`
-            : `<button class="btn btn-yellow" data-series-view="${esc(m.id)}">View</button>`)}
           ${admin ? `
           <div class="series-admin-row">
             <button class="icon-btn" data-series-edit="${esc(m.id)}" title="Edit tournament">✎</button>
@@ -893,11 +887,20 @@
       return;
     }
     // Checked LAST: the whole list card is clickable, but its buttons
-    // (View / edit / delete / default) must win over "open the hub".
+    // (edit / delete / default) must win over "open the hub".
     const open = t.closest("[data-series-open]");
     if (open) {
       const id = open.getAttribute("data-series-open");
-      if (metaOf(id)) { UI.detail = id; UI.form = null; render(); }
+      const m = metaOf(id);
+      if (!m) return;
+      UI.detail = id; UI.form = null;
+      // Opening a tournament that HAS data roots (auction, fixtures, MVP,
+      // fantasy) also points the rest of the app at it - that's the job the
+      // old "View" button did. Archive/stats-only entries have no data roots,
+      // so for them the hub is simply the record. setViewing() no-ops when
+      // this tournament is already the one being viewed.
+      if (!isArchiveOnly(m)) api.setViewing(id);
+      render();
       return;
     }
   }

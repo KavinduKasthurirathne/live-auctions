@@ -108,7 +108,59 @@
 
   let cloudSeasons = null; // seasons read from Firestore (home/seasons), or null
   // Cloud copy wins when present; otherwise the bundled SEASONS render offline.
-  const getSeasons = () => (cloudSeasons && cloudSeasons.length) ? cloudSeasons : SEASONS;
+  const baseSeasons = () => (cloudSeasons && cloudSeasons.length) ? cloudSeasons : SEASONS;
+
+  /* ---------- the Series registry decides who is LIVE ---------- */
+  // A season is "ongoing" while its entry in the Series tab says `live`, and it
+  // is CROWNED the moment an admin fills that entry's Champion / Runner-up /
+  // MVP in (Series -> the season -> ✎ Edit -> Status: Completed + Honors).
+  // That's a cloud edit any admin can make from the phone - no redeploy - and
+  // it drives the LIVE badges, the Home carousel and the bracket below.
+  // The `ongoing` / honors values authored in SEASONS are the offline default,
+  // used until the registry is readable.
+  function seriesMeta(no) {
+    const S = window.HCCLSeries;
+    if (!S || !S.ready || typeof S.list !== "function") return null;
+    return S.list().find(t => (t.season || (t.legacy ? 6 : 0)) === no) || null;
+  }
+
+  // Bracket team names are authored UPPERCASE; an admin types "Velocity Reapers".
+  // Resolve a typed name to the spelling already in the bracket, because the
+  // winner ticks and the hover trace match team names by exact string.
+  function canonicalTeam(name, s) {
+    const t = String(name || "").trim();
+    const p = s && s.playoffs;
+    if (!t || !p) return t;
+    const pool = [];
+    ["q1", "elim"].forEach(k => { if (p[k]) pool.push(p[k].a, p[k].b); });
+    return pool.find(x => x && String(x).trim().toLowerCase() === t.toLowerCase()) || t;
+  }
+
+  function withRegistry(s) {
+    const m = seriesMeta(s.no);
+    if (!m) return s;
+    const h = m.honors || {};
+    const out = { ...s, ongoing: m.status === "live" };
+    if (h.champion) out.champion = canonicalTeam(h.champion, s);
+    if (h.runnerUp) out.runnerUp = canonicalTeam(h.runnerUp, s);
+    if (h.mvp) out.mvp = h.mvp;
+    // Naming a champion also settles the bracket: the two finalists ARE the
+    // champion and the runner-up, and Qualifier 1's winner is already one of
+    // them - so the other one is who came through Qualifier 2.
+    const p = out.playoffs;
+    if (p && p.q1 && out.champion && out.runnerUp && !(p.final && p.final.winner)) {
+      const q1w = String(p.q1.winner || "").toLowerCase();
+      const other = [out.champion, out.runnerUp].find(t => String(t).toLowerCase() !== q1w) || "";
+      out.playoffs = {
+        ...p,
+        q2: { ...(p.q2 || {}), winner: (p.q2 && p.q2.winner) || other },
+        final: { ...(p.final || {}), winner: out.champion },
+      };
+    }
+    return out;
+  }
+  const getSeasons = () => baseSeasons().map(withRegistry);
+
   // Active season tab (season number). Defaults to the ongoing season, else the last.
   let activeSeason = (SEASONS.find(s => s.ongoing) || SEASONS[SEASONS.length - 1]).no;
   // Active leaderboard sub-tab within a season: "overall" | "batting" | "bowling".
@@ -370,12 +422,11 @@
     [6, /runs scored/i], [22, /^wickets$/i], [30, /best bowl/i],
   ];
 
-  // Per-season CSV text uploaded live by an editor for the ongoing season
-  // (Firestore seasonStatsLive/S#), keyed by season number. Wins over the
-  // bundled window.HCCL_SEASON_STATS when present - see seasonRows() below.
+  // Per-season CSV text published by an editor (Firestore seasonStatsLive/S#),
+  // keyed by season number. Wins over the bundled window.HCCL_SEASON_STATS when
+  // present - see seasonRows() below.
   const liveCsvBySeason = {};
-  let liveSeasonNo = null; // season number the Firestore listener currently follows
-  let liveUnsub = null;    // unsubscribe fn for that listener
+  let liveUnsub = null;    // unsubscribe fn for the seasonStatsLive listener
 
   const seasonRowsCache = {};
   // Parse one season's CSV into an array of cell-arrays (header row dropped).
@@ -580,11 +631,10 @@
         <div class="season-boards">
           <div class="season-boards-head">
             <h3 class="season-boards-title">Season ${pad2(s.no)} · Player Stats</h3>
-            ${s.ongoing ? `
-            <label class="btn btn-yellow file-btn season-stats-import" title="Upload the latest Season ${pad2(s.no)} stats CSV - updates the leaderboard live for everyone">
+            <label class="btn btn-yellow file-btn season-stats-import" title="Upload the Season ${pad2(s.no)} stats CSV - updates the leaderboard for everyone (raw STUMPS exports are fine)">
               <span>⬆ Import Season Stats</span>
               <input type="file" class="season-stats-import-file" data-season="${s.no}" accept=".csv,text/csv" hidden />
-            </label>` : ""}
+            </label>
           </div>
           <div class="board-tabs" role="tablist">
             ${BOARDS.map(b => `<button class="board-tab${b.key === activeBoard ? " active" : ""}" data-board="${b.key}">${esc(b.label)}</button>`).join("")}
@@ -742,9 +792,6 @@
           seasons: SEASONS,
         }).catch(err => console.error("home cloud seed failed:", err));
       }
-      // The ongoing season may have changed along with the honors - keep the
-      // live-stats listener pointed at whichever season is ongoing now.
-      startSeasonLiveSync();
     }, err => console.error("home snapshot error:", err));
   }
 
@@ -794,13 +841,17 @@
     }
   }
 
-  /* ------ Firestore: live stats override for the ONGOING season only ------ */
+  /* ------ Firestore: published season stats sheets (seasonStatsLive/S#) ------ */
   // "Store raw CSV, recompute client-side" (mirrors ranking.js's ranking/stats):
-  // an editor imports the day's Season Stats CSV; it's published as-is to
+  // an editor imports a Season Stats CSV; it's published as-is to
   // seasonStatsLive/S{no}; every signed-in client's onSnapshot listener picks
   // it up and seasonRows() prefers it over the bundled CSV for that season.
-  // Only ever follows whichever season is currently flagged `ongoing` - a
-  // finished season always renders from the committed bundle.
+  //
+  // The listener follows the WHOLE collection, not just the ongoing season: the
+  // sheet an editor publishes on finals night has to keep rendering after the
+  // season is marked completed. (The bundled CSVs are only as fresh as the last
+  // deploy, so dropping the published one on season end would silently roll the
+  // leaderboards back.)
   function notify(msg, kind) {
     if (typeof window.toast === "function") window.toast(msg, kind);
     else console.log("[season-archive]", msg);
@@ -836,42 +887,41 @@
 
   function startSeasonLiveSync() {
     const H = window.HCCL;
-    if (!H || !H.configured || !H.user || !H.db || !H.fs) return;
+    if (liveUnsub || !H || !H.configured || !H.user || !H.db || !H.fs) return;
     const fs = H.fs;
-    if (!fs.doc || !fs.onSnapshot) return;
-    const ongoing = getSeasons().find(s => s.ongoing);
-    const no = ongoing ? ongoing.no : null;
-    if (no === liveSeasonNo) return; // already following the right season (or correctly following none)
-    if (liveUnsub) { liveUnsub(); liveUnsub = null; }
-    // A season that just stopped being "ongoing" must immediately revert to
-    // the committed bundle, not keep showing a stale import.
-    if (liveSeasonNo != null) { delete liveCsvBySeason[liveSeasonNo]; delete seasonRowsCache[liveSeasonNo]; }
-    liveSeasonNo = no;
-    if (no == null) { render(); emit(); return; }
-    const ref = fs.doc(H.db, "seasonStatsLive", "S" + no);
-    liveUnsub = fs.onSnapshot(ref, snap => {
-      const data = snap.exists() ? snap.data() : null;
-      const csv = data && typeof data.csv === "string" && data.csv.trim() ? data.csv : null;
-      if (csv) liveCsvBySeason[no] = csv; else delete liveCsvBySeason[no];
-      delete seasonRowsCache[no]; // invalidate BEFORE render() recomputes
+    if (!fs.collection || !fs.onSnapshot) return;
+    liveUnsub = fs.onSnapshot(fs.collection(H.db, "seasonStatsLive"), snap => {
+      // Rebuilt from scratch each snapshot, so a DELETED sheet correctly falls
+      // back to the bundled CSV instead of lingering.
+      Object.keys(liveCsvBySeason).forEach(no => {
+        delete liveCsvBySeason[no];
+        delete seasonRowsCache[no]; // invalidate BEFORE render() recomputes
+      });
+      snap.forEach(d => {
+        const data = d.data() || {};
+        const no = parseInt(data.season || String(d.id).replace(/^S/i, ""), 10);
+        const csv = (typeof data.csv === "string" && data.csv.trim()) ? data.csv : "";
+        if (!no || !csv) return;
+        liveCsvBySeason[no] = csv;
+        delete seasonRowsCache[no];
+      });
       render();
       emit();
-    }, err => console.error("season live stats snapshot error:", err));
+    }, err => console.error("season stats snapshot error:", err));
   }
 
-  // Editor-only: publish an uploaded Season Stats CSV so it updates the
-  // ongoing season's leaderboard for everyone (or apply locally when offline).
+  // Editor-only: publish an uploaded Season Stats CSV so it updates that
+  // season's leaderboard for everyone (or apply locally when offline). Allowed
+  // for ANY season - the ongoing one gets a fresh sheet after every match day,
+  // and a finished one can still be corrected.
   async function importSeasonCsv(file, seasonNo) {
     if (!file || !seasonNo) return;
     const H = window.HCCL;
     let text = "";
     try { text = await file.text(); } catch (e) { notify("Couldn't read that file.", "bad"); return; }
+    text = api.normalizeSheet(text); // tolerate raw STUMPS exports (preamble rows)
     const check = validateSeasonCsv(text);
     if (!check.ok) { notify(check.reason, "bad"); return; }
-    // Re-confirm this season is still ongoing (the button may be stale if the
-    // tab's been open across a season change).
-    const ongoing = getSeasons().find(s => s.ongoing);
-    if (!ongoing || ongoing.no !== seasonNo) { notify("That season is no longer ongoing - refresh and try again.", "bad"); return; }
 
     if (H && H.configured && H.db && H.fs && H.fs.setDoc && H.canEdit && H.canEdit()) {
       try {
@@ -976,6 +1026,12 @@
     // the carousel on Home stays fresh even if nobody opens the Series hub.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
       window.HCCL.onChange(() => { startHomeSync(); seedSeasonStats(); startSeasonLiveSync(); });
+    }
+    // The registry owns each season's live/completed status and honors
+    // (see withRegistry) - repaint the moment an admin changes them, and let
+    // home.js rebuild its carousel off the same event.
+    if (window.HCCLSeries && typeof window.HCCLSeries.onChange === "function") {
+      window.HCCLSeries.onChange(() => { render(); emit(); });
     }
   }
 

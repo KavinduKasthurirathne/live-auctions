@@ -1208,12 +1208,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 /* Belt & braces: rules already reject non-editors; never even show them the box. */
 body:not(.can-edit) .news-composer { display: none; }
 .news-composer-head { display: flex; align-items: flex-start; gap: 10px; }
-.news-input {
-  flex: 1; min-height: 64px; resize: vertical;
+.news-composer-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.news-title-input, .news-input {
+  width: 100%;
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
   color: var(--text); font: inherit; font-size: 14px; padding: 10px 12px;
 }
-.news-input:focus { outline: none; border-color: var(--gold); }
+.news-title-input { font-weight: 700; font-size: 15px; }
+.news-input { min-height: 64px; resize: vertical; }
+.news-title-input:focus, .news-input:focus { outline: none; border-color: var(--gold); }
 /* Composer: attached-image thumbnails, each with its own remove button. */
 .news-attach-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .news-attach { position: relative; }
@@ -1222,28 +1225,99 @@ body:not(.can-edit) .news-composer { display: none; }
 .news-composer-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
 .news-composer-bar .btn { padding: 9px 18px; font-size: 13px; }
 
-.news-feed { display: flex; flex-direction: column; gap: 12px; }
-.news-item { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; }
-.news-item-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.news-item-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* Story list (Cricinfo/Cricbuzz style): one panel, rows split by hairlines.
+   Each row is [fixed-size thumbnail] [headline + description + byline] - the
+   picture CROPS into its tile, so it can never stretch the row. */
+.news-feed { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; }
+.news-list { display: flex; flex-direction: column; }
+.news-card {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 14px 16px; cursor: pointer; border-radius: 16px;
+  transition: background .16s ease;
+}
+.news-card + .news-card { border-top: 1px solid var(--border); border-radius: 0; }
+.news-card:hover, .news-card:focus-visible { background: var(--panel-2); outline: none; }
+.news-thumb {
+  flex: none; width: 190px; aspect-ratio: 16 / 10; border-radius: 10px;
+  background: var(--panel-2) center/cover no-repeat; border: 1px solid var(--border);
+  position: relative;
+}
+.news-thumb.empty {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; filter: grayscale(1); opacity: .6;
+}
+/* "+2" on a multi-image story - the rest are in the popup. */
+.news-thumb-count {
+  position: absolute; right: 6px; bottom: 6px;
+  background: rgba(10, 10, 11, .78); border: 1px solid var(--border); border-radius: 999px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .3px; padding: 2px 7px; color: #fff;
+}
+.news-card-body { flex: 1; min-width: 0; }
+.news-headline {
+  font-size: 16px; font-weight: 700; line-height: 1.32; overflow-wrap: break-word;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.news-card:hover .news-headline { color: var(--yellow); }
+.news-desc {
+  color: var(--muted); font-size: 13.5px; line-height: 1.45; margin-top: 5px; overflow-wrap: break-word;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.news-card-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin-top: 9px; color: var(--muted); font-size: 12px;
+}
+.news-dot { opacity: .55; }
+.news-by { color: var(--gold); }
+.news-card .news-del { flex: none; align-self: center; }
 .news-author { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .news-time { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
-.news-del { flex: none; }
-.news-text { font-size: 14.5px; line-height: 1.55; overflow-wrap: break-word; }
-.news-img { display: block; max-width: 100%; max-height: 340px; border-radius: 12px; border: 1px solid var(--border); margin-top: 10px; }
-/* Multi-image posts: the grid auto-adjusts to the image count.
-   1 -> natural full-width; 2 -> side by side; 3 -> lead image over a pair;
-   4 -> 2x2. Tiles crop to a uniform ratio so mixed sizes still line up. */
-.news-imgs { display: grid; gap: 6px; margin-top: 10px; }
-.news-imgs .news-img { margin-top: 0; width: 100%; }
-.news-imgs.n2, .news-imgs.n3, .news-imgs.n4 { grid-template-columns: 1fr 1fr; }
-.news-imgs.n2 .news-img, .news-imgs.n3 .news-img, .news-imgs.n4 .news-img {
-  aspect-ratio: 16 / 11; height: 100%; max-height: none; object-fit: cover;
-}
-.news-imgs.n3 .news-img:first-child { grid-column: 1 / -1; aspect-ratio: 16 / 8; }
 .news-empty {
   color: var(--muted); text-align: center; font-size: 13.5px;
   padding: 20px 14px; border: 1px dashed var(--border); border-radius: 14px;
+}
+
+/* ---- full story popup ---- */
+.news-backdrop {
+  position: fixed; inset: 0; background: rgba(5, 5, 6, .82); backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
+}
+.news-backdrop.hidden { display: none !important; }
+.news-modal {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  width: 100%; max-width: 720px; max-height: 88vh; max-height: min(88vh, calc(100dvh - 24px));
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow); animation: newsPop .22s cubic-bezier(.2, 1.2, .4, 1);
+}
+@keyframes newsPop { from { transform: translateY(8px) scale(.98); opacity: 0; } }
+.news-modal-head, .news-modal-foot {
+  display: flex; align-items: center; gap: 10px; padding: 12px 18px; flex: 0 0 auto;
+}
+.news-modal-head { justify-content: space-between; border-bottom: 1px solid var(--border); }
+.news-modal-head h3 { font-family: "Russo One", sans-serif; font-size: 15px; letter-spacing: 1px; }
+.news-modal-foot { justify-content: flex-end; border-top: 1px solid var(--border); }
+.news-modal-body { padding: 20px; overflow-y: auto; }
+.news-modal-title { font-size: clamp(20px, 3vw, 26px); font-weight: 800; line-height: 1.25; overflow-wrap: break-word; }
+.news-modal-meta { display: flex; align-items: center; gap: 10px; margin: 14px 0 18px; }
+.news-modal-by { display: flex; flex-direction: column; min-width: 0; }
+/* Story images FIT - capped on both axes, never stretched to the box and never
+   cropped (the feed thumbnail is the only place we crop). */
+.news-modal-img {
+  display: block; max-width: 100%; max-height: 460px; width: auto; height: auto;
+  margin: 0 auto 14px; border-radius: 12px; border: 1px solid var(--border);
+}
+.news-modal-text { font-size: 15px; line-height: 1.65; overflow-wrap: break-word; }
+
+@media (max-width: 620px) {
+  /* Phones: a smaller thumbnail keeps the headline readable; the standfirst
+     drops (the story is one tap away anyway). */
+  .news-card { gap: 12px; padding: 12px; }
+  .news-thumb { width: 108px; border-radius: 8px; }
+  .news-headline { font-size: 14.5px; -webkit-line-clamp: 3; }
+  .news-desc { display: none; }
+  .news-card-meta { margin-top: 7px; font-size: 11px; }
+  .news-modal { max-height: min(92vh, calc(100dvh - 12px)); }
+  .news-modal-body { padding: 16px; }
+  .news-modal-img { max-height: 260px; }
 }
 
 /* ===================== SERIES DETAIL (tournament hub) ===================== */

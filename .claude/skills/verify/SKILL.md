@@ -21,13 +21,44 @@ Static site, no build step. The surface is a browser at `index.html`.
 - To see the sign-in gate instead, use a fake-but-shaped config
   (`apiKey: "AIzaSy..."`, non-empty `projectId`) — the gate renders locally
   without valid credentials.
-- Cloud-only features (news feed posts, multi-tournament registry, live CSV
-  sync) cannot be exercised without real Google sign-in — verify their
-  offline fallbacks (hints/empty states) and read the Firestore rules instead.
+- Cloud-only features (news posts, the tournaments registry, published stats
+  sheets) need a signed-in Firestore — use the **fake-cloud stub** below rather
+  than settling for offline empty states.
+
+## Fake-cloud stub (drives the REAL cloud code paths offline)
+
+Add `stub.js` to the scratch copy and inject it into `index.html` right after
+`<script type="module" src="firebase-init.js">`. Modules run in order and all
+finish **before** `DOMContentLoaded`, which is exactly when the classic modules
+(`app/series/home/news`) call `window.HCCL.onChange(...)` — so a stub that
+replaces `window.HCCL` there is the one they all bind to. (They read
+`window.HCCL` lazily, never caching it, so this works.)
+
+The stub is a signed-in admin whose `fs.onSnapshot` answers from fixtures, keyed
+on the ref: tag refs in `collection()`/`doc()` (e.g. `{ __coll: "news" }`) and
+branch inside `onSnapshot`. Useful branches:
+- `news` → fake post docs (`{ id, data: () => ({...}) }`, `createdAt` as
+  `{ toDate: () => Date }`) → the real feed, rows and story popup render.
+- `tournaments` → call the **error** callback to exercise the offline seed
+  fallback, or return docs to script a scenario (e.g. HCCL S06 `completed` with
+  honors = "the admin ended the season"). Include a `_config` doc with the
+  current `seasonSeedVersion` so the seeder stays quiet.
+- `seasonStatsLive` → empty snapshot; doc refs → `{ exists: () => false }`.
+Give `fs` no-op `setDoc/updateDoc/deleteDoc/getDoc/getDocs` and no `writeBatch`
+(that keeps the season-stats seeder from running). Drive scenarios with a query
+param the stub reads (`?scenario=finals`).
+
+Keep the offline `firebase-config.js` as well — `firebase-init.js` still sets
+`body.can-edit` in open mode, which is what un-hides editor-only UI
+(`.news-composer`, `.season-stats-import` are CSS-gated, so assert with
+`isVisible()`, not `count()`).
 
 ## Recipe that works
 
-1. Copy the repo (minus `.git`) to a scratch dir; blank the firebase config
+1. Copy the repo (minus `.git`) to a scratch dir — **including
+   `firebase-init.js`**, which is easy to miss when copying only
+   `index.html css js assets docs` (without it there's no `body.can-edit`, so
+   every editor-only control is silently hidden). Blank the firebase config
    as above.
 2. `npm i playwright-core` (no browser download) and launch the installed
    Chrome: `chromium.launch({ executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", headless: true })`.
@@ -36,16 +67,17 @@ Static site, no build step. The surface is a browser at `index.html`.
    `.series-card [data-series-open]` / `[data-series-back]`; home carousel via
    `[data-champs-prev/next/dot]`; season tabs `[data-season="N"]`; board tabs
    `[data-board="overall|batting|bowling"]`.
-5. Capture `console`/`pageerror` events — the app logs loudly on failure.
-   Known benign 404: `assets/Players/Chamika Kaushila.jpeg` (photo listed in
-   season-archive.js but never committed).
+5. Capture `console`/`pageerror` events — the app logs loudly on failure. A
+   clean run has zero console errors and zero 404s.
 
-Flows worth driving after a change: home (hero, carousel auto-advance ~6.5s,
-dots, news shell), Series list → per-season Details hubs (S1-S5 archive-only,
-S6 live with quick links, S7 upcoming placeholder; bracket lines drawn,
-leaderboards, board switching), back-and-reopen a hub (re-mount must not
-stack listeners), other tabs still render, 390px mobile viewport,
-`reducedMotion: "reduce"` context (no autoplay).
+Flows worth driving after a change: home (hero, the Hall of Champions carousel —
+registry-driven, 6-month window, live card first — auto-advance ~6.5s, dots),
+the news list (`.news-card` rows) + story popup (`[data-news-open]`, Escape /
+backdrop close), Series list → Details hubs (no View button: the card and
+`[data-series-open]` open the hub; S1-S5 archive-only, S6 live with quick links,
+S7 upcoming placeholder; bracket lines drawn, leaderboards, board switching),
+back-and-reopen a hub (re-mount must not stack listeners), other tabs still
+render, 390px mobile viewport, `reducedMotion: "reduce"` context (no autoplay).
 
 More gotchas:
 - Don't pass multi-line JS to `node -e` from PowerShell - the quoting gets
