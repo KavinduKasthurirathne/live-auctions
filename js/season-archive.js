@@ -76,7 +76,7 @@
         q1:    { a: "VELOCITY REAPERS", b: "INVINCIBLE LORDS", winner: "VELOCITY REAPERS" },
         elim:  { a: "SILENTEARZ", b: "SUPER FIRE DRAGONS", winner: "SILENTEARZ" },
         q2:    { winner: "INVINCIBLE LORDS" },
-        final: { winner: "" },
+        final: { winner: "VELOCITY REAPERS" },
       } },
   ];
 
