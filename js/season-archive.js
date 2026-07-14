@@ -139,7 +139,13 @@
       "Rising Mavericks.jpg", "Rising Strikers.jpg", "Young Velocity Kings.jpg",
     ],
     "assets/Legends League Logos": [
-      "Zyther Legends.jpg",
+      "Zyther Legends.jpg", "Blackout Reapers.jpg", "Legend Strikers.png", "Majestic Maestros.jpg",
+      "MX Legends.jpg", "Supreme IV Greats.png",
+    ],
+    "assets/Mini IPL Logos": [
+      "Chennai Super Kings.png", "Delhi Capitals.jpg", "Gujarat Titans.jpg", "Kolkata Knight Riders.jpg",
+      "Lucknow Super Giants.jpg", "Mumbai Indians.jpg", "Punjab Kings.jpg", "Rajasthan Royals.jpg",
+      "Royal Challengers Bangalore.png", "Sunrisers Hyderabad.jpg",
     ],
   };
   const PLAYER_PHOTO_FILES = [
