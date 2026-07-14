@@ -1126,21 +1126,24 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 }
 .champs-track::-webkit-scrollbar { display: none; }
 
+/* One row, four zones: logo | name + duration | podium | leaders.
+   Cards without a leaders zone (.has-right absent) use three zones. */
 .champs-card {
   flex: 0 0 100%; min-width: 0;
   scroll-snap-align: start; scroll-snap-stop: always;
-  display: grid; grid-template-columns: minmax(220px, 1fr) 1.5fr; gap: 18px; align-items: center;
-  border: 1px solid var(--border); border-radius: 18px; padding: 22px clamp(16px, 3vw, 30px);
+  display: grid; grid-template-columns: auto minmax(150px, 0.8fr) 1.7fr;
+  gap: clamp(14px, 2vw, 24px); align-items: center;
+  border: 1px solid var(--border); border-radius: 18px; padding: 20px clamp(16px, 3vw, 30px);
   background:
     radial-gradient(500px 220px at 0% 0%, rgba(225, 6, 0, 0.14), transparent 60%),
     linear-gradient(rgba(16, 16, 18, 0.82), rgba(16, 16, 18, 0.9)),
     url('../assets/home-hero bg image.jpg') center/100% 100% no-repeat var(--panel);
 }
+.champs-card.has-right { grid-template-columns: auto minmax(140px, 0.75fr) 1.6fr minmax(190px, 0.85fr); }
 .champs-card.live { border-color: rgba(225, 6, 0, 0.55); box-shadow: 0 0 0 1px rgba(225, 6, 0, 0.2); }
 
-.champs-left { display: flex; align-items: center; gap: 18px; min-width: 0; }
 .champs-logo {
-  flex: none; width: 96px; height: 96px; border-radius: 20px;
+  flex: none; width: 92px; height: 92px; border-radius: 20px;
   background: #0d0d0f center/cover no-repeat; border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
@@ -1151,19 +1154,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 }
 .champs-meta { min-width: 0; }
 .champs-league { display: block; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); }
-.champs-name { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(20px, 2.6vw, 28px); letter-spacing: .5px; margin-top: 3px; }
+.champs-name { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(18px, 2.2vw, 25px); letter-spacing: .5px; margin-top: 3px; }
 .champs-dur { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
 .champs-live { display: inline-block; margin-top: 8px; font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #fff; background: var(--red); border-radius: 999px; padding: 3px 9px; animation: seriesPulse 1.4s infinite; }
 
-/* Right side: the podium, sized down so a card stays a card. */
+/* Middle zone: the podium, sized down so a card stays one tidy row. */
+.champs-mid { min-width: 0; }
 .champs-card .podium { margin-bottom: 0; }
-.champs-card .bubble { width: 64px; height: 64px; font-size: 22px; }
-.champs-card .podium-item.champion .bubble { width: 94px; height: 94px; font-size: 32px; }
-.champs-card .podium-item.mvp, .champs-card .podium-item.runner { margin-top: 24px; }
-.champs-card .podium-name { font-size: 12.5px; }
-.champs-card .podium-item.champion .podium-name { font-size: 15px; }
-/* LIVE card: the Most Runs / Most Wickets race instead of a podium. */
-.champs-race { display: grid; gap: 10px; max-width: 340px; margin: 0 auto; }
+.champs-card .bubble { width: 58px; height: 58px; font-size: 20px; }
+.champs-card .podium-item.champion .bubble { width: 86px; height: 86px; font-size: 30px; }
+.champs-card .podium-item.mvp, .champs-card .podium-item.runner { margin-top: 20px; }
+.champs-card .podium-role { margin-top: 7px; font-size: 10px; }
+.champs-card .podium-name { font-size: 12px; }
+.champs-card .podium-item.champion .podium-name { font-size: 14px; }
+/* Right zone: the Most Runs / Most Wickets pair. */
+.champs-race { display: grid; gap: 10px; width: 100%; max-width: 320px; margin: 0 auto; }
 .champs-progress { text-align: center; font-family: "Russo One", sans-serif; font-size: 19px; letter-spacing: .5px; }
 .champs-progress span { display: block; font-family: "Inter", sans-serif; color: var(--muted); font-size: 12.5px; margin-top: 8px; letter-spacing: 0; }
 
@@ -1175,12 +1180,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 }
 .champs-dot.active { width: 24px; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
 
-@media (max-width: 760px) {
-  .champs-card { grid-template-columns: 1fr; gap: 16px; }
-  .champs-left { justify-content: center; text-align: left; }
-  .champs-logo { width: 74px; height: 74px; border-radius: 16px; }
-  .champs-card .bubble { width: 54px; height: 54px; font-size: 18px; }
-  .champs-card .podium-item.champion .bubble { width: 78px; height: 78px; font-size: 26px; }
+@media (max-width: 860px) {
+  /* Stack: [logo | meta] row on top, then the podium, then the leaders. */
+  .champs-card, .champs-card.has-right { grid-template-columns: auto 1fr; gap: 14px 16px; }
+  .champs-mid { grid-column: 1 / -1; }
+  .champs-right { grid-column: 1 / -1; }
+  .champs-logo { width: 70px; height: 70px; border-radius: 16px; }
+  .champs-card .bubble { width: 52px; height: 52px; font-size: 18px; }
+  .champs-card .podium-item.champion .bubble { width: 76px; height: 76px; font-size: 26px; }
+  .champs-race { max-width: none; }
 }
 
 /* ===================== HC NEWS FEED (Home) ===================== */
@@ -1247,9 +1255,18 @@ body:not(.can-edit) .news-composer { display: none; }
 .series-detail-card:hover { transform: none; box-shadow: none; border-color: var(--border); }
 .series-detail-card.viewing:hover,
 .series-detail-card.viewing { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(245, 179, 1, 0.25); }
-.series-honors { max-width: 680px; margin-bottom: 16px; }
-.series-honors .podium { margin: 14px 0 6px; }
-.series-coming { max-width: 680px; }
+/* Stats-only tournament hub: podium + Most Runs/Wickets banner up top. */
+.series-honors { margin-bottom: 16px; }
+.hub-honors { display: grid; grid-template-columns: 1.6fr minmax(230px, 1fr); gap: 20px; align-items: center; }
+.series-honors .podium { margin-bottom: 0; }
+.series-honors .bubble { width: 66px; height: 66px; font-size: 23px; }
+.series-honors .podium-item.champion .bubble { width: 98px; height: 98px; font-size: 34px; }
+.series-honors .podium-item.mvp, .series-honors .podium-item.runner { margin-top: 22px; }
+.hub-leads { display: grid; gap: 10px; }
+@media (max-width: 760px) {
+  .hub-honors { grid-template-columns: 1fr; }
+}
+.series-stats .board-tabs { margin-top: 4px; }
 .series-archive { margin-top: 6px; }
 
 /* Respect users who turn animations off. */

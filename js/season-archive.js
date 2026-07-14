@@ -125,34 +125,55 @@
 
   // Committed asset files (exact names; extensions vary between .png/.jpeg).
   // A team/player NAME resolves to its file via a lookup keyed by the lowercased
-  // basename, so UPPERCASE values match regardless of case. Add a file here to
-  // introduce a new team/player.
-  const TEAM_LOGO_FILES = [
-    "Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg",
-    "Silentearz.jpeg", "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg",
-    "Thickheaders.png", "Noble Knights.png",
-  ];
+  // basename, so UPPERCASE values match regardless of case. Team logos span
+  // every league's folder - add a file to the right folder's list to introduce
+  // a new team.
+  const TEAM_LOGO_DIRS = {
+    "assets/HCCL Team Logos": [
+      "Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg",
+      "Silentearz.jpeg", "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg",
+      "Thickheaders.png", "Noble Knights.png",
+    ],
+    "assets/Rising League Logos": [
+      "Apex Risers.jpg", "Knights of Future.jpg", "Nova Rising Force.jpg", "Rising Falcons.jpg",
+      "Rising Mavericks.jpg", "Rising Strikers.jpg", "Young Velocity Kings.jpg",
+    ],
+    "assets/Legends League Logos": [
+      "Zyther Legends.jpg",
+    ],
+  };
   const PLAYER_PHOTO_FILES = [
     "Chathuka Lakshan.jpeg", "Hasitha Lakmal.png", "Sasindu Madushan.png", "Thenu Pabeesha.png",
-    "Udara Perera.jpeg", "Yasitha Nawod.jpeg", "Yathish Leyon.png", "Chamika Kaushila.jpeg", "Binura Yeshan.jpeg",
+    "Udara Perera.jpeg", "Yasitha Nawod.jpeg", "Yathish Leyon.png", "Binura Yeshan.jpeg",
   ];
   const SEASON_LOGO_FILES = {
     1: "S1 LOGO.png", 2: "S2 LOGO.png", 3: "S3 LOGO.png",
     4: "S4 LOGO.png", 5: "S5 LOGO.png", 6: "S6 LOGO.jpg",
+  };
+  // Tournament badge files (assets/Tournament Logos), keyed by the lowercased
+  // registry tournament NAME (file names don't always match the full name).
+  const TOURNAMENT_LOGO_FILES = {
+    "hc mini ipl 2026": "HC Mini IPL S1.png",
+    "solo knockout championship s01": "Solo Knockout S1.png",
+    "hc county rising league s01": "HC County Rising League S1.png",
   };
   function fileIndex(files) {
     const m = {};
     files.forEach(f => { m[f.replace(/\.[^.]+$/, "").trim().toLowerCase()] = f; });
     return m;
   }
-  const TEAM_LOGO_INDEX = fileIndex(TEAM_LOGO_FILES);
+  // One combined name -> path index across every team-logo folder.
+  const TEAM_LOGO_INDEX = {};
+  Object.entries(TEAM_LOGO_DIRS).forEach(([dir, files]) => {
+    files.forEach(f => { TEAM_LOGO_INDEX[f.replace(/\.[^.]+$/, "").trim().toLowerCase()] = `${dir}/${f}`; });
+  });
   const PLAYER_PHOTO_INDEX = fileIndex(PLAYER_PHOTO_FILES);
   // Encode so the spaces in folder/file names survive inside url()/href.
   const assetUrl = p => encodeURI(p);
 
   function teamLogo(team) {
-    const f = TEAM_LOGO_INDEX[String(team || "").trim().toLowerCase()];
-    return f ? assetUrl(`assets/Team Logos/${f}`) : "";
+    const p = TEAM_LOGO_INDEX[String(team || "").trim().toLowerCase()];
+    return p ? assetUrl(p) : "";
   }
   function playerPhoto(name) {
     const f = PLAYER_PHOTO_INDEX[String(name || "").trim().toLowerCase()];
@@ -161,6 +182,10 @@
   function seasonLogo(no) {
     const f = SEASON_LOGO_FILES[no];
     return f ? assetUrl(`assets/HCCL Logos/${f}`) : "";
+  }
+  function tournamentLogo(name) {
+    const f = TOURNAMENT_LOGO_FILES[String(name || "").trim().toLowerCase()];
+    return f ? assetUrl(`assets/Tournament Logos/${f}`) : "";
   }
   // A round bubble: team logo / player photo if known, else a colored initial.
   function bubble(kind, value) {
@@ -892,17 +917,33 @@
         ${podiumItem("runner", "Runner-up", kind, h.runnerUp || "")}
       </div>`;
     },
-    extraItem, bubble, seasonLogo,
+    extraItem, bubble, seasonLogo, tournamentLogo,
     /* ---- reusable stats-sheet machinery (per-tournament sheets in series.js) ---- */
+    // Raw STUMPS exports carry a few preamble rows (app title, tournament
+    // name, tour id) before the real header - drop everything above it so
+    // both the bundled sheets and hand-uploaded exports parse the same way.
+    normalizeSheet(text) {
+      const lines = String(text || "").split(/\r?\n/);
+      const idx = lines.findIndex(l => /^no\.?\s*,\s*player name/i.test(l.trim()));
+      return idx > 0 ? lines.slice(idx).join("\n") : String(text || "");
+    },
     // Parse a Season-Stats-format CSV into cell rows (header dropped) - the
     // same naive split the bundled season sheets use.
     rowsFromCsv(text) {
-      return String(text || "").split(/\r?\n/)
+      return api.normalizeSheet(text).split(/\r?\n/)
         .map(l => l.trim()).filter(Boolean).slice(1)
         .map(line => line.split(",").map(c => c.trim()));
     },
     // Strict 36-column layout check - returns { ok, reason?, playerCount? }.
-    validateCsv: validateSeasonCsv,
+    validateCsv: text => validateSeasonCsv(api.normalizeSheet(text)),
+    // Bundled per-tournament sheet (js/tournament-stats-data.js), matched by
+    // registry id first, then case-insensitive tournament name.
+    tournamentCsv(id, name) {
+      const store = window.HCCL_TOURNAMENT_STATS || [];
+      const norm = s => String(s || "").trim().toLowerCase();
+      const hit = store.find(x => x.id === id || (name && norm(x.name) === norm(name)));
+      return hit ? hit.csv : null;
+    },
     // One leaderboard table (key: "overall" | "batting" | "bowling").
     boardHtml(rows, key) {
       const b = BOARDS.find(x => x.key === key) || BOARDS[0];

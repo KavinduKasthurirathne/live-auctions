@@ -46,9 +46,10 @@
   const sortKey = m => (m.ts || 0) || (m.uploadedAtMs || 0);
 
   /* --------------------------- team icons --------------------------- */
-  // Committed team-logo files (assets/Team Logos). The STUMPS team names are
-  // upper-cased ("SUPER FIRE DRAGONS"); we key the index by lowercased basename
-  // so they resolve regardless of case. Add a file here to introduce a team.
+  // Committed team-logo files (assets/HCCL Team Logos). The STUMPS team names
+  // are upper-cased ("SUPER FIRE DRAGONS"); we key the index by lowercased
+  // basename so they resolve regardless of case. Add a file here to introduce
+  // a team.
   const TEAM_LOGO_FILES = [
     "Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg", "Silentearz.jpeg",
     "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg",
@@ -57,7 +58,7 @@
   TEAM_LOGO_FILES.forEach(f => { TEAM_LOGO_INDEX[f.replace(/\.[^.]+$/, "").trim().toLowerCase()] = f; });
   function teamLogo(team) {
     const f = TEAM_LOGO_INDEX[String(team || "").trim().toLowerCase()];
-    return f ? encodeURI(`assets/Team Logos/${f}`) : "";
+    return f ? encodeURI(`assets/HCCL Team Logos/${f}`) : "";
   }
 
   const TEAM_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];

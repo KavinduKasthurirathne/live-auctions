@@ -50,18 +50,16 @@
     return new Date(+m[3], MONTH_IDX[m[2]], m[1] ? +m[1] : 1).getTime();
   }
 
-  // Three zones: logo + name + date | Champion/Runner-up/MVP podium | Most
-  // Runs & Most Wickets. Cards without a leaders zone drop to two zones.
+  // Four zones in one row: logo | name + duration | Champion/Runner-up/MVP
+  // podium | Most Runs & Most Wickets. Cards without a leaders zone drop it.
   function cardHtml(c) {
-    return `<article class="champs-card${c.live ? " live" : ""}${c.rightHtml ? " three" : ""}">
-      <div class="champs-left">
-        ${cardLogo(c.logo, c.title)}
-        <div class="champs-meta">
-          ${c.league ? `<span class="champs-league">${esc(c.league)}</span>` : ""}
-          <h3 class="champs-name">${esc(c.title)}</h3>
-          ${c.duration ? `<span class="champs-dur">${esc(c.duration)}</span>` : ""}
-          ${c.live ? `<span class="champs-live">● LIVE</span>` : ""}
-        </div>
+    return `<article class="champs-card${c.live ? " live" : ""}${c.rightHtml ? " has-right" : ""}">
+      ${cardLogo(c.logo, c.title)}
+      <div class="champs-meta">
+        ${c.league ? `<span class="champs-league">${esc(c.league)}</span>` : ""}
+        <h3 class="champs-name">${esc(c.title)}</h3>
+        ${c.duration ? `<span class="champs-dur">${esc(c.duration)}</span>` : ""}
+        ${c.live ? `<span class="champs-live">● LIVE</span>` : ""}
       </div>
       <div class="champs-mid">${c.midHtml || ""}</div>
       ${c.rightHtml ? `<div class="champs-right">${c.rightHtml}</div>` : ""}
@@ -102,13 +100,27 @@
     // AND the seeded per-season entries (archive:"hccl") are already covered by
     // the archive-derived cards, so they'd only duplicate.
     const list = (S ? S.list() : []).filter(t => !t.legacy && t.archive !== "hccl");
-    list.filter(t => t.status === "live").forEach(t => {
+    // A registry tournament's leaders: derived from its stats sheet (bundled
+    // or cloud-lifted into honors), else the hand-entered honors fields.
+    const tournamentLead = t => {
       const h = t.honors || {};
+      let lead = { mostRuns: h.mostRuns || "", mostWickets: h.mostWickets || "" };
+      const csv = A && A.tournamentCsv ? A.tournamentCsv(t.id, t.name) : null;
+      if (csv) {
+        const der = A.leadersFromRows(A.rowsFromCsv(csv));
+        lead = { mostRuns: der.mostRuns || lead.mostRuns, mostWickets: der.mostWickets || lead.mostWickets };
+      }
+      return lead;
+    };
+    const tournamentLogo = t => t.logo || (A && A.tournamentLogo && A.tournamentLogo(t.name)) || "";
+
+    list.filter(t => t.status === "live").forEach(t => {
+      const lead = tournamentLead(t);
       liveCards.push({
         live: true, stamp: startStamp(t.duration),
-        logo: t.logo, title: t.name, duration: t.duration,
+        logo: tournamentLogo(t), title: t.name, duration: t.duration,
         midHtml: `<div class="champs-progress">Tournament in progress<span>Follow it in the 🏆 Series tab</span></div>`,
-        rightHtml: leadersHtml(h.mostRuns, h.mostWickets),
+        rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
       });
     });
 
@@ -128,21 +140,30 @@
       });
     }
 
-    // Completed registry tournaments with a recorded champion. Leaders appear
-    // once a stats sheet is imported (or entered by hand in the honors form).
+    // Completed registry tournaments with a recorded champion. Leaders come
+    // from the bundled/imported stats sheet, else the honors fields.
     list.filter(t => t.status === "completed" && t.honors && t.honors.champion).forEach(t => {
-      const h = t.honors;
+      const lead = tournamentLead(t);
       doneCards.push({
         stamp: startStamp(t.duration),
-        logo: t.logo, title: t.name, duration: t.duration,
-        midHtml: A ? A.podiumHtml(h, t.solo ? "player" : "team") : "",
-        rightHtml: leadersHtml(h.mostRuns, h.mostWickets),
+        logo: tournamentLogo(t), title: t.name, duration: t.duration,
+        midHtml: A ? A.podiumHtml(t.honors, t.solo ? "player" : "team") : "",
+        rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
       });
     });
 
     liveCards.sort((a, b) => a.stamp - b.stamp);
     doneCards.sort((a, b) => a.stamp - b.stamp);
-    return [...liveCards, ...doneCards];
+    // Belt & braces: if the same tournament somehow exists twice (a seeded
+    // entry AND a hand-created twin in the registry), only one card shows.
+    const seen = new Set();
+    const uniq = c => {
+      const k = `${c.league || ""}|${c.title}`.trim().toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    };
+    return [...liveCards.filter(uniq), ...doneCards.filter(uniq)];
   }
 
   /* ---------------------- carousel behaviour ---------------------- */

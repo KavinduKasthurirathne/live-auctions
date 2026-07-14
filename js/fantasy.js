@@ -233,7 +233,7 @@
     if (!t || t === "-") return "";
     const f = FAN_TEAM_LOGO_INDEX[t.toLowerCase()];
     return f
-      ? `<span class="team-ico" title="${esc(t)}" style="background-image:url('${encodeURI("assets/Team Logos/" + f)}')"></span>`
+      ? `<span class="team-ico" title="${esc(t)}" style="background-image:url('${encodeURI("assets/HCCL Team Logos/" + f)}')"></span>`
       : `<span class="team-ico" title="${esc(t)}" style="background:${fanTeamColor(t)}">${esc(t[0] ? t[0].toUpperCase() : "?")}</span>`;
   }
   function fmtPts(n) { return String(Math.round((Number(n) || 0) * 100) / 100); }

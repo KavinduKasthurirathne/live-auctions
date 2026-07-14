@@ -75,30 +75,31 @@
   // champion/runner-up podium bubbles resolve player photos.
   const TOURNEY_SEEDS = [
     {
-      id: "hc-mini-ipl-2026", name: "HC Mini IPL 2026", short: "MIPL 26", logo: "",
+      id: "hc-mini-ipl-2026", name: "HC Mini IPL 2026", short: "MIPL 26",
+      logo: encodeURI("assets/Tournament Logos/HC Mini IPL S1.png"),
       duration: "MAR 2026 - APR 2026", status: "completed",
       statsOnly: true, order: 4.5, createdAt: 0,
       honors: { champion: "Mumbai Indians", runnerUp: "Gujarat Titans", mvp: "Kalana Thenuja" },
     },
     {
-      id: "solo-knockout-championship-s01", name: "Solo Knockout Championship S01", short: "SKC S1", logo: "",
+      id: "solo-knockout-championship-s01", name: "Solo Knockout Championship S01", short: "SKC S1",
+      logo: encodeURI("assets/Tournament Logos/Solo Knockout S1.png"),
       duration: "13 MAY 2026 - 14 MAY 2026", status: "completed",
       statsOnly: true, solo: true, order: 5.3, createdAt: 0,
       honors: { champion: "Chathuka Lakshan", runnerUp: "Nehan Fernando", mvp: "Chathuka Lakshan" },
     },
     {
-      id: "hc-county-rising-league-s01", name: "HC County Rising League S01", short: "CRL S1", logo: "",
+      id: "hc-county-rising-league-s01", name: "HC County Rising League S01", short: "CRL S1",
+      logo: encodeURI("assets/Tournament Logos/HC County Rising League S1.png"),
       duration: "MAY 2026 - JUN 2026", status: "completed",
       statsOnly: true, order: 5.5, createdAt: 0,
       honors: { champion: "Nova Rising Force", runnerUp: "Knights of Future", mvp: "Sandun Chinthana" },
     },
     {
-      // Honors intentionally blank - an admin records them via ✎ Edit, and the
-      // card joins the Home carousel once a champion is set.
       id: "hc-county-legends-league-s01", name: "HC County Legends League S01", short: "CLL S1", logo: "",
       duration: "MAY 2026 - JUN 2026", status: "completed",
       statsOnly: true, order: 5.6, createdAt: 0,
-      honors: null,
+      honors: { champion: "Zyther Legends", runnerUp: "Legend Strikers", mvp: "Udara Perera" },
     },
   ];
   const allSeeds = () => [...seasonSeeds(), ...TOURNEY_SEEDS];
@@ -229,8 +230,9 @@
       if (metas.length) {
         metas.sort((x, y) => (x.order - y.order) || (x.createdAt - y.createdAt));
         tournaments = metas;
-        maybeMigrateLegacyMeta(); // one-time per-season restructure of the legacy entry
-        maybeSeedSeasons(cfg);    // one-time seed of the S1-S5 + next-season entries
+        maybeMigrateLegacyMeta();    // one-time per-season restructure of the legacy entry
+        maybeSeedSeasons(cfg);       // one-time seed of the bundled entries
+        maybeNormalizeTournaments(); // adopt hand-created twins of the bundled tournaments
       } else {
         tournaments = [LEGACY_META];
         maybeSeed(); // first editor creates the registry
@@ -295,9 +297,13 @@
     if (cfg && cfg.seasonSeedVersion === SEASON_SEED_VERSION) return;
     seasonSeedTried = true;
     const a = fsa(), d = db();
+    const norm = s => String(s || "").trim().toLowerCase();
+    const byName = name => tournaments.find(t => norm(t.name) === norm(name));
     try {
       for (const seed of allSeeds()) {
-        if (metaOf(seed.id)) continue; // never overwrite an existing entry
+        // Never overwrite - and never DUPLICATE a tournament an admin already
+        // created by hand under a different id but the same name.
+        if (metaOf(seed.id) || byName(seed.name)) continue;
         const meta = { ...seed, createdAt: Date.now() };
         delete meta.id;
         if (!meta.honors) delete meta.honors;
@@ -306,6 +312,40 @@
       await a.setDoc(a.doc(d, "tournaments", "_config"),
         { activeId: activeId || LEGACY_ID, seasonSeedVersion: SEASON_SEED_VERSION });
     } catch (e) { console.warn("tournament seed failed:", e); seasonSeedTried = false; }
+  }
+
+  // Adopt tournaments an admin created by hand through the ＋ New Tournament
+  // form: the form doesn't know about identity flags, so a doc matching one
+  // of our bundled tournaments (by id or name) gets its missing pieces filled
+  // in - flags, chronological order, logo, honors. Existing values an admin
+  // typed are never overwritten.
+  let normalizeTried = false;
+  async function maybeNormalizeTournaments() {
+    if (normalizeTried || !cloudOn() || !editorOn()) return;
+    const a = fsa(), d = db();
+    if (!a.updateDoc) return;
+    const norm = s => String(s || "").trim().toLowerCase();
+    const patches = [];
+    for (const seed of TOURNEY_SEEDS) {
+      const m = metaOf(seed.id) || tournaments.find(t => norm(t.name) === norm(seed.name));
+      if (!m) continue;
+      const patch = {};
+      if (!m.statsOnly) patch.statsOnly = true;
+      if (seed.solo && !m.solo) patch.solo = true;
+      if (m.order !== seed.order) patch.order = seed.order;
+      if (!m.logo && seed.logo) patch.logo = seed.logo;
+      if (!m.duration && seed.duration) patch.duration = seed.duration;
+      // A completed tournament left on the form's default "upcoming" never
+      // reaches the carousel - lift it to the seed's status.
+      if (m.status === "upcoming" && seed.status === "completed") patch.status = "completed";
+      if (seed.honors && !(m.honors && m.honors.champion)) patch.honors = seed.honors;
+      if (Object.keys(patch).length) patches.push({ id: m.id, patch });
+    }
+    if (!patches.length) return;
+    normalizeTried = true;
+    try {
+      for (const p of patches) await a.updateDoc(a.doc(d, "tournaments", p.id), p.patch);
+    } catch (e) { console.warn("tournament normalize failed:", e); normalizeTried = false; }
   }
 
   /* ---------------- admin: create / edit / copy / delete ---------------- */
@@ -460,8 +500,12 @@
   const STATUS_LABEL = { live: "● LIVE", completed: "COMPLETED", upcoming: "UPCOMING" };
 
   function logoHtml(m) {
-    const style = m.logo ? ` style="background-image:url('${m.logo}')"` : "";
-    const text = m.logo ? "" : esc((m.short || m.name || "?").trim().slice(0, 3).toUpperCase());
+    const A = window.HCCLSeasonArchive;
+    // Meta logo (admin-uploaded dataURL or seeded asset path) wins; else the
+    // committed tournament badge matched by name; else initials.
+    const logo = m.logo || (A && A.tournamentLogo && A.tournamentLogo(m.name)) || "";
+    const style = logo ? ` style="background-image:url('${logo}')"` : "";
+    const text = logo ? "" : esc((m.short || m.name || "?").trim().slice(0, 3).toUpperCase());
     return `<div class="series-logo"${style}>${text}</div>`;
   }
 
@@ -591,23 +635,59 @@
     statsTid = null; statsCsv = null; statsLoaded = false;
   }
 
+  // The sheet a hub renders from: a cloud-imported one wins, else the bundled
+  // copy shipped with the site (js/tournament-stats-data.js), else nothing.
+  function effectiveCsv(m) {
+    const A = window.HCCLSeasonArchive;
+    return statsCsv || (A && A.tournamentCsv(m.id, m.name)) || null;
+  }
+
+  // Podium (Champion / Runner-up / MVP) + Most Runs / Most Wickets at the top
+  // of a stats-only tournament hub. Leaders derive from the stats sheet when
+  // one exists, falling back to hand-entered honors fields.
+  function hubHonorsHtml(m) {
+    const A = window.HCCLSeasonArchive;
+    if (!A) return "";
+    const h = m.honors || {};
+    const hasPodium = !!(h.champion || h.runnerUp || h.mvp);
+    let lead = { mostRuns: h.mostRuns || "", mostWickets: h.mostWickets || "" };
+    const csv = effectiveCsv(m);
+    if (csv) {
+      const der = A.leadersFromRows(A.rowsFromCsv(csv));
+      lead = { mostRuns: der.mostRuns || lead.mostRuns, mostWickets: der.mostWickets || lead.mostWickets };
+    }
+    const hasLead = !!(lead.mostRuns || lead.mostWickets);
+    if (!hasPodium && !hasLead) return "";
+    return `
+      <div class="card series-honors">
+        <div class="hub-honors">
+          ${hasPodium ? A.podiumHtml(h, m.solo ? "player" : "team") : ""}
+          ${hasLead ? `<div class="hub-leads">
+            ${A.extraItem("🏏", "Most Runs", lead.mostRuns || "TBD")}
+            ${A.extraItem("🎯", "Most Wickets", lead.mostWickets || "TBD")}
+          </div>` : ""}
+        </div>
+      </div>`;
+  }
+
   function statsPanelHtml(m) {
     const A = window.HCCLSeasonArchive;
     const admin = editorOn();
     const importBtn = admin ? `
-      <label class="btn btn-yellow file-btn tstats-import" title="Upload this tournament's stats CSV (same 36-column Season Stats format)">
+      <label class="btn btn-yellow file-btn tstats-import" title="Upload this tournament's stats CSV (36-column Season Stats format; raw STUMPS exports are fine)">
         <span>⬆ Import Stats Sheet</span>
         <input type="file" class="tstats-import-file" accept=".csv,text/csv" hidden />
       </label>` : "";
+    const csv = effectiveCsv(m);
     let body;
-    if (!statsLoaded) {
-      body = `<p class="hint">Loading stats…</p>`;
-    } else if (!statsCsv || !A) {
-      body = `<p class="hint">${admin
-        ? "No stats sheet imported yet - upload this tournament's Season-Stats CSV to publish its leaderboards for everyone."
-        : "Stats for this tournament haven't been published yet - check back soon."}</p>`;
+    if (!csv) {
+      body = !statsLoaded && cloudOn()
+        ? `<p class="hint">Loading stats…</p>`
+        : `<p class="hint">${admin
+            ? "No stats sheet imported yet - upload this tournament's Season-Stats CSV to publish its leaderboards for everyone."
+            : "Stats for this tournament haven't been published yet - check back soon."}</p>`;
     } else {
-      const rows = A.rowsFromCsv(statsCsv);
+      const rows = A.rowsFromCsv(csv);
       body = `
         <div class="board-tabs" role="tablist">
           ${A.boardKeys().map(b => `<button class="board-tab${b.key === detailBoard ? " active" : ""}" data-tstat-board="${b.key}">${esc(b.label)}</button>`).join("")}
@@ -634,6 +714,7 @@
     if (!editorOn()) { toast("Only moderators/admins can import stats", "bad"); return; }
     let text = "";
     try { text = await file.text(); } catch (e) { toast("Couldn't read that file", "bad"); return; }
+    text = A.normalizeSheet(text); // tolerate raw STUMPS exports (preamble rows)
     const check = A.validateCsv(text);
     if (!check.ok) { toast(check.reason, "bad"); return; }
     const leaders = A.leadersFromRows(A.rowsFromCsv(text));
@@ -686,9 +767,8 @@
       </div>` : "";
       return `${links}<div class="series-archive"></div>`;
     }
-    // Everything else: the imported stats sheet is the whole record (honors
-    // already live on the Home carousel - no podium repeated here).
-    return statsPanelHtml(m);
+    // Everything else: podium + leaders up top, the stats sheet below.
+    return hubHonorsHtml(m) + statsPanelHtml(m);
   }
 
   function renderDetail(view, m) {
@@ -804,7 +884,9 @@
         detailBoard = key;
         const A = window.HCCLSeasonArchive;
         const panel = document.querySelector(".tstats-panel");
-        if (panel && A && statsCsv) panel.innerHTML = A.boardHtml(A.rowsFromCsv(statsCsv), detailBoard);
+        const m = UI.detail ? metaOf(UI.detail) : null;
+        const csv = m ? effectiveCsv(m) : null; // cloud sheet or the bundled copy
+        if (panel && A && csv) panel.innerHTML = A.boardHtml(A.rowsFromCsv(csv), detailBoard);
         document.querySelectorAll("[data-tstat-board]").forEach(b =>
           b.classList.toggle("active", b.getAttribute("data-tstat-board") === detailBoard));
       }
