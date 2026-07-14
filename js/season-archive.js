@@ -509,6 +509,9 @@
   // host view - the Series tournament hub), or null while unmounted. Firestore
   // sync keeps running either way; render() just no-ops without a mount.
   let mountEl = null;
+  // Season number the mount is pinned to (per-season tournament hub), or null
+  // for the full archive with its row of season tabs.
+  let pinnedSeason = null;
   // Data-change subscribers (home.js rebuilds the champions carousel from these).
   const listeners = [];
   function emit() {
@@ -538,11 +541,6 @@
             <span class="season-year">${esc(s.year)}${s.ongoing ? ` · <span class="season-live">ONGOING</span>` : ""}</span>
           </div>
         </div>
-        <div class="podium">
-          ${podiumItem("mvp", "MVP", "player", s.mvp)}
-          ${podiumItem("champion", "Champion", "team", s.champion)}
-          ${podiumItem("runner", "Runner-up", "team", s.runnerUp)}
-        </div>
         ${playoffsHtml(s)}
         <div class="season-extra">
           ${extraItem("🏏", "Most Runs", mostRuns)}
@@ -570,6 +568,32 @@
   function render() {
     if (!mountEl) return;
     const list = getSeasons();
+
+    // Pinned mount (per-season tournament hub): just that season's panel,
+    // no season-tab row. A pinned season with no archive entry yet (an
+    // upcoming season) gets a friendly placeholder instead.
+    if (pinnedSeason != null) {
+      const s = list.find(x => x.no === pinnedSeason);
+      mountEl.innerHTML = `
+        <section class="home-seasons">
+          <div class="season-panel">
+            ${s ? seasonPanelHtml(s) : `
+            <article class="season-card">
+              <div class="season-card-head">
+                <div class="season-no">S${pad2(pinnedSeason)}</div>
+                <div class="season-meta">
+                  <h3>Season ${pad2(pinnedSeason)}</h3>
+                  <span class="season-year">COMING SOON</span>
+                </div>
+              </div>
+              <p class="hint">This season hasn't started yet - fixtures, playoffs and stats will appear here once it's under way.</p>
+            </article>`}
+          </div>
+        </section>`;
+      requestAnimationFrame(drawBracketLines);
+      return;
+    }
+
     // Keep the active season in range if the honors list changes (cloud copy).
     if (!list.some(s => s.no === activeSeason)) activeSeason = list.length ? list[list.length - 1].no : 1;
     const active = list.find(s => s.no === activeSeason) || list[0];
@@ -631,11 +655,15 @@
 
   const onMouseLeave = () => traceTeam("");
 
-  function mount(el) {
+  // mount(el) -> full archive with season tabs; mount(el, 3) -> pinned to
+  // Season 03 only (the per-season tournament hubs use this form).
+  function mount(el, seasonNo) {
     if (!el) return;
-    if (el === mountEl) { render(); return; }
+    const pin = seasonNo == null ? null : seasonNo;
+    if (el === mountEl && pin === pinnedSeason) { render(); return; }
     unmount();
     mountEl = el;
+    pinnedSeason = pin;
     el.addEventListener("click", onClick);
     el.addEventListener("change", onFileChange);
     // Playoffs bracket: trace a team's path on hover, and drop the trace when
@@ -652,6 +680,7 @@
     mountEl.removeEventListener("mouseover", onBracketHover);
     mountEl.removeEventListener("mouseleave", onMouseLeave);
     mountEl = null;
+    pinnedSeason = null;
   }
 
   /* ---------------- Firestore: read cloud honors + editor seed --------------- */
@@ -852,15 +881,41 @@
       };
     },
     // Champion / Runner-up / MVP podium for any honors-shaped object.
-    podiumHtml(h) {
+    // `champKind` is "team" (default) or "player" - solo tournaments crown a
+    // player, so their champion/runner-up bubbles resolve player photos.
+    podiumHtml(h, champKind) {
       h = h || {};
+      const kind = champKind === "player" ? "player" : "team";
       return `<div class="podium">
         ${podiumItem("mvp", "MVP", "player", h.mvp || "")}
-        ${podiumItem("champion", "Champion", "team", h.champion || "")}
-        ${podiumItem("runner", "Runner-up", "team", h.runnerUp || "")}
+        ${podiumItem("champion", "Champion", kind, h.champion || "")}
+        ${podiumItem("runner", "Runner-up", kind, h.runnerUp || "")}
       </div>`;
     },
     extraItem, bubble, seasonLogo,
+    /* ---- reusable stats-sheet machinery (per-tournament sheets in series.js) ---- */
+    // Parse a Season-Stats-format CSV into cell rows (header dropped) - the
+    // same naive split the bundled season sheets use.
+    rowsFromCsv(text) {
+      return String(text || "").split(/\r?\n/)
+        .map(l => l.trim()).filter(Boolean).slice(1)
+        .map(line => line.split(",").map(c => c.trim()));
+    },
+    // Strict 36-column layout check - returns { ok, reason?, playerCount? }.
+    validateCsv: validateSeasonCsv,
+    // One leaderboard table (key: "overall" | "batting" | "bowling").
+    boardHtml(rows, key) {
+      const b = BOARDS.find(x => x.key === key) || BOARDS[0];
+      return b.build(rows);
+    },
+    boardKeys: () => BOARDS.map(b => ({ key: b.key, label: b.label })),
+    // Top run-scorer / wicket-taker of a sheet ("" until someone scores).
+    leadersFromRows(rows) {
+      return {
+        mostRuns: seasonLeader(rows, byRuns, COL.runs),
+        mostWickets: seasonLeader(rows, byWickets, COL.wickets),
+      };
+    },
     // Fired whenever the underlying data changes (cloud honors, live CSV).
     onChange(cb) { listeners.push(cb); },
   };

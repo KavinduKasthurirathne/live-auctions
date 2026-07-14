@@ -186,7 +186,7 @@ function renderAuthGate() {
     <div class="gate-hero">
       ${gateLogoHtml()}
       <h1 class="gate-title">HC LEAGUES</h1>
-      <p class="gate-tagline">WHERE HAND CRICKET CHAMPIONS SHINE</p>
+      <p class="gate-tagline">HAND CRICKET CHAMPIONS LEAGUE</p>
       <p class="gate-tags">Live Auctions · Fantasy League · Player Rankings</p>
     </div>
     <div class="gate-panel"><div class="gate-panel-card">${panel}</div></div>`;

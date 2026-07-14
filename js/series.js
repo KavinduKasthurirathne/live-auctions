@@ -27,15 +27,81 @@
 
   const LEGACY_ID = "hccl-s6";
   const VIEW_KEY = "hccl_viewing_tournament";
-  // The legacy entry represents the WHOLE HC Champions League (its data roots
-  // hold the ongoing season; the S1-S6 archive renders inside its detail hub).
+  // The legacy entry is HCCL Season 06 - the LIVE season whose data stays at
+  // the ORIGINAL Firestore roots (auction/fantasy/mvp/matches). Every other
+  // HCCL season is an archive-only entry (see seasonSeeds) whose stats come
+  // from the bundled season archive, not from tournament data roots.
   const LEGACY_META = {
-    id: LEGACY_ID, name: "HC Champions League", short: "HCCL", logo: "",
-    duration: "NOV 2025 - PRESENT", status: "live", legacy: true, order: 0, createdAt: 0,
+    id: LEGACY_ID, name: "HCCL Season 06", short: "HCCL S6",
+    logo: encodeURI("assets/HCCL Logos/S6 LOGO.jpg"),
+    duration: "JUN 2026 - JUL 2026", status: "live", legacy: true,
+    archive: "hccl", season: 6, order: 6, createdAt: 0,
   };
-  // The stored name this entry had before the rebrand - used to migrate the
-  // cloud doc exactly once without ever clobbering a later admin rename.
-  const LEGACY_OLD_NAME = "HCCL Season 06";
+  // Names this entry may carry from earlier AUTO-writes (original seed, the
+  // brief league-level rename). Migration only ever touches those - a manual
+  // admin rename to anything else is final.
+  const LEGACY_AUTO_NAMES = ["HC Champions League", "HCCL Season 06"];
+
+  // Per-season HCCL entries: Season 01-05 (completed, honors + stats from the
+  // bundled archive) and the scheduled next season. Derived from
+  // window.HCCLSeasonArchive so the honors live in ONE place. Used both to
+  // seed the cloud registry (once) and as the offline fallback list.
+  const NEXT_SEASON = { no: 7, duration: "COMING SOON" };
+  function seasonSeeds() {
+    const A = window.HCCLSeasonArchive;
+    const pad = n => String(n).padStart(2, "0");
+    const seeds = (A ? A.seasons() : []).filter(s => !s.ongoing && s.champion).map(s => ({
+      id: `hccl-s${s.no}`,
+      name: `HCCL Season ${pad(s.no)}`, short: `HCCL S${s.no}`,
+      logo: (A && A.seasonLogo(s.no)) || "",
+      duration: s.year || "", status: "completed",
+      archive: "hccl", season: s.no, order: s.no, createdAt: 0,
+      honors: { champion: s.champion || "", runnerUp: s.runnerUp || "", mvp: s.mvp || "" },
+    }));
+    seeds.push({
+      id: `hccl-s${NEXT_SEASON.no}`,
+      name: `HCCL Season ${pad(NEXT_SEASON.no)}`, short: `HCCL S${NEXT_SEASON.no}`, logo: "",
+      duration: NEXT_SEASON.duration, status: "upcoming",
+      archive: "hccl", season: NEXT_SEASON.no, order: NEXT_SEASON.no, createdAt: 0,
+      honors: null,
+    });
+    return seeds;
+  }
+
+  // Other HC tournaments (stats-sheet only: no auction/fantasy/MVP tabs - an
+  // editor imports a Season-Stats-format CSV in each one's Details hub).
+  // `order` slots them chronologically between the HCCL seasons (S4=4, S5=5,
+  // S6=6). `solo: true` = players (not teams) contest the title, so the
+  // champion/runner-up podium bubbles resolve player photos.
+  const TOURNEY_SEEDS = [
+    {
+      id: "hc-mini-ipl-2026", name: "HC Mini IPL 2026", short: "MIPL 26", logo: "",
+      duration: "MAR 2026 - APR 2026", status: "completed",
+      statsOnly: true, order: 4.5, createdAt: 0,
+      honors: { champion: "Mumbai Indians", runnerUp: "Gujarat Titans", mvp: "Kalana Thenuja" },
+    },
+    {
+      id: "solo-knockout-championship-s01", name: "Solo Knockout Championship S01", short: "SKC S1", logo: "",
+      duration: "13 MAY 2026 - 14 MAY 2026", status: "completed",
+      statsOnly: true, solo: true, order: 5.3, createdAt: 0,
+      honors: { champion: "Chathuka Lakshan", runnerUp: "Nehan Fernando", mvp: "Chathuka Lakshan" },
+    },
+    {
+      id: "hc-county-rising-league-s01", name: "HC County Rising League S01", short: "CRL S1", logo: "",
+      duration: "MAY 2026 - JUN 2026", status: "completed",
+      statsOnly: true, order: 5.5, createdAt: 0,
+      honors: { champion: "Nova Rising Force", runnerUp: "Knights of Future", mvp: "Sandun Chinthana" },
+    },
+    {
+      // Honors intentionally blank - an admin records them via ✎ Edit, and the
+      // card joins the Home carousel once a champion is set.
+      id: "hc-county-legends-league-s01", name: "HC County Legends League S01", short: "CLL S1", logo: "",
+      duration: "MAY 2026 - JUN 2026", status: "completed",
+      statsOnly: true, order: 5.6, createdAt: 0,
+      honors: null,
+    },
+  ];
+  const allSeeds = () => [...seasonSeeds(), ...TOURNEY_SEEDS];
 
   const H = () => window.HCCL;
   const db = () => (window.HCCL ? window.HCCL.db : null);
@@ -59,8 +125,13 @@
   const metaOf = id => tournaments.find(t => t.id === id) || null;
 
   // Tournaments whose detail hub shows the HCCL season archive: the legacy
-  // entry (it IS the league), plus anything explicitly tagged archive:"hccl".
+  // entry (Season 06), plus the seeded per-season entries tagged archive:"hccl".
   const isHcclFamily = m => !!(m && (m.legacy || m.archive === "hccl"));
+  // Archive-only entries have NO data roots (no auction/fixtures/fantasy) -
+  // their Details hub is the whole content, so "viewing" them is meaningless.
+  // Same for stats-sheet-only tournaments (Mini IPL, Solo Knockout, County
+  // leagues): their record IS the imported stats sheet.
+  const isArchiveOnly = m => !!(m && ((m.archive === "hccl" && !m.legacy) || m.statsOnly));
 
   function normMeta(id, d) {
     return {
@@ -69,8 +140,11 @@
       legacy: !!d.legacy, order: d.order == null ? 999 : d.order,
       createdAt: d.createdAt || 0,
       archive: d.archive || "",
-      // { champion, runnerUp, mvp } - drives this tournament's card on the
-      // Home champions carousel (and its detail hub) once it's completed.
+      season: d.season || 0,
+      statsOnly: !!d.statsOnly,
+      solo: !!d.solo,
+      // { champion, runnerUp, mvp, mostRuns?, mostWickets? } - drives this
+      // tournament's card on the Home champions carousel once it's completed.
       honors: d.honors || null,
     };
   }
@@ -78,9 +152,12 @@
   function resolveViewing() {
     let want = null;
     try { want = localStorage.getItem(VIEW_KEY); } catch (e) {}
-    if (want && metaOf(want)) return want;
-    if (metaOf(activeId)) return activeId;
-    return tournaments.length ? tournaments[0].id : LEGACY_ID;
+    // Never resolve to an archive-only entry - it has no data for the tabs.
+    if (want) { const m = metaOf(want); if (m && !isArchiveOnly(m)) return want; }
+    const act = metaOf(activeId);
+    if (act && !isArchiveOnly(act)) return activeId;
+    const firstReal = tournaments.find(t => !isArchiveOnly(t));
+    return firstReal ? firstReal.id : LEGACY_ID;
   }
 
   function fire() {
@@ -103,6 +180,10 @@
     },
     setViewing(id) {
       if (!metaOf(id) || id === viewingId) return;
+      if (isArchiveOnly(metaOf(id))) {
+        toast("That season's record lives under its Details page", "bad");
+        return;
+      }
       if (!cloudOn() && !api.isLegacy(id)) {
         toast("Other tournaments live in the cloud - sign in to browse them", "bad");
         return;
@@ -123,7 +204,12 @@
 
   /* ---------------- registry sync ---------------- */
   function fallbackReady() {
-    tournaments = [LEGACY_META]; activeId = LEGACY_ID;
+    // Offline mode still shows the full HC story: HCCL season entries, the
+    // live legacy season, the scheduled next season, and the other seeded
+    // tournaments (Mini IPL, Solo Knockout, County leagues).
+    tournaments = [...allSeeds().filter(t => t.id !== LEGACY_ID), LEGACY_META]
+      .sort((x, y) => (x.order - y.order) || (x.createdAt - y.createdAt));
+    activeId = LEGACY_ID;
     viewingId = LEGACY_ID;
     if (!ready) { ready = true; render(); renderBanner(); fire(); }
   }
@@ -143,13 +229,15 @@
       if (metas.length) {
         metas.sort((x, y) => (x.order - y.order) || (x.createdAt - y.createdAt));
         tournaments = metas;
-        maybeMigrateLegacyName(); // one-time rebrand of the seeded legacy entry
+        maybeMigrateLegacyMeta(); // one-time per-season restructure of the legacy entry
+        maybeSeedSeasons(cfg);    // one-time seed of the S1-S5 + next-season entries
       } else {
         tournaments = [LEGACY_META];
         maybeSeed(); // first editor creates the registry
       }
-      activeId = (cfg && cfg.activeId && metaOf(cfg.activeId)) ? cfg.activeId
-        : (tournaments[0] ? tournaments[0].id : LEGACY_ID);
+      const cfgActive = cfg && cfg.activeId && metaOf(cfg.activeId);
+      activeId = (cfgActive && !isArchiveOnly(metaOf(cfg.activeId))) ? cfg.activeId
+        : (tournaments.find(t => !isArchiveOnly(t)) || tournaments[0] || LEGACY_META).id;
       if (!viewingId || !metaOf(viewingId)) viewingId = resolveViewing();
       ready = true;
       render(); renderBanner();
@@ -174,20 +262,50 @@
     } catch (e) { console.warn("series seed failed:", e); }
   }
 
-  // Registries seeded before the HC Leagues rebrand still say "HCCL Season 06".
-  // The first editor to load the page renames the entry to the league-level
-  // identity - guarded on the OLD name so a deliberate admin rename is final.
-  let renameTried = false;
-  async function maybeMigrateLegacyName() {
-    if (renameTried || !cloudOn() || !editorOn()) return;
+  // One-time restructure of the legacy entry: registries written by earlier
+  // versions call it "HCCL Season 06" without season/archive fields, or
+  // "HC Champions League" (the brief league-level rename). Both are auto-names,
+  // so migrating them is safe; a manual admin rename is never touched.
+  let legacyMigrateTried = false;
+  async function maybeMigrateLegacyMeta() {
+    if (legacyMigrateTried || !cloudOn() || !editorOn()) return;
     const m = metaOf(LEGACY_ID);
-    if (!m || m.name !== LEGACY_OLD_NAME) return;
-    renameTried = true;
+    if (!m || !LEGACY_AUTO_NAMES.includes(m.name)) return;
+    const current = m.name === LEGACY_META.name && m.season === 6 && m.order === 6 && m.archive === "hccl";
+    if (current) return;
+    legacyMigrateTried = true;
     try {
-      await fsa().updateDoc(fsa().doc(db(), "tournaments", LEGACY_ID), {
+      const target = {
         name: LEGACY_META.name, short: LEGACY_META.short, duration: LEGACY_META.duration,
-      });
-    } catch (e) { console.warn("legacy tournament rename failed:", e); renameTried = false; }
+        archive: "hccl", season: 6, order: 6,
+      };
+      if (!m.logo) target.logo = LEGACY_META.logo;
+      await fsa().updateDoc(fsa().doc(db(), "tournaments", LEGACY_ID), target);
+    } catch (e) { console.warn("legacy tournament migration failed:", e); legacyMigrateTried = false; }
+  }
+
+  // One-time seed of the bundled entries (HCCL seasons + the other HC
+  // tournaments). Version-guarded via tournaments/_config.seasonSeedVersion so
+  // an admin DELETING one of them stays deleted (no resurrect-on-reload loop).
+  // v1 = HCCL S1-S5 + S7; v2 adds Mini IPL, Solo Knockout, County leagues.
+  const SEASON_SEED_VERSION = "v2";
+  let seasonSeedTried = false;
+  async function maybeSeedSeasons(cfg) {
+    if (seasonSeedTried || !cloudOn() || !editorOn()) return;
+    if (cfg && cfg.seasonSeedVersion === SEASON_SEED_VERSION) return;
+    seasonSeedTried = true;
+    const a = fsa(), d = db();
+    try {
+      for (const seed of allSeeds()) {
+        if (metaOf(seed.id)) continue; // never overwrite an existing entry
+        const meta = { ...seed, createdAt: Date.now() };
+        delete meta.id;
+        if (!meta.honors) delete meta.honors;
+        await a.setDoc(a.doc(d, "tournaments", seed.id), meta);
+      }
+      await a.setDoc(a.doc(d, "tournaments", "_config"),
+        { activeId: activeId || LEGACY_ID, seasonSeedVersion: SEASON_SEED_VERSION });
+    } catch (e) { console.warn("tournament seed failed:", e); seasonSeedTried = false; }
   }
 
   /* ---------------- admin: create / edit / copy / delete ---------------- */
@@ -265,7 +383,10 @@
       const champion = ($("#serChampion").value || "").trim();
       const runnerUp = ($("#serRunnerUp").value || "").trim();
       const mvp = ($("#serMvp").value || "").trim();
-      const honors = (champion || runnerUp || mvp) ? { champion, runnerUp, mvp } : null;
+      const mostRuns = ($("#serMostRuns").value || "").trim();
+      const mostWickets = ($("#serMostWickets").value || "").trim();
+      const honors = (champion || runnerUp || mvp || mostRuns || mostWickets)
+        ? { champion, runnerUp, mvp, mostRuns, mostWickets } : null;
 
       if (UI.form && UI.form.mode === "edit") {
         const cur = metaOf(UI.form.id);
@@ -274,7 +395,11 @@
           name, short, duration, status,
           logo: logo || cur.logo || "",
           legacy: !!cur.legacy, order: cur.order, createdAt: cur.createdAt || Date.now(),
+          // setDoc replaces the whole doc - carry the identity flags over.
           ...(cur.archive ? { archive: cur.archive } : {}),
+          ...(cur.season ? { season: cur.season } : {}),
+          ...(cur.statsOnly ? { statsOnly: true } : {}),
+          ...(cur.solo ? { solo: true } : {}),
           ...(honors ? { honors } : {}),
         });
         toast("Tournament updated", "good");
@@ -342,6 +467,7 @@
 
   function cardHtml(m) {
     const isViewing = m.id === (viewingId || LEGACY_ID);
+    const archiveOnly = isArchiveOnly(m);
     const chips = [
       `<span class="series-chip st-${esc(m.status)}">${STATUS_LABEL[m.status] || esc(m.status)}</span>`,
       m.id === activeId ? `<span class="series-chip st-default">DEFAULT</span>` : "",
@@ -350,9 +476,14 @@
     const admin = (editorOn() && cloudOn()) ? `
       <div class="series-admin-row">
         <button class="icon-btn" data-series-edit="${esc(m.id)}" title="Edit tournament">✎</button>
-        ${m.id !== activeId ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament">★</button>` : ""}
+        ${(!archiveOnly && m.id !== activeId) ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament">★</button>` : ""}
         ${(!m.legacy && m.id !== activeId) ? `<button class="icon-btn del" data-series-del="${esc(m.id)}" title="Delete (only while empty)">🗑</button>` : ""}
       </div>` : "";
+    // Archive-only seasons have no auction/fixtures data to "View" - their
+    // Details hub IS the content.
+    const viewBtn = archiveOnly ? "" : (isViewing
+      ? `<button class="btn btn-dark" disabled>✓ Viewing</button>`
+      : `<button class="btn btn-yellow" data-series-view="${esc(m.id)}">View</button>`);
     return `
       <div class="series-card${isViewing ? " viewing" : ""}" data-series-open="${esc(m.id)}">
         ${logoHtml(m)}
@@ -362,9 +493,7 @@
           <div class="series-chips">${chips}</div>
         </div>
         <div class="series-actions">
-          ${isViewing
-            ? `<button class="btn btn-dark" disabled>✓ Viewing</button>`
-            : `<button class="btn btn-yellow" data-series-view="${esc(m.id)}">View</button>`}
+          ${viewBtn}
           <button class="btn btn-dark" data-series-open="${esc(m.id)}">Details ›</button>
           ${admin}
         </div>
@@ -398,14 +527,20 @@
         </label>
         <details class="stats-fieldset"${editing && editing.honors ? " open" : ""}>
           <summary>Honors (optional) - shown on the Home champions carousel once completed</summary>
-          <label>Champion (team)
+          <label>Champion (team, or player for solo events)
             <input type="text" id="serChampion" placeholder="e.g. Super Fire Dragons" value="${editing && editing.honors ? esc(editing.honors.champion || "") : ""}" />
           </label>
-          <label>Runner-up (team)
+          <label>Runner-up
             <input type="text" id="serRunnerUp" placeholder="e.g. Matrix" value="${editing && editing.honors ? esc(editing.honors.runnerUp || "") : ""}" />
           </label>
           <label>MVP (player)
             <input type="text" id="serMvp" placeholder="e.g. Sasindu Madushan" value="${editing && editing.honors ? esc(editing.honors.mvp || "") : ""}" />
+          </label>
+          <label>Most Runs (player)
+            <input type="text" id="serMostRuns" placeholder="auto-filled by a stats-sheet import" value="${editing && editing.honors ? esc(editing.honors.mostRuns || "") : ""}" />
+          </label>
+          <label>Most Wickets (player)
+            <input type="text" id="serMostWickets" placeholder="auto-filled by a stats-sheet import" value="${editing && editing.honors ? esc(editing.honors.mostWickets || "") : ""}" />
           </label>
         </details>
         ${editing ? "" : `
@@ -423,30 +558,145 @@
       </div>`;
   }
 
+  /* ---- per-tournament stats sheet (non-HCCL tournaments) ---- */
+  // The imported sheet lives at tournaments/{tid}/stats/sheet = { csv,
+  // playerCount, updatedAt, updatedBy } - already covered by the recursive
+  // tournaments/** security rule, so no rules change is needed. While a hub
+  // is open we follow the doc with onSnapshot, so an editor's import shows
+  // up on every device immediately.
+  let statsTid = null, statsUnsub = null, statsCsv = null, statsLoaded = false;
+  let detailBoard = "overall"; // board sub-tab inside a stats hub
+
+  function startDetailStats(tid) {
+    if (statsTid === tid) return;
+    stopDetailStats();
+    statsTid = tid;
+    detailBoard = "overall";
+    const a = fsa();
+    if (!cloudOn() || !a.onSnapshot) { statsLoaded = true; return; }
+    statsUnsub = a.onSnapshot(a.doc(db(), "tournaments", tid, "stats", "sheet"), snap => {
+      const data = snap.exists() ? snap.data() : null;
+      statsCsv = (data && typeof data.csv === "string" && data.csv.trim()) ? data.csv : null;
+      statsLoaded = true;
+      if (UI.detail === tid) render();
+    }, err => {
+      console.warn("tournament stats snapshot error:", err && err.code);
+      statsLoaded = true;
+      if (UI.detail === tid) render();
+    });
+  }
+
+  function stopDetailStats() {
+    if (statsUnsub) { statsUnsub(); statsUnsub = null; }
+    statsTid = null; statsCsv = null; statsLoaded = false;
+  }
+
+  function statsPanelHtml(m) {
+    const A = window.HCCLSeasonArchive;
+    const admin = editorOn();
+    const importBtn = admin ? `
+      <label class="btn btn-yellow file-btn tstats-import" title="Upload this tournament's stats CSV (same 36-column Season Stats format)">
+        <span>⬆ Import Stats Sheet</span>
+        <input type="file" class="tstats-import-file" accept=".csv,text/csv" hidden />
+      </label>` : "";
+    let body;
+    if (!statsLoaded) {
+      body = `<p class="hint">Loading stats…</p>`;
+    } else if (!statsCsv || !A) {
+      body = `<p class="hint">${admin
+        ? "No stats sheet imported yet - upload this tournament's Season-Stats CSV to publish its leaderboards for everyone."
+        : "Stats for this tournament haven't been published yet - check back soon."}</p>`;
+    } else {
+      const rows = A.rowsFromCsv(statsCsv);
+      body = `
+        <div class="board-tabs" role="tablist">
+          ${A.boardKeys().map(b => `<button class="board-tab${b.key === detailBoard ? " active" : ""}" data-tstat-board="${b.key}">${esc(b.label)}</button>`).join("")}
+        </div>
+        <div class="board-panel tstats-panel">${A.boardHtml(rows, detailBoard)}</div>`;
+    }
+    return `
+      <div class="card series-stats">
+        <div class="season-boards-head">
+          <h3 class="season-boards-title">${esc(m.short || m.name)} · Player Stats</h3>
+          ${importBtn}
+        </div>
+        ${body}
+      </div>`;
+  }
+
+  // Editor-only: publish an uploaded stats CSV for this tournament, and lift
+  // its Most Runs / Most Wickets into the meta honors so the Home carousel
+  // shows them without ever reading the sheet itself.
+  async function importTournamentStats(file, tid) {
+    if (!file || !tid) return;
+    const A = window.HCCLSeasonArchive;
+    if (!A) return;
+    if (!editorOn()) { toast("Only moderators/admins can import stats", "bad"); return; }
+    let text = "";
+    try { text = await file.text(); } catch (e) { toast("Couldn't read that file", "bad"); return; }
+    const check = A.validateCsv(text);
+    if (!check.ok) { toast(check.reason, "bad"); return; }
+    const leaders = A.leadersFromRows(A.rowsFromCsv(text));
+    if (cloudOn()) {
+      try {
+        const a = fsa(), d = db();
+        const h = H();
+        await a.setDoc(a.doc(d, "tournaments", tid, "stats", "sheet"), {
+          csv: text, playerCount: check.playerCount,
+          updatedAt: a.serverTimestamp ? a.serverTimestamp() : Date.now(),
+          updatedBy: (h && h.user && (h.user.displayName || h.user.email)) || "",
+        });
+        const upd = {};
+        if (leaders.mostRuns) upd["honors.mostRuns"] = leaders.mostRuns;
+        if (leaders.mostWickets) upd["honors.mostWickets"] = leaders.mostWickets;
+        if (Object.keys(upd).length && a.updateDoc) {
+          await a.updateDoc(a.doc(d, "tournaments", tid), upd)
+            .catch(e => console.warn("carousel leader update failed:", e));
+        }
+        toast(`Stats imported - ${check.playerCount} players. Live for everyone.`, "good");
+        // onSnapshot re-renders every device (including this one).
+      } catch (e) {
+        console.error("tournament stats import failed:", e);
+        toast("Upload failed - need moderator/admin + published rules", "bad");
+      }
+      return;
+    }
+    // Offline / open mode: apply on this device only.
+    if (statsTid === tid) { statsCsv = text; statsLoaded = true; render(); }
+    toast(`Stats imported - ${check.playerCount} players (this device only)`, "good");
+  }
+
   /* -------- tournament detail hub (list ⇄ detail inside #view-series) -------- */
   function detailBodyHtml(m) {
-    // HCCL-family tournaments carry the full season archive (season tabs,
-    // podium, playoffs bracket, leaderboards) - mounted after innerHTML below.
-    if (isHcclFamily(m)) return `<div class="series-archive"></div>`;
-    const A = window.HCCLSeasonArchive;
-    const h = m.honors || {};
-    const hasHonors = !!(h.champion || h.runnerUp || h.mvp);
-    return `
-      <div class="card series-honors">
-        <h3>Honors</h3>
-        ${hasHonors && A ? A.podiumHtml(h) : `<p class="hint">${m.status === "completed"
-          ? "Honors not recorded yet - an admin can add Champion / Runner-up / MVP via ✎ Edit."
-          : "Honors appear here once the tournament finishes."}</p>`}
-      </div>
-      <div class="card series-coming">
-        <h3>Season stats</h3>
-        <p class="hint">Detailed stats for this tournament are coming soon. Meanwhile, hit <strong>View</strong> above and the 🔨 Auction, 📅 Fixtures and 🏅 MVP tabs follow its live data.</p>
-      </div>`;
+    // HCCL-family tournaments show THAT season's record (playoffs bracket,
+    // top run-scorer/wicket-taker, leaderboards) - mounted after innerHTML
+    // below. The live season also gets shortcuts to its live data tabs,
+    // which earlier seasons never had (no MVP/fantasy back then).
+    if (isHcclFamily(m)) {
+      const links = m.legacy ? `
+      <div class="card series-quick">
+        <h3>Live season data</h3>
+        <p class="hint">Auction squads, fixtures &amp; results, MVP rankings and fantasy for this season run live in their own tabs.</p>
+        <div class="form-row">
+          <button class="btn btn-dark" data-goto="fixtures">📅 Fixtures &amp; Results</button>
+          <button class="btn btn-dark" data-goto="mvp">🏅 MVP Rankings</button>
+          <button class="btn btn-dark" data-goto="fantasy">🏏 Fantasy</button>
+          <button class="btn btn-dark" data-goto="auctions">🔨 Auction</button>
+        </div>
+      </div>` : "";
+      return `${links}<div class="series-archive"></div>`;
+    }
+    // Everything else: the imported stats sheet is the whole record (honors
+    // already live on the Home carousel - no podium repeated here).
+    return statsPanelHtml(m);
   }
 
   function renderDetail(view, m) {
     const admin = editorOn() && cloudOn();
     const isViewing = m.id === (viewingId || LEGACY_ID);
+    // Follow this tournament's stats sheet while its hub is open (no-op for
+    // HCCL-family hubs, which render from the bundled archive instead).
+    if (isHcclFamily(m)) stopDetailStats(); else startDetailStats(m.id);
     const chips = [
       `<span class="series-chip st-${esc(m.status)}">${STATUS_LABEL[m.status] || esc(m.status)}</span>`,
       m.id === activeId ? `<span class="series-chip st-default">DEFAULT</span>` : "",
@@ -465,21 +715,27 @@
           <div class="series-chips">${chips}</div>
         </div>
         <div class="series-actions">
-          ${isViewing
+          ${isArchiveOnly(m) ? "" : (isViewing
             ? `<button class="btn btn-dark" disabled>✓ Viewing</button>`
-            : `<button class="btn btn-yellow" data-series-view="${esc(m.id)}">View</button>`}
+            : `<button class="btn btn-yellow" data-series-view="${esc(m.id)}">View</button>`)}
           ${admin ? `
           <div class="series-admin-row">
             <button class="icon-btn" data-series-edit="${esc(m.id)}" title="Edit tournament">✎</button>
-            ${m.id !== activeId ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament">★</button>` : ""}
+            ${(!isArchiveOnly(m) && m.id !== activeId) ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament">★</button>` : ""}
           </div>` : ""}
         </div>
       </div>
       ${UI.form ? formHtml() : ""}
       ${detailBodyHtml(m)}`;
     const holder = view.querySelector(".series-archive");
-    if (holder && window.HCCLSeasonArchive) window.HCCLSeasonArchive.mount(holder);
-    else if (window.HCCLSeasonArchive) window.HCCLSeasonArchive.unmount();
+    if (holder && window.HCCLSeasonArchive) {
+      // Every HCCL-family entry carries its season number; pin the mount to it
+      // so the hub shows just that season (no season-tab row).
+      const sn = m.season || (m.legacy ? 6 : null);
+      window.HCCLSeasonArchive.mount(holder, sn == null ? undefined : sn);
+    } else if (window.HCCLSeasonArchive) {
+      window.HCCLSeasonArchive.unmount();
+    }
   }
 
   function render() {
@@ -489,6 +745,7 @@
     if (UI.detail && !metaOf(UI.detail)) UI.detail = null;
     if (UI.detail) { renderDetail(view, metaOf(UI.detail)); return; }
     if (window.HCCLSeasonArchive) window.HCCLSeasonArchive.unmount();
+    stopDetailStats();
     const admin = editorOn() && cloudOn();
     const offlineHint = !cloudOn()
       ? `<p class="hint series-hint">Multi-tournament browsing works through the shared cloud - sign in to see and switch tournaments.</p>` : "";
@@ -539,6 +796,20 @@
     if (t.closest("[data-series-save]")) { submitForm(); return; }
     if (t.closest("[data-series-cancel]")) { UI.form = null; render(); return; }
     if (t.closest("[data-series-back]")) { UI.detail = null; UI.form = null; render(); return; }
+    // Stats-hub board sub-tab: swap only the board panel (no page jump).
+    const tb = t.closest("[data-tstat-board]");
+    if (tb) {
+      const key = tb.getAttribute("data-tstat-board");
+      if (key && key !== detailBoard) {
+        detailBoard = key;
+        const A = window.HCCLSeasonArchive;
+        const panel = document.querySelector(".tstats-panel");
+        if (panel && A && statsCsv) panel.innerHTML = A.boardHtml(A.rowsFromCsv(statsCsv), detailBoard);
+        document.querySelectorAll("[data-tstat-board]").forEach(b =>
+          b.classList.toggle("active", b.getAttribute("data-tstat-board") === detailBoard));
+      }
+      return;
+    }
     // Checked LAST: the whole list card is clickable, but its buttons
     // (View / edit / delete / default) must win over "open the hub".
     const open = t.closest("[data-series-open]");
@@ -560,6 +831,14 @@
   function init() {
     // Delegated: covers the Series page AND the banner (outside the page).
     document.addEventListener("click", onClick);
+    // Stats-sheet import inside a tournament hub (editor-only button).
+    document.addEventListener("change", e => {
+      const inp = e.target.closest(".tstats-import-file");
+      if (inp && inp.files && inp.files[0] && UI.detail) {
+        importTournamentStats(inp.files[0], UI.detail);
+        inp.value = "";
+      }
+    });
     const tabs = document.getElementById("tabs");
     if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="series"]')) render(); });
     if (window.HCCL && typeof window.HCCL.onChange === "function") window.HCCL.onChange(onAuth);

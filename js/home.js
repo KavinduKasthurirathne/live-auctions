@@ -39,8 +39,21 @@
     return `<div class="champs-logo fallback">${initials}</div>`;
   }
 
+  // Chronology key: the leading date of a duration string ("MAR 2026 - APR
+  // 2026", "13 MAY 2026 - …"). Unparseable strings ("COMING SOON") sink to
+  // the end, so a tournament without dates never jumps the queue.
+  const MONTH_IDX = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
+  function startStamp(duration) {
+    const m = String(duration || "").toUpperCase()
+      .match(/(?:(\d{1,2})\s+)?(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?\s+(\d{4})/);
+    if (!m) return Infinity;
+    return new Date(+m[3], MONTH_IDX[m[2]], m[1] ? +m[1] : 1).getTime();
+  }
+
+  // Three zones: logo + name + date | Champion/Runner-up/MVP podium | Most
+  // Runs & Most Wickets. Cards without a leaders zone drop to two zones.
   function cardHtml(c) {
-    return `<article class="champs-card${c.live ? " live" : ""}">
+    return `<article class="champs-card${c.live ? " live" : ""}${c.rightHtml ? " three" : ""}">
       <div class="champs-left">
         ${cardLogo(c.logo, c.title)}
         <div class="champs-meta">
@@ -50,72 +63,86 @@
           ${c.live ? `<span class="champs-live">● LIVE</span>` : ""}
         </div>
       </div>
-      <div class="champs-right">
-        ${c.rightHtml}
-      </div>
+      <div class="champs-mid">${c.midHtml || ""}</div>
+      ${c.rightHtml ? `<div class="champs-right">${c.rightHtml}</div>` : ""}
     </article>`;
   }
 
-  // Card list, newest first: LIVE cards lead, then completed tournaments from
-  // the registry (they're newer than the archived HCCL seasons), then the
-  // finished HCCL seasons.
+  // Card list: LIVE cards lead (the default view), then every finished
+  // tournament - HCCL seasons AND the other HC tournaments interleaved -
+  // in tournament-date order.
   function buildCards() {
     const A = archive();
     const S = series();
-    const cards = [];
+    const liveCards = [];
+    const doneCards = [];
 
-    // Ongoing HCCL season: champions aren't decided, so a podium would be a row
-    // of TBDs - the current Most Runs / Most Wickets race reads far better.
-    const live = A && A.ongoing();
-    if (live) {
-      const lead = A.leaders(live.no);
-      cards.push({
-        live: true,
-        logo: A.seasonLogo(live.no),
+    const leadersHtml = (mostRuns, mostWickets) => (A && (mostRuns || mostWickets)) ? `<div class="champs-race">
+      ${A.extraItem("🏏", "Most Runs", mostRuns || "TBD")}
+      ${A.extraItem("🎯", "Most Wickets", mostWickets || "TBD")}
+    </div>` : "";
+
+    // Ongoing HCCL season: champions aren't decided, so the mid zone carries
+    // an "in progress" note instead of a podium of TBDs.
+    const on = A && A.ongoing();
+    if (on) {
+      const lead = A.leaders(on.no);
+      liveCards.push({
+        live: true, stamp: startStamp(on.year),
+        logo: A.seasonLogo(on.no),
         league: "HC Champions League",
-        title: `Season ${pad2(live.no)}`,
-        duration: live.year || "",
-        rightHtml: `<div class="champs-race">
-          ${A.extraItem("🏏", "Most Runs", lead.mostRuns || "TBD")}
-          ${A.extraItem("🎯", "Most Wickets", lead.mostWickets || "TBD")}
-        </div>`,
+        title: `Season ${pad2(on.no)}`,
+        duration: on.year || "",
+        midHtml: `<div class="champs-progress">Season in progress<span>Champion crowned soon - follow it in 🏆 Series</span></div>`,
+        rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
       });
     }
 
-    const list = S ? S.list() : [];
-    // Live registry tournaments (the legacy entry is the ongoing HCCL season -
-    // already covered by the archive card above).
-    list.filter(t => !t.legacy && t.status === "live").forEach(t => {
-      cards.push({
-        live: true,
+    // Registry tournaments - excluding the whole HCCL family: the legacy entry
+    // AND the seeded per-season entries (archive:"hccl") are already covered by
+    // the archive-derived cards, so they'd only duplicate.
+    const list = (S ? S.list() : []).filter(t => !t.legacy && t.archive !== "hccl");
+    list.filter(t => t.status === "live").forEach(t => {
+      const h = t.honors || {};
+      liveCards.push({
+        live: true, stamp: startStamp(t.duration),
         logo: t.logo, title: t.name, duration: t.duration,
-        rightHtml: `<div class="champs-progress">Tournament in progress<span>Follow it in the 🏆 Series tab</span></div>`,
+        midHtml: `<div class="champs-progress">Tournament in progress<span>Follow it in the 🏆 Series tab</span></div>`,
+        rightHtml: leadersHtml(h.mostRuns, h.mostWickets),
       });
     });
 
-    // Completed registry tournaments with recorded honors, newest first.
-    list.filter(t => !t.legacy && t.status === "completed" && t.honors && t.honors.champion)
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-      .forEach(t => {
-        cards.push({
-          logo: t.logo, title: t.name, duration: t.duration,
-          rightHtml: A ? A.podiumHtml(t.honors) : "",
-        });
-      });
-
-    // Finished HCCL seasons, newest first.
+    // Finished HCCL seasons (leaders derive from each season's stats sheet).
     if (A) {
-      A.seasons().filter(s => !s.ongoing && s.champion).sort((a, b) => b.no - a.no).forEach(s => {
-        cards.push({
+      A.seasons().filter(s => !s.ongoing && s.champion).forEach(s => {
+        const lead = A.leaders(s.no);
+        doneCards.push({
+          stamp: startStamp(s.year),
           logo: A.seasonLogo(s.no),
           league: "HC Champions League",
           title: `Season ${pad2(s.no)}`,
           duration: s.year || "",
-          rightHtml: A.podiumHtml(s),
+          midHtml: A.podiumHtml(s),
+          rightHtml: leadersHtml(lead.mostRuns, lead.mostWickets),
         });
       });
     }
-    return cards;
+
+    // Completed registry tournaments with a recorded champion. Leaders appear
+    // once a stats sheet is imported (or entered by hand in the honors form).
+    list.filter(t => t.status === "completed" && t.honors && t.honors.champion).forEach(t => {
+      const h = t.honors;
+      doneCards.push({
+        stamp: startStamp(t.duration),
+        logo: t.logo, title: t.name, duration: t.duration,
+        midHtml: A ? A.podiumHtml(h, t.solo ? "player" : "team") : "",
+        rightHtml: leadersHtml(h.mostRuns, h.mostWickets),
+      });
+    });
+
+    liveCards.sort((a, b) => a.stamp - b.stamp);
+    doneCards.sort((a, b) => a.stamp - b.stamp);
+    return [...liveCards, ...doneCards];
   }
 
   /* ---------------------- carousel behaviour ---------------------- */

@@ -41,7 +41,23 @@ Static site, no build step. The surface is a browser at `index.html`.
    season-archive.js but never committed).
 
 Flows worth driving after a change: home (hero, carousel auto-advance ~6.5s,
-dots, news shell), Series list → HCCL Details hub (season tabs, podium,
-bracket lines drawn, leaderboards, board switching), back-and-reopen the hub
-(re-mount must not stack listeners), other tabs still render, 390px mobile
-viewport, `reducedMotion: "reduce"` context (no autoplay).
+dots, news shell), Series list → per-season Details hubs (S1-S5 archive-only,
+S6 live with quick links, S7 upcoming placeholder; bracket lines drawn,
+leaderboards, board switching), back-and-reopen a hub (re-mount must not
+stack listeners), other tabs still render, 390px mobile viewport,
+`reducedMotion: "reduce"` context (no autoplay).
+
+More gotchas:
+- Don't pass multi-line JS to `node -e` from PowerShell - the quoting gets
+  mangled. Write driver scripts to files and `node file.js`.
+- On mobile (≤900px) the nav is a hamburger drawer: click `#navToggle` first,
+  then the `[data-tab]` buttons inside `#tabs`; a closed drawer's tabs are
+  translated off-screen and unclickable.
+- The nav drawer lives inside the sticky header's stacking context (z-index
+  30) - any overlay meant to sit UNDER it must use z-index < 30.
+- Full-page mobile screenshots come out wider than the viewport (the clipped
+  off-screen drawer inflates CDP's content-size); check real overflow with
+  `document.documentElement.scrollWidth <= clientWidth`, not screenshot width.
+- To exercise the news composer offline, stub `window.HCCL` (configured, user,
+  role "moderator"), add `body.can-edit`, call `HCCLNews.render()`; don't
+  submit (no real Firestore).

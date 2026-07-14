@@ -2,13 +2,14 @@
    HC News feed  (window.HCCLNews - renders into #homeNews)
 
    The official news board on the Home page. Moderators/admins get
-   a composer (text + optional image) and can post; every signed-in
+   a composer (text + up to 4 images) and can post; every signed-in
    user reads. Posts carry the author's Google display name + photo.
    Deliberately NOT a social timeline: no comments, no likes, no
    edits - just announcements, newest first.
 
-   Firestore: news/{postId} = { text, image (dataURL or ""),
-     authorUid, authorName, authorPhoto, createdAt }.
+   Firestore: news/{postId} = { text, images: [dataURL, ...],
+     authorUid, authorName, authorPhoto, createdAt }. Older posts
+     may carry a single `image` string instead - still rendered.
    Rules: read signedIn; create canEdit (own uid only); delete
    admin or the author; update never.
 
@@ -19,8 +20,10 @@
   "use strict";
 
   const MAX_TEXT = 2000;
-  // Firestore documents cap at 1 MiB - leave headroom for the other fields.
-  const MAX_IMAGE_CHARS = 700 * 1024;
+  const MAX_IMAGES = 4;
+  // Firestore documents cap at 1 MiB - the COMBINED size of every attached
+  // image (as dataURL text) has to leave headroom for the other fields.
+  const MAX_IMAGES_CHARS = 700 * 1024;
 
   const H = () => window.HCCL;
   const cloudOn = () => { const h = H(); return !!(h && h.configured && h.user && h.db && h.fs); };
@@ -32,7 +35,7 @@
   let busy = false;      // a post is being submitted
   // Composer draft survives re-renders (snapshots rebuild the whole section).
   let draftText = "";
-  let draftImage = "";   // resized dataURL, ready to publish
+  let draftImages = []; // resized dataURLs, ready to publish (max MAX_IMAGES)
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
@@ -70,10 +73,15 @@
         ${avatarHtml(me.photoURL, me.displayName || me.email)}
         <textarea class="news-input" placeholder="Share an update with the league…" maxlength="${MAX_TEXT}">${esc(draftText)}</textarea>
       </div>
-      ${draftImage ? `<div class="news-attach"><img src="${draftImage}" alt="" /><button class="icon-btn del" data-news-clear-img title="Remove image">✕</button></div>` : ""}
+      ${draftImages.length ? `<div class="news-attach-grid">
+        ${draftImages.map((img, i) => `<div class="news-attach">
+          <img src="${img}" alt="" />
+          <button class="icon-btn del" data-news-clear-img="${i}" title="Remove image">✕</button>
+        </div>`).join("")}
+      </div>` : ""}
       <div class="news-composer-bar">
-        <label class="btn btn-dark file-btn">🖼 Add image
-          <input type="file" class="news-image-file" accept="image/*" hidden />
+        <label class="btn btn-dark file-btn${draftImages.length >= MAX_IMAGES ? " is-busy" : ""}">🖼 Add images${draftImages.length ? ` (${draftImages.length}/${MAX_IMAGES})` : ""}
+          <input type="file" class="news-image-file" accept="image/*" multiple hidden ${draftImages.length >= MAX_IMAGES ? "disabled" : ""} />
         </label>
         <button class="btn btn-yellow" data-news-post ${busy ? "disabled" : ""}>${busy ? "Posting…" : "Post"}</button>
       </div>
@@ -84,6 +92,9 @@
     const h = H();
     const mine = h.user && h.user.uid === p.authorUid;
     const canDelete = (h.isAdmin && h.isAdmin()) || (mine && h.canEdit && h.canEdit());
+    // New posts carry images[]; older ones a single image string.
+    const imgs = (Array.isArray(p.images) && p.images.length) ? p.images.slice(0, MAX_IMAGES)
+      : (p.image ? [p.image] : []);
     return `<article class="news-item">
       <div class="news-item-head">
         ${avatarHtml(p.authorPhoto, p.authorName)}
@@ -94,7 +105,9 @@
         ${canDelete ? `<button class="icon-btn del news-del" data-news-del="${esc(p.id)}" title="Delete post">🗑</button>` : ""}
       </div>
       <p class="news-text">${esc(p.text).replace(/\n/g, "<br>")}</p>
-      ${p.image ? `<img class="news-img" src="${p.image}" alt="" loading="lazy" />` : ""}
+      ${imgs.length ? `<div class="news-imgs n${imgs.length}">
+        ${imgs.map(src => `<img class="news-img" src="${src}" alt="" loading="lazy" />`).join("")}
+      </div>` : ""}
     </article>`;
   }
 
@@ -115,7 +128,7 @@
       body = posts.map(postHtml).join("");
     }
     el.innerHTML = `
-      <div class="news-head"><h2 class="news-title">📰 HC News</h2></div>
+      <div class="news-head"><h2 class="news-title">📰 HC Top Stories</h2></div>
       ${canPost() ? composerHtml() : ""}
       <div class="news-feed">${body}</div>`;
   }
@@ -155,13 +168,13 @@
       const ref = fs.doc(fs.collection(h.db, "news")); // auto-ID
       await fs.setDoc(ref, {
         text,
-        image: draftImage || "",
+        images: draftImages.slice(),
         authorUid: h.user.uid,
         authorName: h.user.displayName || h.user.email || "",
         authorPhoto: h.user.photoURL || "",
         createdAt: fs.serverTimestamp ? fs.serverTimestamp() : Date.now(),
       });
-      draftText = ""; draftImage = "";
+      draftText = ""; draftImages = [];
       notify("Posted to HC News.", "good");
     } catch (e) {
       console.error("news post failed:", e);
@@ -183,18 +196,27 @@
     }
   }
 
-  async function pickImage(file) {
-    if (!file) return;
+  async function pickImages(files) {
+    if (!files || !files.length) return;
     if (typeof window.fileToDataURL !== "function") { notify("Image helper unavailable.", "bad"); return; }
-    try {
-      const url = await fileToDataURL(file, 900, "jpeg");
-      if (url.length > MAX_IMAGE_CHARS) { notify("That image is too large even after resizing - try a smaller one.", "bad"); return; }
-      draftImage = url;
-      render();
-    } catch (e) {
-      console.error(e);
-      notify("Couldn't read that image.", "bad");
+    const room = MAX_IMAGES - draftImages.length;
+    if (room <= 0) { notify(`Up to ${MAX_IMAGES} images per post.`, "bad"); return; }
+    const picked = Array.from(files);
+    if (picked.length > room) notify(`Only ${room} more image${room === 1 ? "" : "s"} fit - taking the first ${room}.`, "bad");
+    let skipped = 0;
+    for (const file of picked.slice(0, room)) {
+      try {
+        const url = await fileToDataURL(file, 900, "jpeg");
+        const total = draftImages.reduce((n, u) => n + u.length, 0) + url.length;
+        if (total > MAX_IMAGES_CHARS) { skipped++; continue; } // post would blow the 1MB doc cap
+        draftImages.push(url);
+      } catch (e) {
+        console.error(e);
+        skipped++;
+      }
     }
+    if (skipped) notify(`${skipped} image${skipped === 1 ? "" : "s"} skipped - too large for one post even after resizing.`, "bad");
+    render();
   }
 
   /* ------------------------- events ------------------------- */
@@ -204,7 +226,13 @@
     if (e.target.closest("[data-news-post]")) { submitPost(); return; }
     const del = e.target.closest("[data-news-del]");
     if (del) { deletePost(del.getAttribute("data-news-del")); return; }
-    if (e.target.closest("[data-news-clear-img]")) { draftImage = ""; render(); return; }
+    const clear = e.target.closest("[data-news-clear-img]");
+    if (clear) {
+      const i = parseInt(clear.getAttribute("data-news-clear-img"), 10);
+      if (!isNaN(i)) draftImages.splice(i, 1);
+      render();
+      return;
+    }
   }
 
   function onInput(e) {
@@ -214,7 +242,7 @@
 
   function onFileChange(e) {
     const inp = e.target.closest(".news-image-file");
-    if (inp && inp.files && inp.files[0]) { pickImage(inp.files[0]); inp.value = ""; }
+    if (inp && inp.files && inp.files.length) { pickImages(inp.files); inp.value = ""; }
   }
 
   function onAuth() {

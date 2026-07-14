@@ -368,24 +368,72 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .toast.bad { border-color: var(--red); }
 
 /* ===================== RESPONSIVE ===================== */
-/* Tablets & phones: the nav becomes a single swipeable pill row under the
-   brand, so the sticky header stays two compact rows instead of wrapping. */
+/* Hamburger button: hidden on desktop; the 900px block below reveals it and
+   turns the .tabs row into a slide-in drawer. */
+.nav-toggle {
+  display: none;
+  width: 44px; height: 44px; flex: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  cursor: pointer; padding: 0;
+  flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  /* Above the open drawer (same header stacking context), so the morphing
+     X stays visible and clickable as a close button. */
+  position: relative; z-index: 70;
+}
+.nav-toggle span {
+  display: block; width: 20px; height: 2px; border-radius: 2px;
+  background: var(--text);
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+/* The three bars morph into an X while the drawer is open. */
+body.nav-open .nav-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+body.nav-open .nav-toggle span:nth-child(2) { opacity: 0; }
+body.nav-open .nav-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Dimmed page behind the open drawer; clicking it closes the menu (app.js).
+   NOTE: the drawer (.tabs) lives INSIDE the sticky header's stacking context
+   (z-index 30), so the backdrop must stay BELOW 30 - anything higher would
+   paint over the drawer and swallow its clicks. */
+.nav-backdrop {
+  position: fixed; inset: 0; z-index: 25;
+  background: rgba(5, 5, 6, 0.6);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+body.nav-open .nav-backdrop { opacity: 1; pointer-events: auto; }
+
+/* Tablets & phones: hamburger + right-side slide-in nav drawer. */
 @media (max-width: 900px) {
+  /* The closed drawer sits translated past the right edge; without this the
+     page gains ~320px of phantom horizontal scroll. `clip` (not `hidden`)
+     avoids creating a scroll container, so the sticky header keeps sticking. */
+  html, body { overflow-x: hidden; overflow-x: clip; }
   .auction-stage { grid-template-columns: 1fr; }
   .app-header { gap: 10px 12px; }
   .brand { flex: 1; min-width: 0; }
+  .brand-text { min-width: 0; }
   .brand-logo { width: 46px; height: 46px; border-radius: 12px; font-size: 15px; }
+  .nav-toggle { display: flex; }
   .tabs {
-    order: 3; width: 100%;
-    flex-wrap: nowrap; justify-content: flex-start;
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    /* soft fade on the clipped edges so the row reads as swipeable */
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 60;
+    width: min(78vw, 320px);
+    flex-wrap: nowrap; flex-direction: column; align-items: stretch; gap: 6px;
+    padding: 86px 16px 24px;
+    background: rgba(15, 15, 17, 0.98);
+    border-left: 1px solid var(--border);
+    box-shadow: -18px 0 40px rgba(0, 0, 0, 0.55);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    transform: translateX(105%);
+    transition: transform 0.3s ease;
   }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab { flex: none; }
+  body.nav-open .tabs { transform: translateX(0); }
+  .tabs::before {
+    content: "MENU";
+    position: absolute; top: 36px; left: 18px;
+    font-family: "Russo One", sans-serif; font-size: 13px; letter-spacing: 2px;
+    color: var(--muted);
+  }
+  .tab { flex: none; text-align: left; padding: 13px 16px; font-size: 15px; }
 }
 @media (max-width: 760px) {
   /* iOS Safari zooms the page when it focuses a field under 16px -
@@ -394,9 +442,12 @@ input[type="file"] { padding: 8px; font-size: 13px; }
   .member-role-select { font-size: 16px; }
 }
 @media (max-width: 560px) {
-  .tab { padding: 8px 12px; font-size: 13px; }
   .btn { padding: 11px 14px; font-size: 14px; }
   .overlay-card { padding: 28px 20px; }
+  /* Header has to fit brand + auth + hamburger on one row. */
+  .brand-sub { font-size: 10px; letter-spacing: 1.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .auth-meta { display: none; }
+  .auth-btn { padding: 8px 10px; font-size: 12px; }
 }
 
 /* ===================== AUTH (sign-in + roles) ===================== */
@@ -1155,9 +1206,11 @@ body:not(.can-edit) .news-composer { display: none; }
   color: var(--text); font: inherit; font-size: 14px; padding: 10px 12px;
 }
 .news-input:focus { outline: none; border-color: var(--gold); }
-.news-attach { position: relative; margin-top: 10px; display: inline-block; }
-.news-attach img { display: block; max-width: 100%; max-height: 180px; border-radius: 12px; border: 1px solid var(--border); }
-.news-attach .icon-btn { position: absolute; top: 6px; right: 6px; }
+/* Composer: attached-image thumbnails, each with its own remove button. */
+.news-attach-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.news-attach { position: relative; }
+.news-attach img { display: block; height: 104px; width: 140px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border); }
+.news-attach .icon-btn { position: absolute; top: 5px; right: 5px; width: 24px; height: 24px; font-size: 11px; background: rgba(10, 10, 11, 0.75); }
 .news-composer-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
 .news-composer-bar .btn { padding: 9px 18px; font-size: 13px; }
 
@@ -1170,6 +1223,16 @@ body:not(.can-edit) .news-composer { display: none; }
 .news-del { flex: none; }
 .news-text { font-size: 14.5px; line-height: 1.55; overflow-wrap: break-word; }
 .news-img { display: block; max-width: 100%; max-height: 340px; border-radius: 12px; border: 1px solid var(--border); margin-top: 10px; }
+/* Multi-image posts: the grid auto-adjusts to the image count.
+   1 -> natural full-width; 2 -> side by side; 3 -> lead image over a pair;
+   4 -> 2x2. Tiles crop to a uniform ratio so mixed sizes still line up. */
+.news-imgs { display: grid; gap: 6px; margin-top: 10px; }
+.news-imgs .news-img { margin-top: 0; width: 100%; }
+.news-imgs.n2, .news-imgs.n3, .news-imgs.n4 { grid-template-columns: 1fr 1fr; }
+.news-imgs.n2 .news-img, .news-imgs.n3 .news-img, .news-imgs.n4 .news-img {
+  aspect-ratio: 16 / 11; height: 100%; max-height: none; object-fit: cover;
+}
+.news-imgs.n3 .news-img:first-child { grid-column: 1 / -1; aspect-ratio: 16 / 8; }
 .news-empty {
   color: var(--muted); text-align: center; font-size: 13.5px;
   padding: 20px 14px; border: 1px dashed var(--border); border-radius: 14px;

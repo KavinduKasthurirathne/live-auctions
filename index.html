@@ -33,7 +33,13 @@
       <button class="tab" data-tab="setup">⚙️ Setup</button>
     </nav>
     <div class="auth-box" id="authBox"></div>
+    <!-- Mobile only: opens the slide-in nav drawer (the .tabs list above). -->
+    <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="tabs">
+      <span></span><span></span><span></span>
+    </button>
   </header>
+  <!-- Dimmed backdrop behind the mobile nav drawer; clicking it closes the menu. -->
+  <div class="nav-backdrop" id="navBackdrop"></div>
 
   <main class="app-main">
 

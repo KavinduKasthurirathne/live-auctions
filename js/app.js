@@ -1442,7 +1442,23 @@ function wireEvents() {
     switchTab(tab.dataset.tab);
     if (tab.dataset.tab === "auctions") switchSubTab("auction"); // land on Auction Room by default
     if (tab.dataset.tab === "rankings") switchSubTab("ranking"); // land on Player Ranking by default
+    closeNav(); // picking a destination dismisses the mobile drawer
   });
+
+  // Mobile nav drawer: the hamburger toggles it; the backdrop, the Escape
+  // key, or choosing a tab (above) closes it. Desktop never sets nav-open.
+  const navToggle = $("#navToggle");
+  function closeNav() {
+    document.body.classList.remove("nav-open");
+    if (navToggle) navToggle.setAttribute("aria-expanded", "false");
+  }
+  if (navToggle) navToggle.addEventListener("click", () => {
+    const open = document.body.classList.toggle("nav-open");
+    navToggle.setAttribute("aria-expanded", String(open));
+  });
+  const navBackdrop = $("#navBackdrop");
+  if (navBackdrop) navBackdrop.addEventListener("click", closeNav);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeNav(); });
   // Sub-tab bars - the Auction and Rankings sections share the same
   // .subtab pattern; switchSubTab scopes the toggle to the right section.
   document.addEventListener("click", e => {
