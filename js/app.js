@@ -300,6 +300,36 @@ function money(n) {
   return `${s} ${state.settings.currency}`;
 }
 
+/* ---------- retention categories ----------
+   The "Role / category" dropdown in the Retain / Pre-assign form. The chosen
+   category becomes the player's tag EVERYWHERE a retained player shows up
+   (squads, Players page, fixtures line-ups) - replacing the old blanket "RET".
+   Kept global (app.js is global scope) so fixtures.js can read the same tag. */
+const RETAIN_CATEGORIES = [
+  { value: "Captain",     tag: "CAP" },
+  { value: "Pre-signed",  tag: "PRE" },
+  { value: "Retained",    tag: "RET" },
+  { value: "Batsman",     tag: "BAT" },
+  { value: "Bowler",      tag: "BWL" },
+  { value: "All-rounder", tag: "AR"  },
+];
+// Short tag for a retained player's category. Blank / anything not in the list
+// falls back to RET - they're still a retained player (that's the section).
+function retainTag(role) {
+  const r = String(role || "").trim().toLowerCase();
+  const hit = RETAIN_CATEGORIES.find(c => c.value.toLowerCase() === r);
+  return hit ? hit.tag : "RET";
+}
+// CSS accent hook: rt-cap / rt-pre / rt-ret / rt-bat / rt-bwl / rt-ar.
+function retainTagClass(role) { return "rt-" + retainTag(role).toLowerCase(); }
+// The full category word for detail lines. A custom/legacy value is shown as
+// typed; blank falls back to "Retained".
+function retainLabel(role) {
+  const raw = String(role || "").trim();
+  const hit = RETAIN_CATEGORIES.find(c => c.value.toLowerCase() === raw.toLowerCase());
+  return hit ? hit.value : (raw || "Retained");
+}
+
 const getTeam = id => state.teams.find(t => t.id === id);
 const getPlayer = id => state.players.find(p => p.id === id);
 const currentPlayer = () => getPlayer(state.auction.currentPlayerId);
@@ -954,7 +984,8 @@ function renderPlayers() {
 
   list.forEach(p => {
     const team = p.soldTo ? getTeam(p.soldTo) : null;
-    const tag = p.retained ? "retained" : p.status;
+    const badgeClass = p.retained ? `retained ${retainTagClass(p.role)}` : p.status;
+    const badgeText = p.retained ? retainTag(p.role) : p.status;
     let foot;
     if (p.status === "available")    foot = `<button class="btn btn-yellow btn-mini" data-auction="${p.id}">Auction now</button>`;
     else if (p.status === "unsold")  foot = `<button class="btn btn-dark btn-mini" data-auction="${p.id}">Re-auction</button>`;
@@ -966,11 +997,11 @@ function renderPlayers() {
       <div class="pcard-photo" style="${p.photo ? `background-image:url('${p.photo}')` : ""}">${p.photo ? "" : esc(initials(p.name))}</div>
       <div class="pcard-body">
         <span class="pcard-name">${esc(p.name)}</span>
-        ${p.role ? `<span class="pcard-role">${esc(p.role)}</span>` : ""}
-        <span class="pcard-base">${p.retained ? ("Retained" + (p.soldPrice ? " · " + money(p.soldPrice) : "")) : ("Base " + money(p.basePrice))}</span>
+        ${(p.role && !p.retained) ? `<span class="pcard-role">${esc(p.role)}</span>` : ""}
+        <span class="pcard-base">${p.retained ? (esc(retainLabel(p.role)) + (p.soldPrice ? " · " + money(p.soldPrice) : "")) : ("Base " + money(p.basePrice))}</span>
       </div>
       <div class="pcard-foot">
-        <span class="badge ${tag}">${tag}</span>
+        <span class="badge ${badgeClass}">${esc(badgeText)}</span>
         ${foot}
       </div>`;
     grid.appendChild(card);
@@ -1023,7 +1054,7 @@ function renderSquads() {
         <div class="squad-row">
           <span class="mini-photo" style="${p.photo ? `background-image:url('${p.photo}')` : ""}">${p.photo ? "" : esc(initials(p.name))}</span>
           <span class="sr-name">${esc(p.name)}</span>
-          ${p.retained ? `<span class="ret-tag">RET</span>` : ""}
+          ${p.retained ? `<span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : ""}
           <span class="sr-price">${p.soldPrice ? money(p.soldPrice) : ""}</span>
         </div>`).join("")
       : `<div class="squad-empty">No players bought yet.</div>`;
@@ -1107,6 +1138,7 @@ function renderSetup() {
     row.innerHTML = `
       ${logoHTML("ml-logo", p.photo, p.name)}
       <span class="ml-name">${esc(p.name)}</span>
+      <span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>
       <span class="ml-sub">${team ? esc(team.name) : "-"}${p.soldPrice ? " · " + money(p.soldPrice) : ""}</span>
       <button class="icon-btn" data-edit-retain="${p.id}" title="Edit">✎</button>
       <button class="icon-btn del" data-del-retain="${p.id}" title="Remove">✕</button>`;
@@ -1315,12 +1347,26 @@ async function saveRetain() {
   renderAll();
   toast("Retained player saved", "good");
 }
+// Select a category in the #rRole dropdown. A player saved before this list
+// existed (or with a custom category) keeps their value: we inject it as an
+// option so editing never silently drops it.
+function setRetainRole(role) {
+  const sel = $("#rRole");
+  sel.querySelectorAll("option[data-custom]").forEach(o => o.remove());
+  const val = role || "";
+  if (val && ![...sel.options].some(o => o.value === val)) {
+    const opt = document.createElement("option");
+    opt.value = val; opt.textContent = val; opt.setAttribute("data-custom", "1");
+    sel.appendChild(opt);
+  }
+  sel.value = val;
+}
 function editRetain(id) {
   const p = getPlayer(id); if (!p) return;
   $("#retainEditId").value = p.id;
   $("#retainTeam").value = p.soldTo || "";
   $("#rName").value = p.name;
-  $("#rRole").value = p.role || "";
+  setRetainRole(p.role);
   $("#rPrice").value = p.soldPrice ?? "";
   $("#retainFormTitle").textContent = "Edit Retained Player";
   $("#btnSaveRetain").textContent = "Save Changes";
@@ -1329,7 +1375,7 @@ function editRetain(id) {
   $("#rName").focus();
 }
 function clearRetainForm() {
-  $("#retainEditId").value = ""; $("#rName").value = ""; $("#rRole").value = ""; $("#rPrice").value = ""; $("#rPhotoFile").value = "";
+  $("#retainEditId").value = ""; $("#rName").value = ""; setRetainRole(""); $("#rPrice").value = ""; $("#rPhotoFile").value = "";
   $("#retainFormTitle").textContent = "Retain / Pre-assign Player";
   $("#btnSaveRetain").textContent = "Add Retained Player";
   $("#btnCancelRetain").classList.add("hidden");

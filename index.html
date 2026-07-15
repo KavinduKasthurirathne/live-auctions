@@ -268,7 +268,15 @@
             <input type="text" id="rName" placeholder="e.g. Kasun Perera" />
           </label>
           <label>Role / category (optional)
-            <input type="text" id="rRole" placeholder="e.g. Captain" />
+            <select id="rRole">
+              <option value="">— none (defaults to Retained) —</option>
+              <option value="Captain">Captain</option>
+              <option value="Pre-signed">Pre-signed</option>
+              <option value="Retained">Retained</option>
+              <option value="Batsman">Batsman</option>
+              <option value="Bowler">Bowler</option>
+              <option value="All-rounder">All-rounder</option>
+            </select>
           </label>
           <label>Retention price (optional)
             <input type="number" id="rPrice" min="0" step="any" placeholder="optional" />

@@ -299,7 +299,7 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .badge.available { background: rgba(255,204,0,0.15); color: var(--yellow); }
 .badge.sold { background: rgba(34,197,94,0.15); color: var(--green); }
 .badge.unsold { background: rgba(225,6,0,0.15); color: #ff6b6b; }
-.badge.retained { background: rgba(255,154,60,0.16); color: #ff9a3c; }
+.badge.retained { background: color-mix(in srgb, var(--rt, #ff9a3c) 16%, transparent); color: var(--rt, #ff9a3c); }
 .pcard-sold { font-size: 11px; color: var(--muted); }
 .pcard-sold b { color: var(--text); }
 .btn-mini { font-size: 11px; padding: 5px 9px; border-radius: 8px; }
@@ -328,7 +328,15 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .squad-row .mini-photo { width: 34px; height: 34px; border-radius: 8px; background: #0d0d0f center/cover no-repeat; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #555; flex: none; }
 .squad-row .sr-name { font-weight: 600; font-size: 12px; flex: 1; }
 .squad-row .sr-price { color: var(--yellow); font-weight: 700; font-size: 12px; }
-.ret-tag { font-size: 9px; font-weight: 800; letter-spacing: 1px; color: #ff9a3c; border: 1px solid #ff9a3c; border-radius: 5px; padding: 1px 5px; flex: none; }
+.ret-tag { font-size: 9px; font-weight: 800; letter-spacing: 1px; color: var(--rt, #ff9a3c); border: 1px solid var(--rt, #ff9a3c); border-radius: 5px; padding: 1px 5px; flex: none; }
+/* Category accents for retained / pre-assigned tags (CAP / PRE / RET / BAT / BWL
+   / AR). Each sets --rt, which .ret-tag, .badge.retained and .fx-ret consume. */
+.rt-cap { --rt: #ffcc00; }  /* Captain     - gold   */
+.rt-pre { --rt: #4ea1ff; }  /* Pre-signed  - blue   */
+.rt-ret { --rt: #ff9a3c; }  /* Retained    - orange */
+.rt-bat { --rt: #34d399; }  /* Batsman     - green  */
+.rt-bwl { --rt: #f472b6; }  /* Bowler      - pink   */
+.rt-ar  { --rt: #a78bfa; }  /* All-rounder - violet */
 .squad-empty { color: var(--muted); font-size: 13px; font-style: italic; }
 
 /* ===================== SETUP ===================== */

@@ -388,7 +388,9 @@
     if (!squad.length) return `<div class="fx-squad"><h5>${esc(label)}</h5><p class="hint">No players in this squad yet (they're assigned in the auction).</p></div>`;
     return `<div class="fx-squad">
       <h5>${esc(label)} <span class="fx-squad-n">${squad.length}</span></h5>
-      <ul>${squad.map(p => `<li>${esc(p.name)}${p.role ? `<span class="fx-role">${esc(p.role)}</span>` : ""}${p.retained ? `<span class="fx-role fx-ret">retained</span>` : ""}</li>`).join("")}</ul>
+      <ul>${squad.map(p => `<li>${esc(p.name)}${p.retained
+        ? `<span class="fx-role fx-ret ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>`
+        : (p.role ? `<span class="fx-role">${esc(p.role)}</span>` : "")}</li>`).join("")}</ul>
     </div>`;
   }
 

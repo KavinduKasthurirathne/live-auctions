@@ -211,7 +211,7 @@
   font-size: 10px; font-weight: 600; color: var(--muted);
   border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px;
 }
-.fx-ret { color: var(--gold); border-color: rgba(245, 179, 1, .4); }
+.fx-ret { color: var(--rt, var(--gold)); border-color: var(--rt, rgba(245, 179, 1, .4)); }
 
 /* --------------------------- match details -------------------------- */
 .fx-detail-head { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
