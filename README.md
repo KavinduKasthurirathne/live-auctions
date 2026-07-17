@@ -359,7 +359,7 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 
 - **In-app:** set the season name/number and upload the league logo in
   **Setup → League Settings**. This drives the header, the tab title, and the favicon.
-- **Sign-in wall + default favicon:** swap the committed `assets/brand-logo.jpg` (the league
+- **Sign-in wall + default favicon:** swap the committed `assets/brand-logo.jpeg` (the league
   shield shown on the landing/sign-in screen and as the fallback tab icon) to rebrand for a
   new season.
 
@@ -388,7 +388,7 @@ the HTML/JS are relative to it).
 | `js/mvp-engine.js` | Hybrid MVP model: PDF-scorecard parser + scoring + season aggregation |
 | `css/styles.css` | Theme + auction UI + Squad Tracker / insights / role gating |
 | `css/fantasy.css` | Fantasy tab styling |
-| `assets/brand-logo.jpg` | League logo for the sign-in wall and default favicon |
+| `assets/brand-logo.jpeg` | League logo for the sign-in wall and default favicon |
 | `docs/HCCL Player Stats/` | Raw stats exports (source for regenerating `js/ranking-data.js`) |
 | `docs/HCCL Batting Rankings Explanation.pdf` | Reference doc for the batting rating math |
 

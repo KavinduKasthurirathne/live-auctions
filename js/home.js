@@ -361,7 +361,7 @@
     destroyCarousel(); // before innerHTML replacement orphans the old track
     view.innerHTML = `
       <section class="home-hero">
-        <div class="home-hero-logo" style="background-image:url('assets/brand-logo.jpg')"></div>
+        <div class="home-hero-logo" style="background-image:url('assets/brand-logo.jpeg')"></div>
         <h1 class="home-hero-title">HC LEAGUES</h1>
         <p class="home-hero-sub">A PLACE WHERE HAND CRICKET CHAMPIONS SHINE</p>
         <p class="home-hero-tags">Live Auctions · Fantasy League · Player Rankings</p>
