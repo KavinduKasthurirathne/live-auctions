@@ -44,7 +44,7 @@ Two ways to run, automatically chosen:
   glance; bids are capped so no team can spend itself out of completing a 5-player squad.
 - 📊 **Auction Insights tab** - live analytics, top-buys and team tables, and Chart.js
   visualisations, all derived client-side (no extra reads).
-- 📈 **Optional player season stats** shown on the block; ✨ confetti, glow and pulse polish.
+- 📈 **Optional player season stats** shown on the block; ✨ glow and pulse polish.
 - 🏏 **Fantasy league** with match days, captain/vice-captain multipliers, live points,
   season leaderboards and a Player of the Season board.
 - 🏅 **Season MVP** from a hybrid model - upload a STUMPS match-report PDF and the app
@@ -157,7 +157,7 @@ one of three roles:
 - **📈 Season stats** - players can carry optional historical stats (matches, runs, wickets,
   strike rate, economy, average, fantasy points, previous price), entered in the player form
   under *Season stats (optional)* and shown as a card under the photo during the auction.
-- **✨ Polish** - a confetti burst at auction completion, plus glow and pulse animations.
+- **✨ Polish** - glow and pulse animations.
 
 ---
 
@@ -378,7 +378,7 @@ the HTML/JS are relative to it).
 | `firebase-init.js` | Google auth, roles, members, split landing page, `window.HCCL` API |
 | `firebase-config.js` | Public Firebase web config + admin email list |
 | `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` `/home` `/mvp` read/write gating) |
-| `js/app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, confetti, Firestore sync |
+| `js/app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, Firestore sync |
 | `js/fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
 | `js/home.js` | Home page: hero + past-seasons carousel + Firestore read/seed of `home/seasons` |
 | `js/ranking.js` | Player Ranking boards UI + Firestore read/seed of `ranking/league` |

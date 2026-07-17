@@ -513,7 +513,6 @@ function ensureCurrentPlayer() {
 function renderAuction() {
   ensureCurrentPlayer();
   renderSquadTracker();
-  maybeAnnounceComplete();
   const player = currentPlayer();
   const stage = $("#auctionStage");
   const empty = $("#auctionEmpty");
@@ -668,44 +667,6 @@ function renderSquadTracker() {
     }).join("")}</div>`;
 }
 
-
-/* Fire a one-time confetti + sound the moment the auction finishes (every player
-   resolved). Resets if the auction is re-opened. Stays quiet on initial page load. */
-let auCompleteState = null;
-function maybeAnnounceComplete() {
-  const hasAny = state.players.some(p => !p.retained);
-  const hasAvailable = state.players.some(p => p.status === "available" && !p.retained);
-  const complete = hasAny && !hasAvailable;
-  if (auCompleteState === null) { auCompleteState = complete; return; } // baseline - no fanfare on load
-  if (complete && !auCompleteState) burstConfetti();
-  auCompleteState = complete;
-}
-
-/* Tiny dependency-free confetti burst. */
-function burstConfetti() {
-  let cv = $("#confettiCanvas");
-  if (!cv) { cv = document.createElement("canvas"); cv.id = "confettiCanvas"; cv.className = "confetti-canvas"; document.body.appendChild(cv); }
-  const ctx = cv.getContext("2d");
-  cv.width = window.innerWidth; cv.height = window.innerHeight; cv.style.display = "block";
-  const colors = ["#ffcc00", "#e10600", "#22c55e", "#ffffff", "#f5b301"];
-  const pieces = Array.from({ length: 150 }, () => ({
-    x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * 0.3,
-    r: 4 + Math.random() * 6, c: colors[(Math.random() * colors.length) | 0],
-    vx: -2 + Math.random() * 4, vy: 2 + Math.random() * 4, rot: Math.random() * 6.28, vr: -0.2 + Math.random() * 0.4,
-  }));
-  const start = performance.now();
-  (function frame(now) {
-    const t = now - start;
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    pieces.forEach(p => {
-      p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.rot += p.vr;
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c;
-      ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6); ctx.restore();
-    });
-    if (t < 2600) requestAnimationFrame(frame);
-    else { ctx.clearRect(0, 0, cv.width, cv.height); cv.style.display = "none"; }
-  })(start);
-}
 
 function renderSoldButton() {
   const btn = $("#btnSold");

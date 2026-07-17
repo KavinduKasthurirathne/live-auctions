@@ -689,8 +689,6 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
 .stats-grid input { width: 100%; min-width: 0; }
 
 /* ===================== POLISH (Phase E) ===================== */
-/* Confetti overlay (auction complete) */
-.confetti-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; display: none; }
 
 /* A little life on the live bid + leading team */
 .current-bid-box { transition: box-shadow .3s, border-color .3s; }
