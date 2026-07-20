@@ -1692,8 +1692,18 @@ function auMaybeStartSync() {
 
 /* The viewed tournament changed: drop the old listeners, blank the board,
    and resubscribe under the new tournament's paths. */
+// Reflect whether the VIEWED tournament runs an auction. Toggles body.no-auction,
+// which hides the Auctions tab + every purse / base-price field (see styles.css).
+function syncAuctionMode() {
+  const has = !window.HCCLSeries || window.HCCLSeries.hasAuction();
+  document.body.classList.toggle("no-auction", !has);
+  // Don't strand the user on a now-hidden Auctions tab.
+  if (!has) { const av = $("#view-auctions"); if (av && av.classList.contains("active")) switchTab("series"); }
+}
+
 function auOnSeriesChange(S) {
   if (!S.ready) return;
+  syncAuctionMode();
   const tid = S.viewingId();
   if (!auUsingFirestore) { auMaybeStartSync(); return; }
   if (tid === auTid) return;
@@ -1730,6 +1740,7 @@ function init() {
   }
   // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
   if (window.HCCLSeries) window.HCCLSeries.onChange(auOnSeriesChange);
+  syncAuctionMode();
 }
 // Defer to DOMContentLoaded so the firebase-init.js MODULE (deferred) has already run
 // and exposed window.HCCL - otherwise the onChange hook above never registers and the

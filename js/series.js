@@ -170,6 +170,10 @@
       season: d.season || 0,
       statsOnly: !!d.statsOnly,
       solo: !!d.solo,
+      // Whether the tournament runs a player auction. Default TRUE so every
+      // tournament created before this flag existed keeps its auction. When
+      // false, the Auctions tab and all purse / base-price fields hide for it.
+      hasAuction: d.hasAuction !== false,
       // { champion, runnerUp, mvp, mostRuns?, mostWickets? } - drives this
       // tournament's card on the Home champions carousel once it's completed.
       honors: d.honors || null,
@@ -201,6 +205,12 @@
     // Same-tournament identity, so Home can fold duplicate registry entries
     // into a single Hall of Champions card.
     identityKey: m => identityKey(m),
+    // Does the given (default: viewed) tournament run a player auction? Drives
+    // whether app.js shows the Auctions tab + purse / base-price fields.
+    hasAuction(id) {
+      const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
+      return !!(m && !isArchiveOnly(m) && m.hasAuction !== false);
+    },
     isLegacy(id) {
       const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
       return !m || !!m.legacy;
@@ -453,6 +463,7 @@
     const status = $("#serStatus").value || "upcoming";
     const file = $("#serLogoFile").files[0];
     const srcId = $("#serCopyFrom") ? $("#serCopyFrom").value : "";
+    const hasAuction = $("#serHasAuction") ? !!$("#serHasAuction").checked : true;
 
     // Honors (all optional). Leaving every field blank clears them - the
     // setDoc below replaces the whole meta doc, so an omitted key is removed.
@@ -477,6 +488,7 @@
           name, short, duration, status,
           logo: logo || cur.logo || "",
           legacy: !!cur.legacy, order: cur.order, createdAt: cur.createdAt || Date.now(),
+          hasAuction,
           // setDoc replaces the whole doc - carry the identity flags over.
           ...(cur.archive ? { archive: cur.archive } : {}),
           ...(cur.season ? { season: cur.season } : {}),
@@ -488,7 +500,7 @@
       } else {
         const id = slugify(name);
         await a.setDoc(a.doc(d, "tournaments", id), {
-          name, short, duration, status, logo,
+          name, short, duration, status, logo, hasAuction,
           order: tournaments.length, createdAt: Date.now(),
           ...(honors ? { honors } : {}),
         });
@@ -628,6 +640,10 @@
             ${["upcoming", "live", "completed"].map(s =>
               `<option value="${s}"${editing && editing.status === s ? " selected" : ""}>${s[0].toUpperCase()}${s.slice(1)}</option>`).join("")}
           </select>
+        </label>
+        <label class="ser-check">
+          <input type="checkbox" id="serHasAuction"${(editing ? editing.hasAuction !== false : true) ? " checked" : ""} />
+          <span>This tournament has a <b>player auction</b> (base prices &amp; team purses). Turn off for a fixed-squad tournament - the Auctions tab and all purse / base-price fields disappear for it.</span>
         </label>
         <label>Tournament logo${editing && editing.logo ? " (leave empty to keep current)" : ""}
           <input type="file" id="serLogoFile" accept="image/*" />
@@ -923,7 +939,7 @@
   function squadsHtml(m) {
     const manage = (editorOn() && (cloudOn() || api.isLegacy(m.id)) && hasDataRoots(m))
       ? `<div class="hub-manage-row"><button class="btn btn-yellow" data-goto="setup">⚙️ Manage teams &amp; players</button>
-         <span class="hint">Build this tournament's squads directly — no auction needed.</span></div>` : "";
+         <span class="hint"></span></div>` : "";
     if (isLiveViewed(m) && window.HCCLAuction.teams().length) return manage + auctionSquadsHtml();
     const rows = tournamentRows(m);
     if (rows && rows.length) {
