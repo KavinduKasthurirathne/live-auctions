@@ -167,7 +167,7 @@
         <div class="news-card-meta">
           <span>${esc(dateLabel(p.createdAt))}</span>
           ${ago ? `<span class="news-dot">•</span><span>${esc(ago)}</span>` : ""}
-          <span class="news-dot">•</span><span class="news-by">${esc(p.authorName || "HC Leagues")}</span>
+          <span class="news-dot">•</span><span class="news-by">${esc(p.authorName || "HC Community")}</span>
         </div>
       </div>
       ${canDeletePost(p) ? `<button class="icon-btn del news-del" data-news-del="${esc(p.id)}" title="Delete story">🗑</button>` : ""}
@@ -208,7 +208,7 @@
         <div class="news-modal-meta">
           ${avatarHtml(p.authorPhoto, p.authorName)}
           <div class="news-modal-by">
-            <span class="news-author">${esc(p.authorName || "HC Leagues")}</span>
+            <span class="news-author">${esc(p.authorName || "HC Community")}</span>
             <span class="news-time">${esc(dateLabel(p.createdAt))}${ago ? ` · ${esc(ago)}` : ""}</span>
           </div>
         </div>

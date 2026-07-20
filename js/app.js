@@ -488,10 +488,10 @@ window.HCCLAuction = {
 };
 
 function renderHeader() {
-  // The header carries the SITE brand (HC Leagues), not the viewed tournament -
+  // The header carries the SITE brand (HC Community), not the viewed tournament -
   // that identity lives in the Series tab and the viewing banner. The brand
   // badge / favicon stay on the static assets/brand-logo.jpeg from index.html.
-  document.title = "HC Leagues";
+  document.title = "HC Community";
 }
 
 /* ---------- LIVE AUCTION ---------- */

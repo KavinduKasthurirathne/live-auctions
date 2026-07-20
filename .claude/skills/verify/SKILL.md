@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Verify changes to the HC Leagues static site by driving it in a headless browser (offline Firebase mode).
+description: Verify changes to the HC Community static site by driving it in a headless browser (offline Firebase mode).
 ---
 
-# Verifying the HC Leagues site
+# Verifying the HC Community site
 
 Static site, no build step. The surface is a browser at `index.html`.
 

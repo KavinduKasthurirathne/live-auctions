@@ -518,7 +518,7 @@
   // subtitle, date, divider, the row body, and the footer. `innerHtml` is the table.
   function buildShareShell(subTitle, dateStr, innerHtml) {
     // Brand the share card with the VIEWED tournament (the header now carries
-    // the site-wide "HC Leagues" brand, which would be wrong on a per-league card).
+    // the site-wide "HC Community" brand, which would be wrong on a per-league card).
     const series = window.HCCLSeries;
     const viewing = series && series.viewing ? series.viewing() : null;
     const seasonTitle = (viewing && (viewing.short || viewing.name)) || "HCCL";

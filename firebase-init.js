@@ -185,7 +185,7 @@ function renderAuthGate() {
   authGateEl.innerHTML = `
     <div class="gate-hero">
       ${gateLogoHtml()}
-      <h1 class="gate-title">HC LEAGUES</h1>
+      <h1 class="gate-title">HC COMMUNITY</h1>
       <p class="gate-tagline">HAND CRICKET CHAMPIONS LEAGUE</p>
       <p class="gate-tags">Live Auctions · Fantasy League · Player Rankings</p>
     </div>

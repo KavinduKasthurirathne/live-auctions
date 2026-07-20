@@ -1,8 +1,8 @@
 /* ============================================================
-   HC Leagues Home page  (renders into #view-home)
+   HC Community Home page  (renders into #view-home)
 
    Landing view after sign-in:
-     1. Branded hero (site logo + "HC LEAGUES" + tagline).
+     1. Branded hero (site logo + "HC COMMUNITY" + tagline).
      2. Champions carousel - auto-advancing cards, ONE PER SERIES in
         the 🏆 Series tab (window.HCCLSeries), nothing filtered out:
         each card is logo | name + duration | Champion/Runner-up/MVP
@@ -362,7 +362,7 @@
     view.innerHTML = `
       <section class="home-hero">
         <div class="home-hero-logo" style="background-image:url('assets/brand-logo.jpeg')"></div>
-        <h1 class="home-hero-title">HC LEAGUES</h1>
+        <h1 class="home-hero-title">HC COMMUNITY</h1>
         <p class="home-hero-sub">A PLACE WHERE HAND CRICKET CHAMPIONS SHINE</p>
         <p class="home-hero-tags">Live Auctions · Fantasy League · Player Rankings</p>
       </section>
