@@ -284,7 +284,7 @@
     const view = document.getElementById("view-ranking");
     if (!view) return;
     const updated = lastImport && lastImport.by
-      ? `<span class="rank-updated">Stats updated by ${esc(lastImport.by)}</span>` : "";
+      ? `<span class="rank-updated"></span>` : "";
     view.innerHTML = `
       <div class="view-head">
         <h2>PLAYER RANKING</h2>
