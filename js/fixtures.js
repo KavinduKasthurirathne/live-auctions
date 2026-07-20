@@ -962,9 +962,8 @@
     // Teams/squads changed (auction snapshot, edits) - refresh names, logos, table.
     document.addEventListener("hccl:data", () => { if (!busy) render(); });
 
-    const tabs = document.getElementById("tabs");
-    if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="fixtures"]')) render(); });
-
+    // Fixtures now live inside the tournament page; series.js calls
+    // window.HCCLFixturesView.render() when the Matches inner tab opens.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
       window.HCCL.onChange(() => { startSync(); render(); });
     }
@@ -972,6 +971,11 @@
     if (window.HCCLSeries) window.HCCLSeries.onChange(onSeriesChange);
     render();
   }
+
+  // Public hook: the tournament page (series.js) hosts #view-fixtures as its
+  // "Matches" panel and calls this when that inner tab opens.
+  // NB: window.HCCLFixtures is the ENGINE (fixtures-engine.js) - distinct name.
+  window.HCCLFixturesView = { render };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

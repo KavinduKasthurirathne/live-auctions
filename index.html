@@ -33,12 +33,11 @@
         <span class="tabs-title" id="navTitle">Menu</span>
         <button class="nav-close" id="navClose" aria-label="Close menu">✕</button>
       </div>
-      <button class="tab active" data-tab="home">🏠 Home</button>
-      <button class="tab" data-tab="series">🏆 Series</button>
-      <button class="tab" data-tab="auctions">🔨 Auction</button>
-      <button class="tab" data-tab="fixtures">📅 Fixtures &amp; Results</button>
-      <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
+      <button class="tab active" data-tab="home">🏠 Home<span class="nav-badge" id="newsBadge" hidden></span></button>
+      <button class="tab" data-tab="series">🏆 Tournaments</button>
+      <button class="tab" data-tab="auctions">🔨 Auctions</button>
       <button class="tab" data-tab="rankings">📊 Rankings</button>
+      <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
       <button class="tab" data-tab="setup">⚙️ Setup</button>
     </nav>
     <div class="auth-box" id="authBox"></div>
@@ -56,8 +55,32 @@
     <!-- ===================== HOME (built by home.js) ===================== -->
     <section class="view active" id="view-home"></section>
 
-    <!-- ============ SERIES & TOURNAMENTS (built by series.js) ============ -->
-    <section class="view" id="view-series"></section>
+    <!-- ============ TOURNAMENTS (built by series.js) ============
+         Two persistent children so a list/detail re-render never wipes the
+         hosted module panels (#view-fixtures / #view-mvp / #view-fantasy).
+         The Cricbuzz-style tournament page = #tournamentDetail: a head, an
+         inner tab bar, and a panel per section. Inline panels (overview /
+         squads / players / table / stats) are filled by series.js; the three
+         <section>/<div> targets keep their ids so fixtures.js / mvp.js /
+         fantasy.js render into them unchanged - now as .hub-panel, not .view,
+         so switchTab leaves them alone and the inner tab bar owns them. -->
+    <section class="view" id="view-series">
+      <div id="seriesList"></div>
+      <div id="tournamentDetail" hidden>
+        <div id="tournamentHead"></div>
+        <nav class="subtabs hub-tabs" id="tournamentTabs" aria-label="Tournament sections"></nav>
+        <div id="tournamentPanels">
+          <div class="hub-panel active" id="hub-overview" data-hub="overview"></div>
+          <div class="hub-panel" id="hub-squads" data-hub="squads"></div>
+          <div class="hub-panel" id="hub-players" data-hub="players"></div>
+          <section class="hub-panel" id="view-fixtures" data-hub="matches"></section>
+          <div class="hub-panel" id="hub-table" data-hub="table"></div>
+          <div class="hub-panel" id="hub-stats" data-hub="stats"></div>
+          <div class="hub-panel" id="view-mvp" data-hub="mvp"></div>
+          <section class="hub-panel" id="view-fantasy" data-hub="fantasy"></section>
+        </div>
+      </div>
+    </section>
 
     <!-- ============ AUCTIONS: Auction Room / Players / Teams & Purse / Dashboard ============ -->
     <section class="view" id="view-auctions">
@@ -160,8 +183,8 @@
       <div class="subview" id="subview-dashboard"></div>
     </section><!-- /view-auctions -->
 
-    <!-- ============ FIXTURES & RESULTS (built by fixtures.js) ============ -->
-    <section class="view" id="view-fixtures"></section>
+    <!-- Fixtures & Results now render inside the tournament page (#view-fixtures
+         lives under #tournamentPanels above). -->
 
     <!-- ===================== SETUP ===================== -->
     <section class="view" id="view-setup">
@@ -324,25 +347,15 @@
       </div>
     </section>
 
-    <!-- ===================== FANTASY (built by fantasy.js) ===================== -->
-    <section class="view" id="view-fantasy"></section>
+    <!-- Fantasy now renders inside the tournament page (#view-fantasy lives under
+         #tournamentPanels above); the Fantasy nav pill is a shortcut that opens
+         the viewed tournament there. -->
 
-    <!-- ============ RANKINGS: Player Ranking (ranking.js) / MVP (mvp.js) ============
-         The inner #view-ranking / #view-mvp ids are what those modules render into;
-         only the tab-level visibility moved up to this wrapper section.
-         Player Ranking is the default sub-tab: switchTab("rankings") does not pick
-         a sub-tab, so the one marked `active` here is what opens. -->
+    <!-- ============ RANKINGS: Player Ranking (global, ranking.js) ============
+         MVP moved into the tournament page (#view-mvp under #tournamentPanels).
+         Rankings is now the single global Player-Ranking view. -->
     <section class="view" id="view-rankings">
-      <nav class="subtabs" id="rankingsSubtabs">
-        <button class="subtab active" data-subtab="ranking">📈 Player Ranking</button>
-        <button class="subtab" data-subtab="mvp">🏅 MVP</button>
-      </nav>
-      <div class="subview active" id="subview-ranking">
-        <div id="view-ranking"></div>
-      </div>
-      <div class="subview" id="subview-mvp">
-        <div id="view-mvp"></div>
-      </div>
+      <div id="view-ranking"></div>
     </section>
 
   </main>

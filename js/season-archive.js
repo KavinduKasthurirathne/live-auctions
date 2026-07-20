@@ -1014,6 +1014,29 @@
         mostWickets: seasonLeader(rows, byWickets, COL.wickets),
       };
     },
+    // Bundled per-season CSV rows (S1-S6), used by the tournament page to build
+    // squads/players for an HCCL season straight from its sheet.
+    seasonRows(no) { return seasonRows(no); },
+    // One flat player list from stat rows: { name, team, matches, runs, wickets }.
+    // The Team column (COL.team) is what makes CSV-only tournaments show squads.
+    playersFromRows(rows) {
+      return (rows || []).filter(r => (r[COL.name] || "").trim()).map(r => ({
+        name: r[COL.name] || "", team: r[COL.team] || "",
+        matches: r[COL.matches] || "", runs: r[COL.runs] || "", wickets: r[COL.wickets] || "",
+      }));
+    },
+    // The same players grouped into squads: [{ team, logo, players:[...] }],
+    // teams in first-seen order. Players with no team fall under "Unassigned".
+    squadsFromRows(rows) {
+      const groups = [];
+      const byTeam = new Map();
+      api.playersFromRows(rows).forEach(p => {
+        const key = (p.team || "Unassigned").trim() || "Unassigned";
+        if (!byTeam.has(key)) { const g = { team: key, logo: teamLogo(key) || "", players: [] }; byTeam.set(key, g); groups.push(g); }
+        byTeam.get(key).players.push(p);
+      });
+      return groups;
+    },
     // Fired whenever the underlying data changes (cloud honors, live CSV).
     onChange(cb) { listeners.push(cb); },
   };

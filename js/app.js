@@ -419,18 +419,28 @@ function toast(msg, kind = "") {
 /* ============================================================
    TABS
    ============================================================ */
-/* Old top-level tab names -> their new home after the nav regrouping
-   (Squads lives under Auction; MVP + Player Ranking under Rankings).
+/* Old top-level tab names -> their new home after the nav regrouping.
+   Squads lives under Auctions; Player Ranking IS the Rankings view now.
    Keeps every legacy switchTab()/[data-goto] call working. */
 const TAB_ALIASES = {
   squads:  { tab: "auctions", sub: "squads" },
-  mvp:     { tab: "rankings", sub: "mvp" },
-  ranking: { tab: "rankings", sub: "ranking" },
+  ranking: { tab: "rankings" },   // Player Ranking is the whole Rankings view
 };
 
+/* Fixtures, MVP and Fantasy moved INSIDE the tournament page (Cricbuzz-style
+   inner tabs). A legacy switchTab("fixtures"|"mvp"|"fantasy") - or the Fantasy
+   nav pill / any [data-goto] - opens the tournament page on that inner tab. */
+const HUB_TABS = { fixtures: "matches", mvp: "mvp", fantasy: "fantasy" };
+
 function switchTab(name) {
+  const hub = HUB_TABS[name];
+  if (hub) {
+    switchTab("series");
+    if (window.HCCLSeries && window.HCCLSeries.openHub) window.HCCLSeries.openHub(hub);
+    return;
+  }
   const alias = TAB_ALIASES[name];
-  if (alias) { switchTab(alias.tab); switchSubTab(alias.sub); return; }
+  if (alias) { switchTab(alias.tab); if (alias.sub) switchSubTab(alias.sub); return; }
   // Viewers never get the Setup surface - not via the tab, not via any
   // [data-goto="setup"] shortcut, not via a direct switchTab call.
   if (name === "setup" && !auCanEdit()) name = "home";
@@ -482,8 +492,10 @@ function renderAll() {
    auction owns - in both cloud and localStorage mode. */
 window.HCCLAuction = {
   teams:    () => state.teams.map(t => ({ id: t.id, name: t.name, logo: t.logo || "" })),
-  squad:    id => teamPlayers(id).map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained })),
+  squad:    id => teamPlayers(id).map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
   team:     id => { const t = getTeam(id); return t ? { id: t.id, name: t.name, logo: t.logo || "" } : null; },
+  players:  () => state.players.map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained, status: p.status, soldTo: p.soldTo || null, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
+  money,
   settings: () => ({ ...state.settings }),
 };
 
@@ -1451,7 +1463,6 @@ function wireEvents() {
     closeNav();
     switchTab(tab.dataset.tab);
     if (tab.dataset.tab === "auctions") switchSubTab("auction"); // land on Auction Room by default
-    if (tab.dataset.tab === "rankings") switchSubTab("ranking"); // land on Player Ranking by default
   });
 
   /* ---------------- mobile off-canvas nav drawer ----------------

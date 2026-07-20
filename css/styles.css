@@ -386,6 +386,7 @@ input[type="file"] { padding: 8px; font-size: 13px; }
    sign-in gate (2000) still win, as they should. */
 .nav-toggle {
   display: none;
+  position: relative;
   width: 44px; height: 44px; flex: none;
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
   cursor: pointer; padding: 0;
@@ -1247,8 +1248,22 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 
 /* ===================== HC NEWS FEED (Home) ===================== */
 .home-news { max-width: 780px; margin: 0 auto; }
-.news-head { margin-bottom: 12px; }
+.news-head { margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .news-title { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(17px, 3vw, 21px); letter-spacing: 1px; }
+.news-alerts.on { color: var(--yellow); border-color: rgba(255, 204, 0, 0.4); }
+
+/* Unread-news badge on the Home nav pill + a dot on the mobile hamburger. */
+.nav-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 17px; height: 17px; padding: 0 4px; margin-left: 6px;
+  border-radius: 999px; background: var(--red); color: #fff;
+  font-size: 10px; font-weight: 800; line-height: 1; vertical-align: middle;
+}
+body.has-news-unread .nav-toggle::after {
+  content: ""; position: absolute; top: 8px; right: 8px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--red);
+  box-shadow: 0 0 0 2px var(--bg);
+}
 
 .news-avatar {
   flex: none; width: 40px; height: 40px; border-radius: 50%;
@@ -1396,6 +1411,36 @@ body:not(.can-edit) .news-composer { display: none; }
 }
 .series-stats .board-tabs { margin-top: 4px; }
 .series-archive { margin-top: 6px; }
+
+/* ---- Tournament page (Cricbuzz-style): inner tab bar + section panels ---- */
+#tournamentTabs.hub-tabs { margin: 4px 0 18px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hub-tabs .hub-tab { white-space: nowrap; }
+.hub-panel { display: none; }
+.hub-panel.active { display: block; animation: hubFade .18s ease; }
+@keyframes hubFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* The hosted modules (#view-fixtures / #view-mvp / #view-fantasy) render their
+   own view-heads; the panel just needs to not add extra chrome. */
+#tournamentPanels > section.hub-panel { padding: 0; }
+
+.hub-empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+.hub-empty h3 { color: var(--text); margin-bottom: 6px; }
+
+.hub-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 16px; }
+.hub-fact { display: flex; flex-direction: column; gap: 3px; background: var(--panel-2); border-radius: 10px; padding: 12px 14px; }
+.hub-fact-k { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.hub-fact-v { font-size: 15px; font-weight: 700; }
+
+.hub-manage-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.hub-manage-row .hint { margin: 0; }
+
+.squad-row .sr-role { font-size: 10px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; flex: none; }
+
+.hub-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hub-ptable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.hub-ptable th, .hub-ptable td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.hub-ptable th { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.hub-ptable th.num, .hub-ptable td.num { text-align: right; }
+.hub-ptable tbody tr:hover { background: var(--panel-2); }
 
 /* Respect users who turn animations off. */
 @media (prefers-reduced-motion: reduce) {

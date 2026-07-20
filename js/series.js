@@ -120,7 +120,8 @@
   const listeners = [];
   // form: null | { mode:"create" } | { mode:"edit", id }
   // detail: null | tournament id whose hub page is open (list ⇄ detail)
-  const UI = { form: null, detail: null };
+  // hubTab: which inner tab of the tournament page is showing
+  const UI = { form: null, detail: null, hubTab: "overview" };
 
   /* ---------------- registry helpers ---------------- */
   const metaOf = id => tournaments.find(t => t.id === id) || null;
@@ -227,6 +228,16 @@
     onChange(cb) {
       listeners.push(cb);
       if (ready) { try { cb(api); } catch (e) { console.error(e); } }
+    },
+    // Open the viewed tournament's page on a given inner tab. Used by the
+    // Fantasy nav pill and any legacy switchTab("fixtures"|"mvp"|"fantasy")
+    // (js/app.js HUB_TABS) now that those live inside the tournament page.
+    openHub(hubKey) {
+      const id = (viewingId && metaOf(viewingId)) ? viewingId
+        : (metaOf(activeId) ? activeId : LEGACY_ID);
+      if (!metaOf(id)) return;
+      UI.detail = id; UI.form = null; UI.hubTab = hubKey || "overview";
+      render();
     },
   };
   window.HCCLSeries = api;
@@ -800,44 +811,197 @@
     toast(`Stats imported - ${check.playerCount} players (this device only)`, "good");
   }
 
-  /* -------- tournament detail hub (list ⇄ detail inside #view-series) -------- */
-  function detailBodyHtml(m) {
-    // HCCL-family tournaments show THAT season's record (playoffs bracket,
-    // top run-scorer/wicket-taker, leaderboards) - mounted after innerHTML
-    // below. The live season also gets shortcuts to its live data tabs,
-    // which earlier seasons never had (no MVP/fantasy back then).
-    if (isHcclFamily(m)) {
-      const links = m.legacy ? `
-      <div class="card series-quick">
-        <h3>Live season data</h3>
-        <p class="hint">Auction squads, fixtures &amp; results, MVP rankings and fantasy for this season run live in their own tabs.</p>
-        <div class="form-row">
-          <button class="btn btn-dark" data-goto="fixtures">📅 Fixtures &amp; Results</button>
-          <button class="btn btn-dark" data-goto="mvp">🏅 MVP Rankings</button>
-          <button class="btn btn-dark" data-goto="fantasy">🏏 Fantasy</button>
-          <button class="btn btn-dark" data-goto="auctions">🔨 Auction</button>
-        </div>
-      </div>` : "";
-      return `${links}<div class="series-archive"></div>`;
-    }
-    // Everything else: podium + leaders up top, the stats sheet below.
-    return hubHonorsHtml(m) + statsPanelHtml(m);
+  /* ============================================================
+     TOURNAMENT PAGE (Cricbuzz-style) — list ⇄ detail in #view-series.
+     #view-series holds two PERSISTENT children (index.html): #seriesList and
+     #tournamentDetail (a head + inner tab bar #tournamentTabs + #tournamentPanels).
+     Inline panels (overview/squads/players/stats) are filled here; the hosted
+     modules render into #view-fixtures / #view-mvp / #view-fantasy, which live in
+     #tournamentPanels as .hub-panel so a list/detail re-render never wipes them.
+     ============================================================ */
+
+  // A tournament has live data roots (auction squads, fixtures, MVP, fantasy)
+  // exactly when it isn't archive/stats-only. Those extra inner tabs appear only
+  // for such tournaments; stats-only ones show Overview / Squads / Players / Stats.
+  const hasDataRoots = m => !!m && !isArchiveOnly(m);
+  // Is `m` the tournament the rest of the app is currently synced to? Only then
+  // do its live auction squads (window.HCCLAuction, which follows setViewing)
+  // belong to it.
+  const isLiveViewed = m => hasDataRoots(m) && m.id === (viewingId || LEGACY_ID) && !!window.HCCLAuction;
+
+  function hubTabsFor(m) {
+    const tabs = [
+      { key: "overview", label: "Overview" },
+      { key: "squads",   label: "Squads" },
+      { key: "players",  label: "Players" },
+    ];
+    const live = hasDataRoots(m);
+    if (live) tabs.push({ key: "matches", label: "Matches" });
+    tabs.push({ key: "stats", label: isHcclFamily(m) ? "Record" : "Stats" });
+    if (live) tabs.push({ key: "mvp", label: "MVP" }, { key: "fantasy", label: "Fantasy" });
+    return tabs;
   }
 
-  function renderDetail(view, m) {
+  function applyHubPanel(key) {
+    document.querySelectorAll("#tournamentPanels .hub-panel").forEach(p =>
+      p.classList.toggle("active", p.getAttribute("data-hub") === key));
+  }
+
+  /* ---- data source for a tournament's squads/players ----
+     Live viewed tournament -> the auction squads (window.HCCLAuction).
+     Otherwise -> the stats sheet's rows (bundled season CSV for an HCCL season,
+     the imported/bundled tournament CSV for the rest) grouped by Team column. */
+  function tournamentRows(m) {
+    const A = window.HCCLSeasonArchive;
+    if (!A) return null;
+    if (isHcclFamily(m)) {
+      const no = m.season || (m.legacy ? 6 : null);
+      return no && A.seasonRows ? A.seasonRows(no) : null;
+    }
+    const csv = effectiveCsv(m);
+    return csv ? A.rowsFromCsv(csv) : null;
+  }
+
+  function counts(m) {
+    if (isLiveViewed(m) && window.HCCLAuction.teams().length) {
+      return { teams: window.HCCLAuction.teams().length, players: window.HCCLAuction.players().length };
+    }
+    const rows = tournamentRows(m);
+    const A = window.HCCLSeasonArchive;
+    if (rows && rows.length && A) return { teams: A.squadsFromRows(rows).length, players: rows.length };
+    return { teams: 0, players: 0 };
+  }
+
+  const teamBadge = (logo, name) => logo
+    ? `<span class="team-logo lg" style="background-image:url('${logo}')"></span>`
+    : `<span class="team-logo lg fallback">${esc(initials(name))}</span>`;
+  const emptyPanel = (head, sub) => `<div class="hub-empty"><h3>${esc(head)}</h3><p>${esc(sub)}</p></div>`;
+
+  /* ---- Overview ---- */
+  function overviewHtml(m) {
+    const honors = hubHonorsHtml(m); // podium + Most Runs/Wickets (may be "")
+    const c = counts(m);
+    const facts = `
+      <div class="card hub-facts">
+        <div class="hub-fact"><span class="hub-fact-k">Status</span><span class="hub-fact-v">${STATUS_LABEL[m.status] || esc(m.status)}</span></div>
+        ${m.duration ? `<div class="hub-fact"><span class="hub-fact-k">Duration</span><span class="hub-fact-v">${esc(m.duration)}</span></div>` : ""}
+        <div class="hub-fact"><span class="hub-fact-k">Teams</span><span class="hub-fact-v">${c.teams || "—"}</span></div>
+        <div class="hub-fact"><span class="hub-fact-k">Players</span><span class="hub-fact-v">${c.players || "—"}</span></div>
+      </div>`;
+    return `${honors || ""}${facts}`;
+  }
+
+  /* ---- Squads ---- */
+  function auctionSquadsHtml() {
+    const A = window.HCCLAuction, mfmt = A.money || (n => n);
+    return `<div class="squads-grid">${A.teams().map(t => {
+      const sq = A.squad(t.id);
+      const rows = sq.length ? sq.map(p => `
+        <div class="squad-row">
+          <span class="mini-photo" style="${p.photo ? `background-image:url('${p.photo}')` : ""}">${p.photo ? "" : esc(initials(p.name))}</span>
+          <span class="sr-name">${esc(p.name)}</span>
+          ${p.retained ? `<span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : (p.role ? `<span class="sr-role">${esc(p.role)}</span>` : "")}
+          <span class="sr-price">${p.soldPrice ? mfmt(p.soldPrice) : ""}</span>
+        </div>`).join("") : `<div class="squad-empty">No players yet.</div>`;
+      return `<div class="squad-card">
+        <div class="squad-head">${teamBadge(t.logo, t.name)}<div class="purse-name">${esc(t.name)}</div></div>
+        <div class="squad-meta">${sq.length} player${sq.length === 1 ? "" : "s"}</div>
+        <div class="squad-players">${rows}</div>
+      </div>`;
+    }).join("")}</div>`;
+  }
+  function csvSquadsHtml(groups) {
+    return `<div class="squads-grid">${groups.map(g => `
+      <div class="squad-card">
+        <div class="squad-head">${teamBadge(g.logo, g.team)}<div class="purse-name">${esc(g.team)}</div></div>
+        <div class="squad-meta">${g.players.length} player${g.players.length === 1 ? "" : "s"}</div>
+        <div class="squad-players">${g.players.map(p => `
+          <div class="squad-row"><span class="sr-name">${esc(p.name)}</span>
+          <span class="sr-price">${p.runs && p.runs !== "0" ? `${esc(p.runs)} runs` : ""}${p.wickets && p.wickets !== "0" ? `${p.runs && p.runs !== "0" ? " · " : ""}${esc(p.wickets)} wkts` : ""}</span></div>`).join("")}</div>
+      </div>`).join("")}</div>`;
+  }
+  function squadsHtml(m) {
+    const manage = (editorOn() && (cloudOn() || api.isLegacy(m.id)) && hasDataRoots(m))
+      ? `<div class="hub-manage-row"><button class="btn btn-yellow" data-goto="setup">⚙️ Manage teams &amp; players</button>
+         <span class="hint">Build this tournament's squads directly — no auction needed.</span></div>` : "";
+    if (isLiveViewed(m) && window.HCCLAuction.teams().length) return manage + auctionSquadsHtml();
+    const rows = tournamentRows(m);
+    if (rows && rows.length) {
+      const groups = window.HCCLSeasonArchive.squadsFromRows(rows);
+      if (groups.length) return manage + csvSquadsHtml(groups);
+    }
+    return manage + emptyPanel("No squads yet",
+      hasDataRoots(m) ? "Add teams & players from Manage above (or run an auction)."
+        : "Squads appear here once a stats sheet with a Team column is imported for this tournament.");
+  }
+
+  /* ---- Players ---- */
+  function playersTableHtml(rows) {
+    return `<div class="hub-table-wrap"><table class="hub-ptable">
+      <thead><tr><th>Player</th><th>Team</th><th class="num">M</th><th class="num">Runs</th><th class="num">Wkts</th></tr></thead>
+      <tbody>${rows.map(p => `<tr>
+        <td>${esc(p.name)}</td><td>${esc(p.team || "—")}</td>
+        <td class="num">${esc(p.matches || "—")}</td><td class="num">${esc(p.runs || "—")}</td><td class="num">${esc(p.wickets || "—")}</td>
+      </tr>`).join("")}</tbody></table></div>`;
+  }
+  function playersHtml(m) {
+    if (isLiveViewed(m) && window.HCCLAuction.players().length) {
+      const A = window.HCCLAuction, mfmt = A.money || (n => n);
+      const ps = A.players();
+      return `<div class="hub-table-wrap"><table class="hub-ptable">
+        <thead><tr><th>Player</th><th>Role</th><th>Team</th><th class="num">Price</th></tr></thead>
+        <tbody>${ps.map(p => { const t = p.soldTo ? A.team(p.soldTo) : null; return `<tr>
+          <td>${esc(p.name)}${p.retained ? ` <span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : ""}</td>
+          <td>${esc(p.role || "—")}</td><td>${t ? esc(t.name) : (p.status === "available" ? "Available" : "—")}</td>
+          <td class="num">${p.soldPrice ? mfmt(p.soldPrice) : "—"}</td>
+        </tr>`; }).join("")}</tbody></table></div>`;
+    }
+    const rows = tournamentRows(m);
+    if (rows && rows.length) return playersTableHtml(window.HCCLSeasonArchive.playersFromRows(rows));
+    return emptyPanel("No players yet",
+      hasDataRoots(m) ? "Players appear here once teams & players are added (or auctioned)."
+        : "Players appear here once a stats sheet is imported for this tournament.");
+  }
+
+  /* ---- Stats / Record ---- */
+  function fillStats(m) {
+    const el = $("#hub-stats");
+    if (!el) return;
+    if (isHcclFamily(m)) {
+      el.innerHTML = `<div class="series-archive"></div>`;
+      const holder = el.querySelector(".series-archive");
+      if (holder && window.HCCLSeasonArchive) {
+        const sn = m.season || (m.legacy ? 6 : null);
+        window.HCCLSeasonArchive.mount(holder, sn == null ? undefined : sn);
+      }
+    } else {
+      if (window.HCCLSeasonArchive) window.HCCLSeasonArchive.unmount();
+      el.innerHTML = statsPanelHtml(m);
+    }
+  }
+
+  /* ---- panel dispatch ---- */
+  function fillHubPanel(m, key) {
+    if (key === "overview") { const el = $("#hub-overview"); if (el) el.innerHTML = overviewHtml(m); }
+    else if (key === "squads")  { const el = $("#hub-squads");  if (el) el.innerHTML = squadsHtml(m); }
+    else if (key === "players") { const el = $("#hub-players"); if (el) el.innerHTML = playersHtml(m); }
+    else if (key === "stats")   fillStats(m);
+    else if (key === "matches" && window.HCCLFixturesView) window.HCCLFixturesView.render();
+    else if (key === "mvp" && window.HCCLMvpView) window.HCCLMvpView.render();
+    else if (key === "fantasy" && window.HCCLFantasyView) window.HCCLFantasyView.render();
+  }
+
+  function headHtml(m) {
     const admin = editorOn() && cloudOn();
     const isViewing = m.id === (viewingId || LEGACY_ID);
-    // Follow this tournament's stats sheet while its hub is open (no-op for
-    // HCCL-family hubs, which render from the bundled archive instead).
-    if (isHcclFamily(m)) stopDetailStats(); else startDetailStats(m.id);
     const chips = [
       `<span class="series-chip st-${esc(m.status)}">${STATUS_LABEL[m.status] || esc(m.status)}</span>`,
       m.id === activeId ? `<span class="series-chip st-default">DEFAULT</span>` : "",
-      isViewing ? `<span class="series-chip st-viewing">VIEWING</span>` : "",
+      isViewing && hasDataRoots(m) ? `<span class="series-chip st-viewing">VIEWING</span>` : "",
     ].join("");
-    view.innerHTML = `
+    return `
       <div class="view-head series-detail-head">
-        <button class="btn btn-dark series-back" data-series-back>‹ All Series</button>
+        <button class="btn btn-dark series-back" data-series-back>‹ All Tournaments</button>
         <h2>${esc(m.short || m.name).toUpperCase()}</h2>
       </div>
       <div class="series-card series-detail-card${isViewing ? " viewing" : ""}">
@@ -855,33 +1019,60 @@
           </div>` : ""}
         </div>
       </div>
-      ${UI.form ? formHtml() : ""}
-      ${detailBodyHtml(m)}`;
-    const holder = view.querySelector(".series-archive");
-    if (holder && window.HCCLSeasonArchive) {
-      // Every HCCL-family entry carries its season number; pin the mount to it
-      // so the hub shows just that season (no season-tab row).
-      const sn = m.season || (m.legacy ? 6 : null);
-      window.HCCLSeasonArchive.mount(holder, sn == null ? undefined : sn);
-    } else if (window.HCCLSeasonArchive) {
-      window.HCCLSeasonArchive.unmount();
-    }
+      ${UI.form ? formHtml() : ""}`;
+  }
+
+  function renderDetail(m) {
+    // Follow this tournament's stats sheet while its hub is open (no-op for
+    // HCCL-family hubs, which render from the bundled archive instead).
+    if (isHcclFamily(m)) stopDetailStats(); else startDetailStats(m.id);
+    const tabs = hubTabsFor(m);
+    if (!tabs.some(t => t.key === UI.hubTab)) UI.hubTab = "overview";
+    const head = $("#tournamentHead"); if (head) head.innerHTML = headHtml(m);
+    const bar = $("#tournamentTabs");
+    if (bar) bar.innerHTML = tabs.map(t =>
+      `<button class="subtab hub-tab${t.key === UI.hubTab ? " active" : ""}" data-hub-tab="${esc(t.key)}">${esc(t.label)}</button>`).join("");
+    applyHubPanel(UI.hubTab);
+    // Light inline panels are filled eagerly so switching is instant; the active
+    // tab (incl. heavy archive / hosted modules) is (re)rendered last.
+    fillHubPanel(m, "overview");
+    fillHubPanel(m, "squads");
+    fillHubPanel(m, "players");
+    fillHubPanel(m, UI.hubTab);
+  }
+
+  // Live auction/fixtures/MVP data arrived (app.js hccl:data) - refresh the
+  // inline panels of an open live-tournament hub so squads/players stay current.
+  function refreshLivePanels() {
+    if (!UI.detail) return;
+    const m = metaOf(UI.detail);
+    if (!m || !isLiveViewed(m)) return;
+    fillHubPanel(m, "overview");
+    fillHubPanel(m, "squads");
+    fillHubPanel(m, "players");
   }
 
   function render() {
     const view = document.getElementById("view-series");
-    if (!view) return;
-    // Detail mode - unless the tournament vanished from the registry.
+    const listEl = document.getElementById("seriesList");
+    const detailEl = document.getElementById("tournamentDetail");
+    if (!view || !listEl || !detailEl) return;
     if (UI.detail && !metaOf(UI.detail)) UI.detail = null;
-    if (UI.detail) { renderDetail(view, metaOf(UI.detail)); return; }
+    if (UI.detail) {
+      listEl.hidden = true; detailEl.hidden = false;
+      renderDetail(metaOf(UI.detail));
+      return;
+    }
+    // List mode.
+    detailEl.hidden = true; listEl.hidden = false;
     if (window.HCCLSeasonArchive) window.HCCLSeasonArchive.unmount();
     stopDetailStats();
     const admin = editorOn() && cloudOn();
     const offlineHint = !cloudOn()
       ? `<p class="hint series-hint">Multi-tournament browsing works through the shared cloud - sign in to see and switch tournaments.</p>` : "";
-    view.innerHTML = `
+    listEl.innerHTML = `
       <div class="view-head">
-        <h2>SERIES &amp; TOURNAMENTS</h2>
+        <h2>TOURNAMENTS</h2>
         ${admin ? `<div class="view-head-tools"><button class="btn btn-yellow" data-series-new>＋ New Tournament</button></div>` : ""}
       </div>
       ${offlineHint}
@@ -926,6 +1117,21 @@
     if (t.closest("[data-series-save]")) { submitForm(); return; }
     if (t.closest("[data-series-cancel]")) { UI.form = null; render(); return; }
     if (t.closest("[data-series-back]")) { UI.detail = null; UI.form = null; render(); return; }
+    // Inner tournament-page tab (Overview / Squads / Players / Matches / Stats / …).
+    const hubBtn = t.closest("[data-hub-tab]");
+    if (hubBtn && UI.detail) {
+      const key = hubBtn.getAttribute("data-hub-tab");
+      const m = metaOf(UI.detail);
+      if (key && m && key !== UI.hubTab) {
+        UI.hubTab = key;
+        document.querySelectorAll("#tournamentTabs .hub-tab").forEach(b =>
+          b.classList.toggle("active", b.getAttribute("data-hub-tab") === key));
+        applyHubPanel(key);
+        fillHubPanel(m, key);
+        window.scrollTo(0, 0);
+      }
+      return;
+    }
     // Stats-hub board sub-tab: swap only the board panel (no page jump).
     const tb = t.closest("[data-tstat-board]");
     if (tb) {
@@ -949,7 +1155,7 @@
       const id = open.getAttribute("data-series-open");
       const m = metaOf(id);
       if (!m) return;
-      UI.detail = id; UI.form = null;
+      UI.detail = id; UI.form = null; UI.hubTab = "overview";
       // Opening a tournament that HAS data roots (auction, fixtures, MVP,
       // fantasy) also points the rest of the app at it - that's the job the
       // old "View" button did. Archive/stats-only entries have no data roots,
@@ -982,6 +1188,9 @@
     });
     const tabs = document.getElementById("tabs");
     if (tabs) tabs.addEventListener("click", e => { if (e.target.closest('[data-tab="series"]')) render(); });
+    // Auction/fixtures data changed (app.js) - refresh an open live-tournament
+    // hub so its Squads/Players/Overview panels stay current.
+    document.addEventListener("hccl:data", refreshLivePanels);
     if (window.HCCL && typeof window.HCCL.onChange === "function") window.HCCL.onChange(onAuth);
     onAuth();
   }

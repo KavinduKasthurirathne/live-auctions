@@ -941,6 +941,9 @@
     if (window.HCCLSeries) window.HCCLSeries.onChange(fanOnSeriesChange);
     renderFantasy();
   }
+  // Public hook: the tournament page (series.js) hosts #view-fantasy as its
+  // "Fantasy" panel and calls this when that inner tab opens.
+  if (typeof window !== "undefined") window.HCCLFantasyView = { render: renderFantasy };
   if (typeof document !== "undefined") {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();

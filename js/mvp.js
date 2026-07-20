@@ -328,11 +328,6 @@
     if (!view) return;
     view.addEventListener("click", onClick);
     view.addEventListener("change", onChange);
-    // Re-render when the MVP board opens (icons/role may have changed).
-    // MVP lives under the Rankings tab, so watch both the top tab and our sub-tab.
-    document.addEventListener("click", e => {
-      if (e.target.closest('[data-tab="rankings"], [data-subtab="mvp"]')) render();
-    });
     // Start realtime sync + reflect role (upload button) once signed in.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
       window.HCCL.onChange(() => { startSync(); render(); });
@@ -341,6 +336,11 @@
     if (window.HCCLSeries) window.HCCLSeries.onChange(onSeriesChange);
     render();
   }
+
+  // Public hook: MVP now lives inside the tournament page (series.js hosts
+  // #view-mvp as its "MVP" panel) and calls this when that inner tab opens.
+  // NB: window.HCCLMvp is the ENGINE (mvp-engine.js) - use a distinct name.
+  window.HCCLMvpView = { render };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

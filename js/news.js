@@ -46,6 +46,17 @@
   let draftText = "";
   let draftImages = [];  // resized dataURLs, ready to publish (max MAX_IMAGES)
 
+  // ---- new-post notifications (no backend: in-app badge + toast + opt-in
+  // native browser popup while a tab is open) ----
+  const LAST_SEEN_KEY = "hccl_news_last_seen"; // newest post ts the user has seen
+  const NOTIFY_KEY = "hccl_news_notify";       // "on" once they opt into popups
+  let baselineMaxTs = null;                    // newest ts at first snapshot (no backlog alerts)
+  const myUid = () => { const h = H(); return h && h.user ? h.user.uid : null; };
+  const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const getLastSeen = () => +lsGet(LAST_SEEN_KEY) || 0;
+  const notifyOn = () => lsGet(NOTIFY_KEY) === "on";
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -117,6 +128,58 @@
     const mine = h.user.uid === p.authorUid;
     return (h.isAdmin && h.isAdmin()) || (mine && h.canEdit && h.canEdit());
   };
+
+  /* ---------------------- notification helpers ---------------------- */
+  const postTs = p => { const d = dateOf(p.createdAt); return d ? d.getTime() : 0; };
+  const newestTs = () => posts.reduce((m, p) => Math.max(m, postTs(p)), 0);
+  // Unread = posts newer than last-seen that AREN'T my own.
+  function unreadCount() {
+    const seen = getLastSeen(), me = myUid();
+    return posts.filter(p => p.authorUid !== me && postTs(p) > seen).length;
+  }
+  function updateBadge() {
+    const n = cloudOn() ? unreadCount() : 0;
+    const badge = document.getElementById("newsBadge");
+    if (badge) {
+      if (n > 0) { badge.textContent = n > 9 ? "9+" : String(n); badge.hidden = false; }
+      else badge.hidden = true;
+    }
+    document.body.classList.toggle("has-news-unread", n > 0);
+  }
+  // Home is showing -> everything is "seen"; clear the badge.
+  function markNewsSeen() {
+    if (posts.length) lsSet(LAST_SEEN_KEY, String(newestTs()));
+    updateBadge();
+  }
+  const homeActive = () => { const v = document.getElementById("view-home"); return !!(v && v.classList.contains("active")); };
+
+  // A genuinely-new post (past the quiet baseline, not mine) just arrived.
+  function announceNews(fresh) {
+    const p = fresh[0]; // newest of the batch
+    const title = headline(p);
+    const extra = fresh.length > 1 ? ` (+${fresh.length - 1} more)` : "";
+    notify(`📰 New story: ${title}${extra}`, "good");
+    if (notifyOn() && typeof Notification !== "undefined" && Notification.permission === "granted") {
+      try {
+        const n = new Notification("📰 " + title, {
+          body: (body(p).replace(/\s+/g, " ").trim().slice(0, 140)) || "New update on HC Community",
+          tag: "hccl-news-" + p.id,
+          icon: "assets/brand-logo.jpeg",
+        });
+        n.onclick = () => { try { window.focus(); } catch (e) {} openId = p.id; renderModal(); n.close(); };
+      } catch (e) { /* Notification can throw on some platforms - ignore */ }
+    }
+  }
+
+  async function toggleAlerts() {
+    if (typeof Notification === "undefined") { notify("This browser can't show notifications.", "bad"); return; }
+    if (notifyOn()) { lsSet(NOTIFY_KEY, "off"); notify("News alerts off.", "good"); render(); return; }
+    let perm = Notification.permission;
+    if (perm === "default") { try { perm = await Notification.requestPermission(); } catch (e) {} }
+    if (perm === "granted") { lsSet(NOTIFY_KEY, "on"); notify("News alerts on - you'll get a popup for new stories while this site is open.", "good"); }
+    else { notify("Allow notifications in your browser settings to get news alerts.", "bad"); }
+    render();
+  }
 
   /* ------------------------- composer ------------------------- */
   function composerHtml() {
@@ -246,8 +309,11 @@
     } else {
       feed = `<div class="news-list">${posts.map(rowHtml).join("")}</div>`;
     }
+    const alertsBtn = (h && h.configured && h.user)
+      ? `<button class="btn btn-dark btn-mini news-alerts${notifyOn() ? " on" : ""}" data-news-alerts title="Popup for new stories while this site is open">${notifyOn() ? "🔔 Alerts on" : "🔕 Get alerts"}</button>`
+      : "";
     el.innerHTML = `
-      <div class="news-head"><h2 class="news-title">📰 Top Stories</h2></div>
+      <div class="news-head"><h2 class="news-title">📰 Top Stories</h2>${alertsBtn}</div>
       ${canPost() ? composerHtml() : ""}
       <div class="news-feed">${feed}</div>`;
     // A snapshot may have deleted the open story out from under the popup.
@@ -265,7 +331,18 @@
       snap => {
         posts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         loaded = true;
+        const me = myUid();
+        const newest = newestTs();
+        if (baselineMaxTs === null) {
+          baselineMaxTs = newest; // first snapshot: no alerts for the existing backlog
+        } else if (newest > baselineMaxTs) {
+          const fresh = posts.filter(p => p.authorUid !== me && postTs(p) > baselineMaxTs)
+            .sort((a, b) => postTs(b) - postTs(a));
+          baselineMaxTs = newest;
+          if (fresh.length) announceNews(fresh);
+        }
         render();
+        if (homeActive()) markNewsSeen(); else updateBadge();
       },
       err => {
         console.warn("news snapshot error (rules published?):", err && err.code);
@@ -276,7 +353,8 @@
 
   function stopSync() {
     if (unsub) { unsub(); unsub = null; }
-    posts = []; loaded = false; openId = null;
+    posts = []; loaded = false; openId = null; baselineMaxTs = null;
+    updateBadge();
   }
 
   async function submitPost() {
@@ -352,6 +430,9 @@
   // Delegated at the document level (the #homeNews shell is rebuilt by home.js,
   // so listeners on it wouldn't survive - same pattern as series.js).
   function onClick(e) {
+    if (e.target.closest("[data-news-alerts]")) { toggleAlerts(); return; }
+    // Any nav hop to Home clears the unread badge (the stories are now on screen).
+    if (e.target.closest('[data-tab="home"]')) { setTimeout(markNewsSeen, 0); }
     if (e.target.closest("[data-news-post]")) { submitPost(); return; }
     // Delete is checked BEFORE the row itself, so the bin never opens the story.
     const del = e.target.closest("[data-news-del]");
@@ -401,6 +482,7 @@
     if (cloudOn()) startSync();
     else stopSync();
     render();
+    updateBadge();
   }
 
   function init() {
