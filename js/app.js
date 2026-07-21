@@ -629,7 +629,7 @@ function renderSeasonStats(player) {
   const row = (label, val, fmt) => (val === "" || val == null) ? ""
     : `<div><span class="ss-k">${esc(label)}</span><span class="ss-v">${esc(String(fmt ? fmt(val) : val))}</span></div>`;
   box.classList.remove("hidden");
-  box.innerHTML = `<div class="ss-title">Previous Season Stats</div><div class="ss-grid">
+  box.innerHTML = `<div class="ss-title">Player Stats</div><div class="ss-grid">
     ${row("Matches", s.matches)}${row("Runs", s.runs)}${row("Wickets", s.wickets)}
     ${row("Strike Rate", s.strikeRate)}${row("Economy", s.economy)}${row("Average", s.average)}
     ${row("Fantasy Pts", s.fantasyPoints)}${row("Prev Price", s.previousPrice, fmtPrev)}
