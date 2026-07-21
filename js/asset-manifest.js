@@ -24,7 +24,7 @@ window.HCCL_ASSETS = {
       "kalana thenuja": "assets/Players/Kalana Thenuja.png",
       "kanishka supun": "assets/Players/Kanishka Supun.jpg",
       "kasun de silva": "assets/Players/Kasun de Silva.jpg",
-      "kaushila chamika": "assets/Players/Kaushila Chamika.jpg",
+      "chamika kaushila": "assets/Players/Chamika Kaushila.jpg",
       "kavindu induwara": "assets/Players/Kavindu Induwara.jpg",
       "kavindu maleesha": "assets/Players/Kavindu Maleesha.jpg",
       "loku t rathnayake": "assets/Players/Loku T Rathnayake.jpg",

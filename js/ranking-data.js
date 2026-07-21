@@ -336,7 +336,7 @@ DNB, POTM NO
 DNB, POTM NO
 3 Wickets, 3.6 Eco, POTM YES
 0 Wickets, 13 Eco, POTM NO",36,615
-P037,Kaushila Chamika,REAPERS,41,428,196,13.4,218.4,1,0,8,8,415,"1. 14 runs, 200 SR, Highest scorer No, Not out No, POTM No
+P037,Chamika Kaushila,REAPERS,41,428,196,13.4,218.4,1,0,8,8,415,"1. 14 runs, 200 SR, Highest scorer No, Not out No, POTM No
 2. 0 runs, 0 SR, Highest scorer No, Not out No, POTM Yes
 3. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No
 4. 17 runs, 212.5 SR, Highest scorer No, Not out No, POTM No
