@@ -378,6 +378,11 @@
   <!-- Toast -->
   <div class="toast hidden" id="toast"></div>
 
+  <!-- Image manifest (player photos, team badges, season & tournament logos).
+       GENERATED from assets/ by `node tools/gen-assets.js` - re-run it after
+       adding or renaming any image. Must load before season-archive.js,
+       mvp.js and fantasy.js, which resolve every badge/photo through it. -->
+  <script src="js/asset-manifest.js"></script>
   <!-- Firebase config must load before the modules that read it -->
   <script src="firebase-config.js"></script>
   <script src="js/app.js"></script>

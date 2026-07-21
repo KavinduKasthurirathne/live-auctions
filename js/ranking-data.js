@@ -363,7 +363,7 @@ P039,Kanishka Supun,REAPERS,79,982,488,14.7,201.2,4,3,12,6,465,"1. 3 runs, 150 S
 3. 3 Wickets, 10 Eco, POTM YES
 4. 1 Wickets, 12 Eco, POTM NO
 5. DNB, POTM NO",67,684
-P040,Loku,REAPERS,11,100,56,11.1,178.6,0,0,3,1,50,"1. 16 runs, 160 SR, Highest scorer No, Not out No, POTM No
+P040,Loku T Rathnayake,REAPERS,11,100,56,11.1,178.6,0,0,3,1,50,"1. 16 runs, 160 SR, Highest scorer No, Not out No, POTM No
 2. 10 runs, 200 SR, Highest scorer No, Not out No, POTM No
 3. 17 runs, 212.5 SR, Highest scorer No, Not out No, POTM No
 4. 0 runs, 0 SR, Highest scorer No, Not out No, POTM No

@@ -215,13 +215,12 @@
   const fDay = id => F.days.find(d => d.id === id);
   const pname = id => { const p = fPlayer(id); return p ? p.name : ""; };
   const teamName = id => { const t = fTeam(id); return t ? t.name : "-"; };
-  // Team logo for the Player of the Season board: resolve the committed
-  // assets/Team Logos file by team name (same set the MVP / home boards use),
-  // falling back to a colored initial when no file matches.
-  const FAN_TEAM_LOGOS = ["Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg",
-    "Silentearz.jpeg", "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg"];
-  const FAN_TEAM_LOGO_INDEX = {};
-  FAN_TEAM_LOGOS.forEach(f => { FAN_TEAM_LOGO_INDEX[f.replace(/\.[^.]+$/, "").trim().toLowerCase()] = f; });
+  // Team logo for the Player of the Season board: resolved from the generated
+  // js/asset-manifest.js (tools/gen-assets.js), which indexes every league's
+  // badge folder by lowercased basename - same set the MVP / home boards use.
+  // Falls back to a coloured initial when no file matches.
+  const FAN_TEAM_LOGO_INDEX = (typeof window !== "undefined" && window.HCCL_ASSETS
+    && window.HCCL_ASSETS.teamLogoIndex) || {};
   const FAN_TEAM_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
   function fanTeamColor(name) {
     let h = 0; name = String(name || "");
@@ -231,9 +230,9 @@
   function teamIcon(name) {
     const t = String(name || "").trim();
     if (!t || t === "-") return "";
-    const f = FAN_TEAM_LOGO_INDEX[t.toLowerCase()];
-    return f
-      ? `<span class="team-ico" title="${esc(t)}" style="background-image:url('${encodeURI("assets/HCCL Team Logos/" + f)}')"></span>`
+    const p = FAN_TEAM_LOGO_INDEX[t.toLowerCase()]; // full path from the manifest
+    return p
+      ? `<span class="team-ico" title="${esc(t)}" style="background-image:url('${encodeURI(p)}')"></span>`
       : `<span class="team-ico" title="${esc(t)}" style="background:${fanTeamColor(t)}">${esc(t[0] ? t[0].toUpperCase() : "?")}</span>`;
   }
   function fmtPts(n) { return String(Math.round((Number(n) || 0) * 100) / 100); }

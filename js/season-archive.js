@@ -175,76 +175,50 @@
   }
   const firstInitial = s => { const t = String(s || "").trim(); return t && t !== "" ? t[0].toUpperCase() : "?"; };
 
-  // Committed asset files (exact names; extensions vary between .png/.jpeg).
-  // A team/player NAME resolves to its file via a lookup keyed by the lowercased
-  // basename, so UPPERCASE values match regardless of case. Team logos span
-  // every league's folder - add a file to the right folder's list to introduce
-  // a new team.
-  const TEAM_LOGO_DIRS = {
-    "assets/HCCL Team Logos": [
-      "Aura Dynasty.jpeg", "Invincible Lords.jpeg", "Matrix.jpeg", "Mind Gamers.jpeg",
-      "Silentearz.jpeg", "Super Fire Dragons.jpeg", "Velocity Reapers.jpeg", "Wizard Titans.jpeg", "Zyco Kings.jpeg",
-      "Thickheaders.png", "Noble Knights.png",
-    ],
-    "assets/Rising League Logos": [
-      "Apex Risers.jpg", "Knights of Future.jpg", "Nova Rising Force.jpg", "Rising Falcons.jpg",
-      "Rising Mavericks.jpg", "Rising Strikers.jpg", "Young Velocity Kings.jpg",
-    ],
-    "assets/Legends League Logos": [
-      "Zyther Legends.jpg", "Blackout Reapers.jpg", "Legend Strikers.png", "Majestic Maestros.jpg",
-      "MX Legends.jpg", "Supreme IV Greats.png",
-    ],
-    "assets/Mini IPL Logos": [
-      "Chennai Super Kings.png", "Delhi Capitals.jpg", "Gujarat Titans.jpg", "Kolkata Knight Riders.jpg",
-      "Lucknow Super Giants.jpg", "Mumbai Indians.jpg", "Punjab Kings.jpg", "Rajasthan Royals.jpg",
-      "Royal Challengers Bengaluru.png", "Sunrisers Hyderabad.jpg",
-    ],
+  // Every image lookup comes from js/asset-manifest.js, which tools/gen-assets.js
+  // GENERATES from the real files in assets/. Adding a player photo or a team
+  // badge therefore needs no code change - drop the file in and re-run
+  // `node tools/gen-assets.js`. (Hand-maintained lists are what silently rotted
+  // every player photo into a 404 when the extensions changed.)
+  // All indexes are keyed by the LOWERCASED file basename and hold a full path,
+  // so a name matches regardless of case. Missing manifest -> empty indexes,
+  // which degrade gracefully to the coloured-initial bubbles.
+  const AM = (typeof window !== "undefined" && window.HCCL_ASSETS) || {};
+  const TEAM_LOGO_INDEX = AM.teamLogoIndex || {};
+  const PLAYER_PHOTO_INDEX = AM.playerPhotoIndex || {};
+  const SEASON_LOGO_INDEX = AM.seasonLogos || {};
+  const TOURNAMENT_LOGO_INDEX = AM.tournamentLogoIndex || {};
+  // Tournament badges whose FILE name differs from the registry tournament name.
+  // Anything named after its tournament resolves automatically (see below).
+  const TOURNAMENT_LOGO_ALIASES = {
+    "hc mini ipl 2026": "hc mini ipl s1",
+    "solo knockout championship s01": "solo knockout s1",
+    "solo knockout championship s02": "solo knockout s2",
+    "hc county rising league s01": "hc county rising league s1",
+    "hc county legends league s01": "hc county legends league s1",
   };
-  const PLAYER_PHOTO_FILES = [
-    "Chathuka Lakshan.jpeg", "Hasitha Lakmal.png", "Sasindu Madushan.png", "Thenu Pabeesha.png",
-    "Udara Perera.jpeg", "Yasitha Nawod.jpeg", "Yathish Leyon.png", "Binura Yeshan.jpeg",
-  ];
-  const SEASON_LOGO_FILES = {
-    1: "S1 LOGO.png", 2: "S2 LOGO.png", 3: "S3 LOGO.png",
-    4: "S4 LOGO.png", 5: "S5 LOGO.png", 6: "S6 LOGO.jpg",
-  };
-  // Tournament badge files (assets/Tournament Logos), keyed by the lowercased
-  // registry tournament NAME (file names don't always match the full name).
-  const TOURNAMENT_LOGO_FILES = {
-    "hc mini ipl 2026": "HC Mini IPL S1.png",
-    "solo knockout championship s01": "Solo Knockout S1.png",
-    "hc county rising league s01": "HC County Rising League S1.png",
-    "hc county legends league s01": "HC County Legends League S1.jpeg",
-  };
-  function fileIndex(files) {
-    const m = {};
-    files.forEach(f => { m[f.replace(/\.[^.]+$/, "").trim().toLowerCase()] = f; });
-    return m;
-  }
-  // One combined name -> path index across every team-logo folder.
-  const TEAM_LOGO_INDEX = {};
-  Object.entries(TEAM_LOGO_DIRS).forEach(([dir, files]) => {
-    files.forEach(f => { TEAM_LOGO_INDEX[f.replace(/\.[^.]+$/, "").trim().toLowerCase()] = `${dir}/${f}`; });
-  });
-  const PLAYER_PHOTO_INDEX = fileIndex(PLAYER_PHOTO_FILES);
   // Encode so the spaces in folder/file names survive inside url()/href.
   const assetUrl = p => encodeURI(p);
+  const keyOf = s => String(s || "").trim().toLowerCase();
 
   function teamLogo(team) {
-    const p = TEAM_LOGO_INDEX[String(team || "").trim().toLowerCase()];
+    const p = TEAM_LOGO_INDEX[keyOf(team)];
     return p ? assetUrl(p) : "";
   }
   function playerPhoto(name) {
-    const f = PLAYER_PHOTO_INDEX[String(name || "").trim().toLowerCase()];
-    return f ? assetUrl(`assets/Players/${f}`) : "";
+    const p = PLAYER_PHOTO_INDEX[keyOf(name)];
+    return p ? assetUrl(p) : "";
   }
   function seasonLogo(no) {
-    const f = SEASON_LOGO_FILES[no];
-    return f ? assetUrl(`assets/HCCL Logos/${f}`) : "";
+    const p = SEASON_LOGO_INDEX[no];
+    return p ? assetUrl(p) : "";
   }
   function tournamentLogo(name) {
-    const f = TOURNAMENT_LOGO_FILES[String(name || "").trim().toLowerCase()];
-    return f ? assetUrl(`assets/Tournament Logos/${f}`) : "";
+    const k = keyOf(name);
+    // Alias first, then a straight name match (a badge named after its
+    // tournament needs no alias entry).
+    const p = TOURNAMENT_LOGO_INDEX[TOURNAMENT_LOGO_ALIASES[k] || ""] || TOURNAMENT_LOGO_INDEX[k];
+    return p ? assetUrl(p) : "";
   }
   // A round bubble: team logo / player photo if known, else a colored initial.
   function bubble(kind, value) {
