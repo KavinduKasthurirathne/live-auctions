@@ -38,6 +38,22 @@
     // A team is all out one wicket short of its batting strength. Used to work
     // out "won by N wickets"; falls back to this when the squad size is unknown.
     defaultWicketsPerSide: 10,
+
+    /* ---- TEST CHAMPIONSHIP (a completely separate points system) ----
+       Applies ONLY to tournaments/matches flagged as Test. Limited-overs
+       matches never touch any of this.
+         WIN +12 · DRAW +6 · TIE +4 · LOSS +0
+       Plus BONUS points, awarded PER INNINGS and independent of the result -
+       a losing side still keeps whatever bonuses it earned:
+         batting - innings runs >= 300 -> +2, else >= 200 -> +1
+         bowling - opponent ALL OUT for <= 50 -> +2, else <= 100 -> +1
+       Bands are [threshold, points]; the FIRST match wins, so keep them ordered
+       from the most generous threshold down. */
+    test: {
+      points: { win: 12, draw: 6, tie: 4, loss: 0, abandoned: 0 },
+      battingBonus: [[300, 2], [200, 1]],   // innings runs >= threshold
+      bowlingBonus: [[50, 2], [100, 1]],    // opponent all out for <= threshold
+    },
   };
 
   /* ---- MATCH STAGES ----
@@ -68,7 +84,10 @@
     postponed: "Postponed", abandoned: "Abandoned",
   };
   const FORMATS = ["T10", "T20", "5 Overs", "6 Overs", "10 Overs", "Last Man Stands", "Custom"];
+  // "draw" (an unfinished match) is offered for TEST matches only - it is a
+  // different result from a "tie" (scores finish level) and scores differently.
   const RESULT_TYPES = ["runs", "wickets", "tie", "abandoned", "no-result"];
+  const TEST_RESULT_TYPES = ["runs", "wickets", "innings", "draw", "tie", "abandoned"];
 
   /* ---------------------------- utils ------------------------------ */
   const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
@@ -170,6 +189,90 @@
     return hit || null;
   }
 
+  /* ====================== TEST CHAMPIONSHIP =============================
+     A Test match gives each side TWO innings and is decided on AGGREGATE.
+     It uses its own points table (12/6/4/0 + per-innings bonuses) and never
+     shows net run rate. Everything here is inert for limited-overs matches. */
+
+  // Is this match played under Test rules? The match's own flag wins; otherwise
+  // inherit the tournament's setting (series.js), then fall back to the report.
+  function isTestMatch(match) {
+    if (!match) return false;
+    if (match.isTest === true || match.isTest === false) return match.isTest;
+    if (match.matchType === "test") return true;
+    const S = root.HCCLSeries;
+    if (S && typeof S.isTest === "function" && match.tournamentId) return !!S.isTest(match.tournamentId);
+    if (S && typeof S.isTest === "function" && S.isTest()) return true;
+    const rd = match.resultData;
+    return !!(rd && rd.isTest);
+  }
+
+  // Innings list for a match, oldest first. Stored on resultData by the import.
+  function inningsOf(match) {
+    const rd = (match && match.resultData) || {};
+    const list = Array.isArray(rd.innings) ? rd.innings.slice() : [];
+    return list.filter(i => i && i.played !== false);
+  }
+
+  function bandAward(bands, value, cmp) {
+    for (const [threshold, pts] of bands) if (cmp(value, threshold)) return pts;
+    return 0;
+  }
+  // Batting: >= threshold. Bowling: <= threshold AND the side was all out.
+  const battingBonusFor = runs => bandAward(CONFIG.test.battingBonus, num(runs), (v, t) => v >= t);
+  function bowlingBonusFor(oppInnings) {
+    if (!oppInnings || !oppInnings.allOut) return 0;   // must be bowled out
+    return bandAward(CONFIG.test.bowlingBonus, num(oppInnings.runs), (v, t) => v <= t);
+  }
+
+  // Total bonus a side earned in one match: its own batting innings + every
+  // opposition innings it bowled out cheaply. Awarded regardless of the result.
+  function bonusFor(match, sideKey) {
+    const list = inningsOf(match);
+    if (!list.length) return 0;
+    let bonus = 0;
+    list.forEach(inn => {
+      if (inn.side === sideKey) bonus += battingBonusFor(inn.runs);
+      else bonus += bowlingBonusFor(inn);          // we bowled in this innings
+    });
+    return bonus;
+  }
+
+  /* ---- Lead / trail / target ----
+     Walks the innings IN PLAYED ORDER (so a follow-on needs no special case) and
+     labels each from the point of view of the side that has just finished
+     batting - the standard Test scorecard convention:
+        A 250, B 300  -> "B lead by 50"
+        A 250, B 150  -> "B trail by 100"
+     Once three innings are done, the side batting last needs (lead + 1). */
+  function inningsProgress(match, nameOf) {
+    const list = inningsOf(match);
+    const agg = { home: 0, away: 0 };
+    const label = (k, n) => (typeof nameOf === "function" ? nameOf(k) : k) + " " + n;
+    return list.map(inn => {
+      const side = inn.side === "away" ? "away" : "home";
+      const opp = side === "home" ? "away" : "home";
+      agg[side] += num(inn.runs);
+      const diff = agg[side] - agg[opp];
+      return {
+        ...inn, side,
+        aggFor: agg[side], aggAgainst: agg[opp], diff,
+        text: diff > 0 ? label(side, `lead by ${diff}`)
+          : diff < 0 ? label(side, `trail by ${Math.abs(diff)}`)
+            : "scores level",
+      };
+    });
+  }
+  // { side, runsNeeded } for the team batting last, or null when not applicable.
+  function targetOf(match, nameOf) {
+    const rows = inningsProgress(match, nameOf);
+    if (rows.length !== 3) return null;              // only meaningful before the 4th innings
+    const last = rows[rows.length - 1];
+    const chasing = last.diff > 0 ? (last.side === "home" ? "away" : "home") : last.side;
+    const lead = Math.abs(last.diff);
+    return { side: chasing, runsNeeded: lead + 1 };
+  }
+
   /* --------------------------- SUPER OVER ---------------------------------
      A tied match may be decided by a Super Over. The scorecard still says the
      match TIED (that's the cricket truth, and the innings runs still feed NRR),
@@ -217,8 +320,40 @@
     const battedCount = teamName => players.filter(p =>
       norm(p.team) === norm(teamName) && p.batting && p.batting.batted).length;
 
+    const isTest = !!(parsed && parsed.isTestReport);
+    const parsedInnings = (parsed && parsed.innings) || [];
+
     let resultType = "no-result", winnerName = "", margin = 0;
-    if (first && second) {
+    if (isTest && first && second) {
+      // TEST: decided on the AGGREGATE of both innings, not a single innings.
+      const a = inn[norm(first.name)], b = inn[norm(second.name)];
+      const countOf = name => parsedInnings.filter(x => norm(x.team) === norm(name)).length;
+      const aInns = countOf(first.name), bInns = countOf(second.name);
+      const lastInn = parsedInnings[parsedInnings.length - 1];
+      if (a.runs === b.runs) {
+        resultType = "tie";
+      } else {
+        const leader = a.runs > b.runs ? first : second;
+        const laggard = a.runs > b.runs ? second : first;
+        const lead = Math.abs(a.runs - b.runs);
+        winnerName = leader.name;
+        // An innings victory: the loser batted twice (or was made to follow on)
+        // and STILL trails, while the winner never needed a second innings.
+        const leaderInns = norm(leader.name) === norm(first.name) ? aInns : bInns;
+        const laggardInns = norm(laggard.name) === norm(first.name) ? aInns : bInns;
+        if (leaderInns === 1 && laggardInns >= 2) {
+          resultType = "innings"; margin = lead;
+        } else if (lastInn && norm(lastInn.team) === norm(leader.name)) {
+          // The winner batted last, so they chased the target down: wickets in hand.
+          const strength = (parsed && parsed.playingPerSide)
+            || battedCount(leader.name) || CONFIG.defaultWicketsPerSide + 1;
+          resultType = "wickets";
+          margin = Math.max(0, Math.max(1, strength - 1) - num(lastInn.wickets));
+        } else {
+          resultType = "runs"; margin = lead;
+        }
+      }
+    } else if (first && second) {
       const a = inn[norm(first.name)], b = inn[norm(second.name)];
       if (a.runs === b.runs) {
         resultType = "tie";
@@ -261,8 +396,26 @@
       else if (away && away.name && norm(away.name) === norm(first.name)) firstSide = "away";
     }
 
+    // Label every innings home/away and keep them in PLAYED order, so the
+    // standings bonuses and the lead/trail progression can walk them directly.
+    const sideOfName = name => {
+      if (homeTeam && norm(homeTeam.name) === norm(name)) return "home";
+      if (awayTeam && norm(awayTeam.name) === norm(name)) return "away";
+      if (home && home.name && norm(home.name) === norm(name)) return "home";
+      if (away && away.name && norm(away.name) === norm(name)) return "away";
+      return norm(first && first.name) === norm(name) ? firstSide || "home"
+        : (firstSide === "home" ? "away" : "home");
+    };
+    const inningsOut = parsedInnings.map((x, i) => ({
+      seq: x.seq || i + 1, order: x.order || 0, side: sideOfName(x.team), team: x.team,
+      runs: num(x.runs), wickets: num(x.wickets), allOut: !!x.allOut, played: true,
+    }));
+
     return {
       resultType,
+      isTest,
+      innings: inningsOut,
+      playingPerSide: num(parsed && parsed.playingPerSide),
       battedFirstSide: firstSide,
       oversPerSide: num(parsed && parsed.oversPerSide),   // per-side quota from the report
       // Prefer OUR team's display name over the shouty STUMPS one ("ZYCO KINGS"),
@@ -287,6 +440,8 @@
     switch (rd.resultType) {
       case "runs": return w ? `${w} won by ${rd.margin} run${rd.margin === 1 ? "" : "s"}` : "";
       case "wickets": return w ? `${w} won by ${rd.margin} wicket${rd.margin === 1 ? "" : "s"}` : "";
+      case "innings": return w ? `${w} won by an innings and ${rd.margin} run${rd.margin === 1 ? "" : "s"}` : "";
+      case "draw": return "Match drawn";
       case "tie": {
         const so = rd.superOver;
         return so && so.winnerTeamId && so.winnerName
@@ -309,11 +464,77 @@
               : p.loss;
   }
 
+  /* ---------------------- TEST standings ----------------------------------
+     Columns: M W L D T PTS, sorted by PTS alone (no NRR, no tiebreakers).
+       PTS = 12*W + 6*D + 4*T + 0*L + per-innings bonuses
+     Kept in its own function so the limited-overs path below is untouched. */
+  function testStandings(matches, teams) {
+    const P = CONFIG.test.points;
+    const rows = new Map();
+    const seed = t => {
+      if (!rows.has(t.id)) rows.set(t.id, {
+        teamId: t.id, name: t.name, logo: t.logo || "",
+        played: 0, wins: 0, losses: 0, draws: 0, ties: 0,
+        resultPoints: 0, bonus: 0, points: 0, nrr: null, isTest: true,
+      });
+      return rows.get(t.id);
+    };
+    (teams || []).forEach(seed);
+
+    (matches || []).forEach(m => {
+      if (!m || m.status !== "completed" || !m.resultData) return;
+      if (!countsForStandings(m)) return;              // knockouts still excluded
+      const home = findTeamById(teams, m.homeTeamId);
+      const away = findTeamById(teams, m.awayTeamId);
+      if (!home || !away) return;
+      const rd = m.resultData;
+      const H = seed(home), A = seed(away);
+      H.played++; A.played++;
+
+      // Bonuses are earned regardless of the result - even by the losing side.
+      const hb = bonusFor(m, "home"), ab = bonusFor(m, "away");
+      H.bonus += hb; A.bonus += ab;
+
+      const type = rd.resultType;
+      if (type === "abandoned" || type === "no-result") {
+        H.resultPoints += P.abandoned; A.resultPoints += P.abandoned;
+      } else if (type === "draw") {
+        H.draws++; A.draws++;
+        H.resultPoints += P.draw; A.resultPoints += P.draw;
+      } else {
+        const wid = effectiveWinnerId(m);
+        const decided = wid === home.id || wid === away.id;
+        if (!decided || type === "tie") {
+          H.ties++; A.ties++;
+          H.resultPoints += P.tie; A.resultPoints += P.tie;
+        } else {
+          const winner = wid === home.id ? H : A, loser = wid === home.id ? A : H;
+          winner.wins++; loser.losses++;
+          winner.resultPoints += P.win; loser.resultPoints += P.loss;
+        }
+      }
+    });
+
+    const out = Array.from(rows.values()).map(r => ({ ...r, points: r.resultPoints + r.bonus }));
+    out.sort((a, b) => b.points - a.points || b.wins - a.wins || a.name.localeCompare(b.name));
+    out.forEach((r, i) => { r.pos = i + 1; });
+    return out;
+  }
+
   // matches: our stored match docs. teams: our team records.
   // Only COMPLETED, GROUP-STAGE matches with resultData count. Playoff results
   // (Qualifier / Eliminator / Final) are excluded entirely - no points AND no
   // runs, so they can't skew net run rate either.
-  function standings(matches, teams) {
+  function standings(matches, teams, opts) {
+    // A Test championship uses an entirely different points table.
+    const testMode = opts && opts.test !== undefined
+      ? !!opts.test
+      : (matches || []).some(isTestMatch);
+    if (testMode) return testStandings(matches, teams);
+    return limitedStandings(matches, teams);
+  }
+
+  function limitedStandings(matches, teams) {
     const rows = new Map();
     const seed = t => {
       if (!rows.has(t.id)) rows.set(t.id, {
@@ -402,8 +623,10 @@
   }
 
   root.HCCLFixtures = {
-    CONFIG, STATUSES, STATUS_LABEL, FORMATS, RESULT_TYPES,
+    CONFIG, STATUSES, STATUS_LABEL, FORMATS, RESULT_TYPES, TEST_RESULT_TYPES,
     STAGES, DEFAULT_STAGE, stageOf, stageMeta, countsForStandings, isKnockout,
+    isTestMatch, inningsOf, bonusFor, battingBonusFor, bowlingBonusFor,
+    inningsProgress, targetOf, testStandings,
     superOverOf, hasSuperOver, effectiveWinnerId,
     oversFromFormat, quotaBallsOf, battedFirstSide, nrrBallsFor,
     deriveResult, summarize, standings, findTeam, oversToBalls, ballsToOvers,

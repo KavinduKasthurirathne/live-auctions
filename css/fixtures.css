@@ -198,6 +198,35 @@
 .fx-scorebox legend { font-size: 12px; font-weight: 700; color: var(--yellow); padding: 0 6px; }
 .fx-scorebox input { background: var(--panel); }
 
+/* --------------------- TEST match: innings & entry -------------------- */
+.fx-test-note { color: var(--yellow); }
+.fx-inn-box { grid-template-columns: 1fr; }
+.fx-inn-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+.fx-inn-allout { align-self: center; padding-bottom: 10px; }
+
+/* Innings progression in the match detail (lead / trail / target). */
+.fx-innings { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.fx-innings h5 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 8px; }
+.fx-innings ol { list-style: none; counter-reset: inn; display: flex; flex-direction: column; gap: 6px; }
+.fx-innings li {
+  counter-increment: inn; display: grid; align-items: baseline; gap: 10px;
+  grid-template-columns: 18px 1fr auto auto; font-size: 13px;
+}
+.fx-innings li::before { content: counter(inn); color: var(--muted); font-size: 11px; font-weight: 700; }
+.fx-inn-team { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-inn-score { font-family: "Russo One", sans-serif; color: var(--text); }
+.fx-inn-state { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.fx-inn-target {
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  font-size: 13px; color: var(--yellow); font-weight: 600;
+}
+.fx-inn-target b { font-family: "Russo One", sans-serif; }
+@media (max-width: 560px) {
+  .fx-inn-grid { grid-template-columns: 1fr 1fr; }
+  .fx-innings li { grid-template-columns: 16px 1fr auto; }
+  .fx-inn-state { grid-column: 2 / -1; }
+}
+
 /* ------------------------------ squads ------------------------------ */
 .fx-squads { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .fx-squad { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }

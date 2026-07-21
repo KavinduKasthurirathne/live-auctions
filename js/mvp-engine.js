@@ -110,6 +110,17 @@
   }
   const keyOf = s => cleanName(s).toLowerCase();
 
+  // Cricket overs are base-6: "5.1" = 5 overs + 1 ball. Summing them as decimals
+  // is wrong, so spells accumulate in balls and convert back at the end.
+  function oversToBallsLocal(overs) {
+    const o = num(overs), whole = Math.floor(o);
+    return whole * 6 + Math.min(5, Math.round((o - whole) * 10));
+  }
+  function ballsToOversLocal(balls) {
+    const b = Math.max(0, Math.round(balls));
+    return num(`${Math.floor(b / 6)}.${b % 6}`);
+  }
+
   function bandPoints(bands, value) {
     for (const [max, pts] of bands) if (value <= max) return pts;
     return bands.length ? bands[bands.length - 1][1] : 0;
@@ -135,7 +146,21 @@
   const RE_POTM_LABEL = /Player Of The Match/i;
   // Stop scanning for the POTM value once the Match Information block begins.
   const RE_POTM_STOP = /Match Information|Tournament|^Club\b|Match Title|Match Format|^Playing\b|^Overs\b|^Venue\b|Toss\b|Scorer\b|Match ID|Date & Time/i;
-  const RE_DISMISS = /\s+(?:not out\b|run out\b|retired\b|lbw\b|st\s|c\s|b\s)/i;
+  const RE_DISMISS = /\s+(?:not out\b|run out\b|retired\b|obstructing\b|hit wicket\b|stumped\b|lbw\b|st\s|c\s|b\s)/i;
+  // TEST MATCH: the innings headers are "CEYLON LIONS - 1st Innings R B 4s 6s SR".
+  // Strip the suffix so both innings fold into ONE team. Limited-overs reports
+  // have no suffix ("MIND GAMERS R B 4s 6s SR"), so they are untouched.
+  const RE_INNINGS_SUFFIX = /\s*[-–]\s*(\d+)(?:st|nd|rd|th)\s+Innings\s*$/i;
+  // "Match Format Test Match" (a limited-overs report says "Club Cricket").
+  const RE_MATCH_FORMAT = /^Match Format\s+(.+)$/i;
+  const RE_TEST_FORMAT = /test\s*match/i;
+  function splitInningsHeader(raw) {
+    const s = String(raw || "").trim();
+    const m = s.match(RE_INNINGS_SUFFIX);
+    return m
+      ? { team: s.replace(RE_INNINGS_SUFFIX, "").trim(), order: int(m[1]) }
+      : { team: s, order: 0 };
+  }
 
   // Winner of a completed LMS match = the side with the higher total. On a tie
   // (or missing totals) fall back to the team named in the "won by" line.
@@ -177,10 +202,15 @@
   function parseLines(lines) {
     const players = new Map();       // key -> player record
     const battingTeams = [];         // ordered unique batting-team names
-    const teamTotals = {};           // team -> { total, wickets }
+    const teamTotals = {};           // team -> { total, wickets } (AGGREGATE across innings)
+    // Every innings in the order it was played. A limited-overs match has 2; a Test
+    // match up to 4. Drives lead/trail, per-innings bonuses and the Test scorecard.
+    const innings = [];              // { team, order, runs, wickets, seq }
+    let curInnings = null;           // the innings row awaiting its "Total x/y"
     let mode = null;                 // 'batting' | 'bowling' | null
     let curTeam = null;              // current batting team
     let matchId = "", title = "", dateText = "", winner = "", potm = "";
+    let matchFormat = "";            // "Test Match" | "Club Cricket" | …
     let oversPerSide = 0, playingPerSide = 0;   // Match Information: "Overs 6", "Playing 5 Per Side (LMS)"
     let wonByLine = "";              // raw "... won by ..." line (winner tie fallback)
     let collectingPotm = 0;          // lines left to scan after the POTM label
@@ -193,7 +223,10 @@
         players.set(k, {
           name: cleanName(name), team: team || "",
           batting: { runs: 0, balls: 0, fours: 0, sixes: 0, sr: 0, out: true, batted: false },
-          bowling: { overs: 0, maidens: 0, runs: 0, wickets: 0, eco: 0, dots: 0, bowled: false },
+          // ballsBowled is the accumulator; `overs`/`eco` are derived after the loop.
+          bowling: { overs: 0, maidens: 0, runs: 0, wickets: 0, eco: 0, dots: 0, bowled: false, ballsBowled: 0 },
+          innings: [],      // per-innings batting rows (Test = up to 2)
+          bowlSpells: [],   // per-innings bowling spells
         });
       }
       const p = players.get(k);
@@ -216,16 +249,30 @@
       if (!oversPerSide) { const m = line.match(RE_OVERS_QUOTA); if (m) oversPerSide = num(m[1]); }
       // "Playing 5 Per Side (LMS)" = players per side (true batting strength).
       if (!playingPerSide) { const m = line.match(/^Playing\s+(\d+)\b/i); if (m) playingPerSide = int(m[1]); }
+      if (!matchFormat) { const m = line.match(RE_MATCH_FORMAT); if (m) matchFormat = m[1].trim(); }
       if (!wonByLine && RE_WON.test(line)) wonByLine = line;
       const tot = line.match(RE_TOTAL);
-      if (tot && curTeam) teamTotals[curTeam] = { total: int(tot[1]), wickets: int(tot[2]) };
+      if (tot && curTeam) {
+        const runs = int(tot[1]), wkts = int(tot[2]);
+        // Team totals ACCUMULATE: in a Test match a side bats twice and the match
+        // is decided on aggregate. One-innings matches are unaffected.
+        const agg = teamTotals[curTeam] || (teamTotals[curTeam] = { total: 0, wickets: 0 });
+        agg.total += runs; agg.wickets += wkts;
+        if (curInnings && curInnings.runs == null) { curInnings.runs = runs; curInnings.wickets = wkts; }
+      }
       if (/Over Comparison/i.test(line)) { mode = null; continue; }
 
       // ---- table headers / boundaries ----
       const bh = line.match(RE_BAT_HEAD);
       if (bh) {
-        curTeam = cleanName(bh[1]);
+        // "CEYLON LIONS - 2nd Innings" -> team "CEYLON LIONS", order 2. A
+        // limited-overs header has no suffix and yields order 0.
+        const head = splitInningsHeader(bh[1]);
+        curTeam = cleanName(head.team);
         if (!battingTeams.includes(curTeam)) battingTeams.push(curTeam);
+        curInnings = { team: curTeam, order: head.order || (innings.filter(x => x.team === curTeam).length + 1),
+          runs: null, wickets: null, seq: innings.length + 1 };
+        innings.push(curInnings);
         mode = "batting";
         continue;
       }
@@ -238,21 +285,29 @@
         if (m) {
           const name = m[1].split(RE_DISMISS)[0];
           const p = getPlayer(name, curTeam);
-          p.batting.runs = int(m[2]); p.batting.balls = int(m[3]);
-          p.batting.fours = int(m[4]); p.batting.sixes = int(m[5]);
-          p.batting.sr = num(m[6]);
+          // ACCUMULATE (a Test batter has two innings). Identical to assignment
+          // for a one-innings match, where each player appears exactly once.
+          p.batting.runs += int(m[2]); p.batting.balls += int(m[3]);
+          p.batting.fours += int(m[4]); p.batting.sixes += int(m[5]);
+          // Not out in the LAST innings they batted (rate stats are derived below).
           p.batting.out = !/not out/i.test(m[1]);
           p.batting.batted = true;
+          p.innings.push({ seq: curInnings ? curInnings.seq : 0, runs: int(m[2]), balls: int(m[3]),
+            fours: int(m[4]), sixes: int(m[5]), sr: num(m[6]), out: !/not out/i.test(m[1]) });
           continue;
         }
       } else if (mode === "bowling") {
         const m = line.match(RE_BOWL_ROW);
         if (m) {
           const p = getPlayer(m[1], "");           // team resolved after parse
-          p.bowling.overs = num(m[2]); p.bowling.maidens = int(m[3]);
-          p.bowling.runs = int(m[4]); p.bowling.wickets = int(m[5]);
-          p.bowling.eco = num(m[6]); p.bowling.dots = int(m[7]);
+          // Overs are base-6, so accumulate in BALLS and convert back at the end.
+          p.bowling.ballsBowled += oversToBallsLocal(num(m[2]));
+          p.bowling.maidens += int(m[3]);
+          p.bowling.runs += int(m[4]); p.bowling.wickets += int(m[5]);
+          p.bowling.dots += int(m[7]);
           p.bowling.bowled = true;
+          p.bowlSpells.push({ seq: curInnings ? curInnings.seq : 0, overs: num(m[2]),
+            maidens: int(m[3]), runs: int(m[4]), wickets: int(m[5]), eco: num(m[6]), dots: int(m[7]) });
           bowlContext.push({ p, battingAgainst: curTeam });
           continue;
         }
@@ -279,9 +334,25 @@
       if (!p.team) p.team = other(battingAgainst);
     });
 
+    // Derive the RATE stats from the accumulated totals. Strike rate and economy
+    // must never be summed across innings - they're recomputed from runs/balls.
+    players.forEach(p => {
+      const b = p.batting;
+      b.sr = b.balls > 0 ? Math.round((b.runs / b.balls) * 1000) / 10 : 0;
+      const w = p.bowling;
+      w.overs = ballsToOversLocal(w.ballsBowled);
+      w.eco = w.ballsBowled > 0 ? Math.round((w.runs / (w.ballsBowled / 6)) * 10) / 10 : 0;
+    });
+
+    // An innings is "all out" when every wicket fell (LMS: 12-a-side => 12 wickets).
+    innings.forEach(x => {
+      x.runs = x.runs || 0; x.wickets = x.wickets || 0;
+      x.allOut = playingPerSide > 0 ? x.wickets >= playingPerSide : false;
+    });
+
     const teams = battingTeams.map(name => ({
       name,
-      total: (teamTotals[name] || {}).total || 0,
+      total: (teamTotals[name] || {}).total || 0,      // AGGREGATE across innings
       wickets: (teamTotals[name] || {}).wickets || 0,
     }));
 
@@ -297,6 +368,9 @@
       matchId: matchId || "", title, dateText, ts,
       teams, winner, potm,
       // `teams` is in BATTING order, so teams[0] batted first.
+      innings,           // every innings in played order (Test = up to 4)
+      matchFormat,       // "Test Match" | "Club Cricket" | …
+      isTestReport: RE_TEST_FORMAT.test(matchFormat) || innings.length > 2,
       oversPerSide,      // per-side over quota (0 if the report didn't say)
       playingPerSide,    // players per side (0 if unknown)
       players: Array.from(players.values()),

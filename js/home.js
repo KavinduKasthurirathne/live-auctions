@@ -335,6 +335,13 @@
   }
 
   /* ------------------------- rendering ------------------------- */
+  // Waving Sri Lanka flag for the hero. Markup only - the wave and the sheen are
+  // pure CSS (.sl-flag in styles.css), and the same class is used on the
+  // sign-in gate so there is one definition of the animation.
+  function flagHtml() {
+    return `<span class="sl-flag" role="img" aria-label="Sri Lanka"></span>`;
+  }
+
   function champsHtml() {
     const cards = buildCards();
     if (!cards.length) return "";
@@ -359,10 +366,16 @@
     const view = document.getElementById("view-home");
     if (!view) return;
     destroyCarousel(); // before innerHTML replacement orphans the old track
+    // Waving Sri Lanka flag. The wave + sheen are pure CSS (see .sl-flag in
+    // styles.css); the markup is shared with the sign-in gate.
     view.innerHTML = `
       <section class="home-hero">
         <div class="home-hero-logo" style="background-image:url('assets/brand-logo.jpeg')"></div>
         <h1 class="home-hero-title">HC COMMUNITY</h1>
+        <p class="home-hero-flagline">
+          ${flagHtml()}
+          <span class="home-hero-country">SRI LANKA</span>
+        </p>
         <p class="home-hero-sub">A PLACE WHERE HAND CRICKET CHAMPIONS SHINE</p>
         <p class="home-hero-tags">Live Auctions · Fantasy League · Player Rankings</p>
       </section>

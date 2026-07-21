@@ -848,6 +848,49 @@ body:not(.can-edit) .rank-import { display: none; }
   background: linear-gradient(90deg, #fff, var(--yellow));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
+/* ---- "SRI LANKA" line under the hero title, with the waving flag ---- */
+.home-hero-flagline, .gate-flagline {
+  display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px;
+}
+.home-hero-country, .gate-country {
+  font-family: "Russo One", sans-serif; font-size: 14px; letter-spacing: 4px;
+  color: var(--yellow); text-transform: uppercase;
+}
+
+/* Waving flag. The wave is a gentle 3D oscillation; ::after slides a soft
+   highlight across so the cloth reads as rippling rather than just tilting.
+   Pure CSS - the only asset is the committed local SVG. */
+.sl-flag {
+  position: relative; display: inline-block;
+  width: 38px; height: 19px; flex: 0 0 auto;
+  background: url('../assets/flag-sri-lanka.svg') center/100% 100% no-repeat;
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+  transform-origin: left center;
+  animation: slWave 3.2s ease-in-out infinite;
+}
+.sl-flag::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .38) 50%, transparent 70%);
+  background-size: 260% 100%;
+  animation: slSheen 3.2s ease-in-out infinite;
+}
+@keyframes slWave {
+  0%, 100% { transform: perspective(180px) rotateY(0deg) skewY(0deg) scaleY(1); }
+  25%      { transform: perspective(180px) rotateY(-11deg) skewY(1.4deg) scaleY(.97); }
+  50%      { transform: perspective(180px) rotateY(0deg) skewY(0deg) scaleY(1); }
+  75%      { transform: perspective(180px) rotateY(11deg) skewY(-1.4deg) scaleY(.97); }
+}
+@keyframes slSheen {
+  0%, 100% { background-position: 130% 0; }
+  50%      { background-position: -30% 0; }
+}
+/* Respect a reduced-motion preference: keep the flag, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .sl-flag, .sl-flag::after { animation: none; }
+  .sl-flag::after { opacity: 0; }
+}
+
 .home-hero-sub { color: var(--text); font-size: 15px; margin-top: 10px; }
 .home-hero-tags { color: var(--muted); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-top: 8px; }
 

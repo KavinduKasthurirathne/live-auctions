@@ -196,6 +196,12 @@
   function scoreLine(m, side) {
     const rd = m.resultData;
     if (!rd) return "";
+    // TEST: a side bats twice, so show both innings - "137-12 & 197-12".
+    const inns = eng().inningsOf(m).filter(i => i.side === side);
+    if (eng().isTestMatch(m) && inns.length) {
+      const parts = inns.map(i => `${esc(String(i.runs))}-${esc(String(i.wickets))}`).join(" &amp; ");
+      return `<span class="fx-score">${parts}</span>`;
+    }
     const s = side === "home" ? rd.home : rd.away;
     if (!s) return "";
     const ov = s.balls ? ` <span class="fx-ov">(${eng().ballsToOvers(s.balls)} ov)</span>` : "";
@@ -257,11 +263,57 @@
   // can never disagree with how the table is actually scored.
   const pts = n => `${n} Point${n === 1 ? "" : "s"}`;
 
+  // Is the tournament we're viewing a Test championship? Drives the standings
+  // table, the result-entry form and the match detail.
+  function isTestMode() {
+    const S = window.HCCLSeries;
+    if (S && typeof S.isTest === "function" && S.isTest()) return true;
+    return matches.some(m => eng().isTestMatch(m));
+  }
+
+  /* Test Championship table: # / Team / M / W / L / D / T / PTS, sorted by PTS.
+     No net run rate - a Test table doesn't use it. */
+  function testStandingsTable(rows) {
+    const P = eng().CONFIG.test.points;
+    const cutoff = eng().CONFIG.playoffCutoff;
+    const showCutoff = rows.length > cutoff;
+    const body = rows.map(r => `<tr${showCutoff && r.pos === cutoff ? ` class="fx-cutoff"` : ""}>
+      <td class="fx-pos">${r.pos}</td>
+      <td class="fx-stname">${teamLogoHtml(r.teamId, "fx-logo sm")}<span>${esc(r.name)}</span></td>
+      <td>${r.played}</td>
+      <td>${r.wins}</td>
+      <td>${r.losses}</td>
+      <td>${r.draws}</td>
+      <td>${r.ties}</td>
+      <td class="fx-pts"${r.bonus ? ` title="${r.resultPoints} from results + ${r.bonus} bonus"` : ""}>${r.points}</td>
+    </tr>`).join("");
+    return `<div class="fx-table-wrap">
+      <table class="fx-table">
+        <thead><tr>
+          <th class="fx-pos">#</th><th class="fx-stname">Team</th>
+          <th title="Matches played">M</th><th title="Wins">W</th><th title="Losses">L</th>
+          <th title="Draws">D</th><th title="Ties">T</th>
+          <th class="fx-pts" title="Points (results + bonus)">PTS</th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+    <ul class="hint fx-points-note">
+      <li>W = ${pts(P.win)}</li>
+      <li>D = ${pts(P.draw)}</li>
+      <li>T = ${pts(P.tie)}</li>
+      <li>L = ${pts(P.loss)}</li>
+      <li>Bonus: 200+ runs in an innings = ${pts(1)}, 300+ = ${pts(2)}</li>
+      <li>Bonus: bowled out for 100 or less = ${pts(1)}, 50 or less = ${pts(2)}</li>
+    </ul>`;
+  }
+
   function standingsTable() {
     const ts = teams();
     if (!ts.length) return emptyState("No teams yet", "Add teams in the ⚙️ Setup tab to build the standings.");
     const mine = matches.filter(visible);
-    const rows = eng().standings(mine, ts);
+    const testMode = isTestMode();
+    const rows = eng().standings(mine, ts, { test: testMode });
     const anyPlayed = rows.some(r => r.played > 0);
     if (!anyPlayed) {
       // Distinguish "nothing played" from "only playoffs played" - otherwise an
@@ -272,6 +324,7 @@
         ? "Only knockout matches are completed so far  the table is built from group-stage results."
         : "The table fills up as soon as the first group-stage match is completed.");
     }
+    if (testMode) return testStandingsTable(rows);
     const p = eng().CONFIG.points;
     // Playoff cut-off: a yellow line under the last qualifying team. Only drawn
     // when some team actually sits below it - otherwise it's a line under nothing.
@@ -565,6 +618,26 @@
       ${rd && rd.potm ? `<div class="fx-potm">⭐ Player of the Match: <b>${esc(rd.potm)}</b></div>` : ""}
     </div>`;
 
+    // TEST: innings-by-innings progression with the running lead / trail, then
+    // what the side batting last needs. Standard Test scorecard language.
+    let progression = "";
+    if (eng().isTestMatch(m)) {
+      const nameOf = k => teamName(k === "home" ? m.homeTeamId : m.awayTeamId);
+      const rows = eng().inningsProgress(m, nameOf);
+      if (rows.length) {
+        const target = eng().targetOf(m, nameOf);
+        progression = `<div class="fx-innings">
+          <h5>Innings</h5>
+          <ol>${rows.map(r => `<li>
+            <span class="fx-inn-team">${esc(nameOf(r.side))}</span>
+            <span class="fx-inn-score">${esc(String(r.runs))}-${esc(String(r.wickets))}</span>
+            <span class="fx-inn-state">${esc(r.text)}</span>
+          </li>`).join("")}</ol>
+          ${target ? `<p class="fx-inn-target">🎯 ${esc(nameOf(target.side))} need <b>${target.runsNeeded}</b> to win</p>` : ""}
+        </div>`;
+      }
+    }
+
     const stage = eng().stageMeta(eng().stageOf(m));
     const facts = `<dl class="fx-facts">
       <div><dt>Stage</dt><dd>${esc(stage.label)}</dd></div>
@@ -596,7 +669,7 @@
          <button class="btn btn-yellow" data-fx-close="1">Done</button>`
       : `<button class="btn btn-yellow" data-fx-close="1">Close</button>`;
 
-    return shell("Match Details", head + facts + cards + lineups + notes, foot);
+    return shell("Match Details", head + progression + facts + cards + lineups + notes, foot);
   }
 
   /* --------------------- import Stumps report (PDF) ------------------- */
@@ -636,6 +709,12 @@
       // its format label. Always shown in the dialog so a parse miss is visible.
       rd.oversPerSide = (ok && parsed.oversPerSide)
         || m.oversPerSide || eng().oversFromFormat(m.format) || 0;
+      // TEST: seed four innings slots (2 per side). A slot the report didn't
+      // supply stays played:false - an innings victory or an unfinished match.
+      if (eng().isTestMatch(m) || (ok && parsed.isTestReport)) {
+        rd.isTest = true;
+        rd.innings = testInningsSlots(rd.innings);
+      }
 
       modal = {
         type: "import", matchId: m.id, loading: false,
@@ -656,6 +735,36 @@
     }
   }
 
+  /* A Test match has four innings slots: home 1st, away 1st, home 2nd, away 2nd.
+     Any the report didn't provide stay `played:false` so the admin can tick them
+     on - that's how an innings victory (a side never bats again) or an
+     unfinished match is recorded. Existing rows keep their real played order. */
+  function testInningsSlots(existing) {
+    const have = Array.isArray(existing) ? existing.slice() : [];
+    const slots = [];
+    [["home", 1], ["away", 1], ["home", 2], ["away", 2]].forEach(([side, order], i) => {
+      const hit = have.find(x => x.side === side && (x.order || 0) === order)
+        || have.filter(x => x.side === side)[order - 1];
+      slots.push(hit
+        ? { ...hit, side, order, played: hit.played !== false }
+        : { side, order, seq: i + 1, runs: 0, wickets: 0, allOut: false, played: false });
+    });
+    // Keep the real played sequence where we know it (matters for lead/trail).
+    slots.sort((a, b) => (a.seq || 99) - (b.seq || 99));
+    return slots;
+  }
+
+  // Live feedback on what an innings is worth, so the admin can see the bonus
+  // land as they type rather than discovering it in the table afterwards.
+  function bonusHint(inn) {
+    const bat = eng().battingBonusFor(inn.runs);
+    const bowl = eng().bowlingBonusFor(inn);
+    const bits = [];
+    if (bat) bits.push(`batting bonus +${bat} to this team`);
+    if (bowl) bits.push(`bowling bonus +${bowl} to the opposition`);
+    return bits.length ? "⭐ " + bits.join(" · ") : "No bonus from this innings.";
+  }
+
   function importModal() {
     const m = matches.find(x => x.id === modal.matchId);
     if (!m) return shell("Import", emptyState("Match not found", ""), "");
@@ -667,10 +776,15 @@
     const ts = teams();
     const winOpts = `<option value=""> none </option>` + ts.map(t =>
       `<option value="${esc(t.id)}"${t.id === d.winnerTeamId ? " selected" : ""}>${esc(t.name)}</option>`).join("");
-    const typeOpts = eng().RESULT_TYPES.map(r =>
-      `<option value="${r}"${d.resultType === r ? " selected" : ""}>${
-        r === "runs" ? "Won by runs" : r === "wickets" ? "Won by wickets"
-          : r === "tie" ? "Tied" : r === "abandoned" ? "Abandoned" : "No result"}</option>`).join("");
+    // "Draw" (an unfinished match) is a Test-only result and is NOT the same as
+    // a tie - it scores differently, so it never appears for limited overs.
+    const RESULT_LABEL = {
+      runs: "Won by runs", wickets: "Won by wickets", innings: "Won by an innings",
+      draw: "Draw", tie: "Tied", abandoned: "Abandoned", "no-result": "No result",
+    };
+    const typeList = d.isTest ? eng().TEST_RESULT_TYPES : eng().RESULT_TYPES;
+    const typeOpts = typeList.map(r =>
+      `<option value="${r}"${d.resultType === r ? " selected" : ""}>${RESULT_LABEL[r] || r}</option>`).join("");
 
     const banner = modal.partial
       ? `<div class="fx-warn">⚠️ The scorecard couldn't be read automatically. Enter the result below  it saves exactly the same way.</div>`
@@ -685,6 +799,32 @@
         <label>Overs<input type="text" id="fx_${side}_ov" placeholder="e.g. 10.0" value="${esc(eng().ballsToOvers(s.balls || 0))}" /></label>
       </fieldset>`;
     };
+
+    // TEST: four innings instead of two innings-worth of scores. Each slot can be
+    // marked "not played" - that's an innings victory, or a match that ran out of
+    // time before the innings started.
+    const isTest = !!d.isTest;
+    const testInningsBlock = !isTest ? "" : (d.innings || []).map((inn, i) => {
+      const label = `${teamName(inn.side === "home" ? m.homeTeamId : m.awayTeamId)} — ${inn.order === 2 ? "2nd" : "1st"} innings`;
+      return `<fieldset class="fx-scorebox fx-inn-box">
+        <legend>${esc(label)}</legend>
+        <label class="fx-check">
+          <input type="checkbox" data-fx-inn-played="${i}"${inn.played ? " checked" : ""} />
+          <span>Innings played</span>
+        </label>
+        ${inn.played ? `
+          <div class="fx-inn-grid">
+            <label>Runs<input type="number" min="0" data-fx-inn-runs="${i}" value="${esc(String(inn.runs || 0))}" /></label>
+            <label>Wickets<input type="number" min="0" data-fx-inn-wkts="${i}" value="${esc(String(inn.wickets || 0))}" /></label>
+            <label class="fx-check fx-inn-allout">
+              <input type="checkbox" data-fx-inn-allout="${i}"${inn.allOut ? " checked" : ""} />
+              <span>All out</span>
+            </label>
+          </div>
+          <span class="hint">${esc(bonusHint(inn))}</span>
+        ` : `<span class="hint">Leave unticked if this innings was never played.</span>`}
+      </fieldset>`;
+    }).join("");
 
     // Super Over: only meaningful when the match TIED. STUMPS doesn't export it
     // reliably, so it's entered here - optional, since not every tie goes to one.
@@ -723,9 +863,12 @@
 
     const body = `${banner}
       <div class="fx-form">
-        ${scoreRow("home", teamName(m.homeTeamId) + " (home)")}
-        ${scoreRow("away", teamName(m.awayTeamId) + " (away)")}
-        ${quotaRow}
+        ${isTest
+        ? `<p class="hint fx-test-note">🏏 <b>Test match</b> — enter each innings below. Points: win ${eng().CONFIG.test.points.win} · draw ${eng().CONFIG.test.points.draw} · tie ${eng().CONFIG.test.points.tie} · loss ${eng().CONFIG.test.points.loss}, plus per-innings bonuses.</p>
+           ${testInningsBlock}`
+        : `${scoreRow("home", teamName(m.homeTeamId) + " (home)")}
+           ${scoreRow("away", teamName(m.awayTeamId) + " (away)")}
+           ${quotaRow}`}
         <div class="fx-form-row">
           <label>Result type<select id="fxResType">${typeOpts}</select></label>
           <label>Winner<select id="fxWinner">${winOpts}</select></label>
@@ -772,6 +915,27 @@
     if (get("fxPotm")) d.potm = get("fxPotm").value.trim();
     if (get("fxOversQuota")) d.oversPerSide = Math.max(0, parseInt(get("fxOversQuota").value, 10) || 0);
 
+    // ---- TEST: four innings slots ----
+    if (d.isTest && Array.isArray(d.innings)) {
+      d.innings.forEach((inn, i) => {
+        const played = document.querySelector(`[data-fx-inn-played="${i}"]`);
+        if (played) inn.played = played.checked;
+        if (!inn.played) { inn.runs = 0; inn.wickets = 0; inn.allOut = false; return; }
+        const r = document.querySelector(`[data-fx-inn-runs="${i}"]`);
+        const w = document.querySelector(`[data-fx-inn-wkts="${i}"]`);
+        const ao = document.querySelector(`[data-fx-inn-allout="${i}"]`);
+        if (r) inn.runs = Math.max(0, parseInt(r.value, 10) || 0);
+        if (w) inn.wickets = Math.max(0, parseInt(w.value, 10) || 0);
+        if (ao) inn.allOut = ao.checked;
+      });
+      // Keep the home/away aggregate in step so the card and detail agree.
+      const sum = side => d.innings.filter(x => x.played && x.side === side)
+        .reduce((a, x) => ({ runs: a.runs + x.runs, wickets: a.wickets + x.wickets }), { runs: 0, wickets: 0 });
+      const hs = sum("home"), as = sum("away");
+      d.home = { ...(d.home || {}), runs: hs.runs, wickets: hs.wickets };
+      d.away = { ...(d.away || {}), runs: as.runs, wickets: as.wickets };
+    }
+
     // ---- Super Over (only offered on a tie) ----
     if (d.resultType === "tie") {
       const chk = get("fxSoPlayed");
@@ -812,6 +976,12 @@
       potm: d.potm || "",
       battedFirstSide: d.battedFirstSide || "",   // NRR needs the batting order
       oversPerSide: d.oversPerSide || 0,          // and the per-side quota
+      isTest: !!d.isTest,
+      // Only the innings that were actually played are stored - the standings
+      // bonuses and the lead/trail progression walk this list.
+      innings: d.isTest && Array.isArray(d.innings)
+        ? d.innings.filter(x => x.played).map((x, i) => ({ ...x, seq: x.seq || i + 1 }))
+        : (d.innings || []),
       superOver: so ? {
         winnerTeamId: so.winnerTeamId,
         winnerName: (teamById(so.winnerTeamId) || {}).name || "",
@@ -838,6 +1008,7 @@
     // Keep the quota on the match itself too, so the create/edit form and the
     // standings can read it without digging into resultData.
     if (d.oversPerSide) next.oversPerSide = d.oversPerSide;
+    if (d.isTest) next.isTest = true;   // pins the match to the Test points table
     next.resultData = {
       ...base,
       home: { runs: d.home.runs, wickets: d.home.wickets, balls: d.home.balls, name: teamName(m.homeTeamId) },
@@ -930,9 +1101,11 @@
       return;
     }
     if (modal.type === "import" && modal.draft) {
-      // These two change the dialog's SHAPE ("Tied" reveals the Super Over
-      // section; ticking it reveals the score fields), so redraw it.
-      if (e.target.closest("#fxResType") || e.target.closest("#fxSoPlayed")) {
+      // These change the dialog's SHAPE ("Tied" reveals the Super Over section;
+      // ticking a box reveals its fields), so redraw it.
+      if (e.target.closest("#fxResType") || e.target.closest("#fxSoPlayed")
+        || e.target.closest("[data-fx-inn-played]") || e.target.closest("[data-fx-inn-allout]")
+        || e.target.closest("[data-fx-inn-runs]")) {
         readImportForm();
         renderModal();
         return;

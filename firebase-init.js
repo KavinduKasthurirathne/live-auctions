@@ -186,6 +186,10 @@ function renderAuthGate() {
     <div class="gate-hero">
       ${gateLogoHtml()}
       <h1 class="gate-title">HC COMMUNITY</h1>
+      <p class="gate-flagline">
+        <span class="sl-flag" role="img" aria-label="Sri Lanka"></span>
+        <span class="gate-country">SRI LANKA</span>
+      </p>
       <p class="gate-tagline">HAND CRICKET CHAMPIONS LEAGUE</p>
       <p class="gate-tags">Live Auctions · Fantasy League · Player Rankings</p>
     </div>

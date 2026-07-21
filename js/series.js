@@ -174,6 +174,10 @@
       // tournament created before this flag existed keeps its auction. When
       // false, the Auctions tab and all purse / base-price fields hide for it.
       hasAuction: d.hasAuction !== false,
+      // Match format. "test" switches the Fixtures & Results standings to the
+      // Test Championship points table (12/6/4/0 + per-innings bonuses, no NRR).
+      // Defaults to "limited" so every existing tournament is unchanged.
+      matchFormat: d.matchFormat === "test" ? "test" : "limited",
       // { champion, runnerUp, mvp, mostRuns?, mostWickets? } - drives this
       // tournament's card on the Home champions carousel once it's completed.
       honors: d.honors || null,
@@ -210,6 +214,12 @@
     hasAuction(id) {
       const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
       return !!(m && !isArchiveOnly(m) && m.hasAuction !== false);
+    },
+    // Is the given (default: viewed) tournament a TEST championship? Drives the
+    // Fixtures & Results points table and the 4-innings result entry form.
+    isTest(id) {
+      const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
+      return !!(m && m.matchFormat === "test");
     },
     isLegacy(id) {
       const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
@@ -464,6 +474,7 @@
     const file = $("#serLogoFile").files[0];
     const srcId = $("#serCopyFrom") ? $("#serCopyFrom").value : "";
     const hasAuction = $("#serHasAuction") ? !!$("#serHasAuction").checked : true;
+    const matchFormat = ($("#serMatchFormat") && $("#serMatchFormat").value === "test") ? "test" : "limited";
 
     // Honors (all optional). Leaving every field blank clears them - the
     // setDoc below replaces the whole meta doc, so an omitted key is removed.
@@ -488,7 +499,7 @@
           name, short, duration, status,
           logo: logo || cur.logo || "",
           legacy: !!cur.legacy, order: cur.order, createdAt: cur.createdAt || Date.now(),
-          hasAuction,
+          hasAuction, matchFormat,
           // setDoc replaces the whole doc - carry the identity flags over.
           ...(cur.archive ? { archive: cur.archive } : {}),
           ...(cur.season ? { season: cur.season } : {}),
@@ -500,7 +511,7 @@
       } else {
         const id = slugify(name);
         await a.setDoc(a.doc(d, "tournaments", id), {
-          name, short, duration, status, logo, hasAuction,
+          name, short, duration, status, logo, hasAuction, matchFormat,
           order: tournaments.length, createdAt: Date.now(),
           ...(honors ? { honors } : {}),
         });
@@ -644,6 +655,15 @@
         <label class="ser-check">
           <input type="checkbox" id="serHasAuction"${(editing ? editing.hasAuction !== false : false) ? " checked" : ""} />
           <span>This tournament has a <b>player auction</b> (base prices &amp; team purses). Leave off for a normal fixed-squad tournament - add teams &amp; players directly in Setup. Turn on only to run a live auction: the Auctions tab and all purse / base-price fields appear for it.</span>
+        </label>
+        <label>Match format
+          <select id="serMatchFormat">
+            <option value="limited"${(editing && editing.matchFormat === "test") ? "" : " selected"}>Limited overs (T10 / T20 / LMS)</option>
+            <option value="test"${(editing && editing.matchFormat === "test") ? " selected" : ""}>Test championship</option>
+          </select>
+          <span class="hint">Limited overs uses the usual table: win 2, tie 1, loss 0, plus net run rate.
+            <b>Test</b> switches this tournament&rsquo;s standings to win 12 &middot; draw 6 &middot; tie 4 &middot; loss 0
+            with per-innings bonus points, and its results are entered as two innings per team.</span>
         </label>
         <label>Tournament logo${editing && editing.logo ? " (leave empty to keep current)" : ""}
           <input type="file" id="serLogoFile" accept="image/*" />

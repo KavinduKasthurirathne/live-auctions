@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" role="img" aria-label="Flag of Sri Lanka">
+  <!-- Flag of Sri Lanka (the Lion Flag), simplified for small display sizes.
+       Stripe order, hoist -> fly: saffron, green, then the maroon lion panel.
+       If the stripes ever need swapping it is the two <rect> fills below. -->
+  <rect width="60" height="30" fill="#FFBE29"/>
+  <rect x="3" y="3" width="9.5" height="24" fill="#FF883E"/>   <!-- saffron -->
+  <rect x="14.5" y="3" width="9.5" height="24" fill="#00534E"/><!-- green -->
+  <rect x="27" y="3" width="30" height="24" fill="#8D153A"/>   <!-- maroon panel -->
+
+  <!-- Four bo leaves, one per corner of the maroon panel -->
+  <g fill="#FFBE29">
+    <path d="M30.4 7.6c-.9-.6-1.2-1.7-.7-2.6.9.2 1.6 1 1.7 2 .5-.2 1 0 1.2.4-.6.6-1.5.7-2.2.2z"/>
+    <path d="M53.6 7.6c.9-.6 1.2-1.7.7-2.6-.9.2-1.6 1-1.7 2-.5-.2-1 0-1.2.4.6.6 1.5.7 2.2.2z"/>
+    <path d="M30.4 22.4c-.9.6-1.2 1.7-.7 2.6.9-.2 1.6-1 1.7-2 .5.2 1 0 1.2-.4-.6-.6-1.5-.7-2.2-.2z"/>
+    <path d="M53.6 22.4c.9.6 1.2 1.7.7 2.6-.9-.2-1.6-1-1.7-2-.5.2-1 0-1.2-.4.6-.6 1.5-.7 2.2-.2z"/>
+  </g>
+
+  <!-- Lion passant holding a kastane sword, stylised -->
+  <g fill="#FFBE29">
+    <path d="M47.4 6.3l.7-2.1.9 2.3-.5.4z"/>                    <!-- sword blade -->
+    <ellipse cx="42.6" cy="17.6" rx="5.2" ry="6.4"/>            <!-- body -->
+    <circle cx="46.1" cy="10.6" r="3.1"/>                        <!-- head/mane -->
+    <path d="M46.6 7.1c.9-.3 1.8.2 2.1 1 .2.7-.1 1.4-.7 1.8l-1.4-2.8z"/>
+    <path d="M37.6 13.2c-1.5-.9-2.3-2.6-2-4.3 1.4.5 2.4 1.7 2.7 3.1l-.7 1.2z"/><!-- raised paw -->
+    <path d="M37.9 21.9c-1.7.6-3 2-3.4 3.8 1.7-.2 3.2-1.2 4-2.7l-.6-1.1z"/>   <!-- tail -->
+    <path d="M40.6 23.6l-.5 3.1 1.5-2.6zM44.6 23.8l1.1 2.9.2-3z"/>            <!-- hind legs -->
+  </g>
+</svg>
