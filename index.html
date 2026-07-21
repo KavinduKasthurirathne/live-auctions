@@ -226,7 +226,7 @@
           <label>Team name
             <input type="text" id="teamName" placeholder="e.g. Royal Strikers" />
           </label>
-          <label>Purse (leave blank for default)
+          <label class="auction-only">Purse (leave blank for default)
             <input type="number" id="teamPurse" min="0" step="any" placeholder="100" />
           </label>
           <label>Squad size (leave blank for default)
@@ -249,10 +249,13 @@
           <label>Player name
             <input type="text" id="pName" placeholder="e.g. Kasun Perera" />
           </label>
+          <label class="no-auction-only">Team
+            <select id="pTeam"></select>
+          </label>
           <label>Role / category (optional)
             <input type="text" id="pRole" placeholder="e.g. All-rounder" />
           </label>
-          <label>Base price
+          <label class="auction-only">Base price
             <input type="number" id="pBase" min="0" step="any" placeholder="1" />
           </label>
           <label>Player photo
@@ -275,12 +278,12 @@
             <button class="btn btn-red" id="btnSavePlayer">Add Player</button>
             <button class="btn btn-dark hidden" id="btnCancelPlayer">Cancel</button>
           </div>
-          <p class="hint">Tip: players are auctioned top-to-bottom in this order. Use ▲ ▼ to reorder.</p>
+          <p class="hint auction-only">Tip: players are auctioned top-to-bottom in this order. Use ▲ ▼ to reorder.</p>
           <div class="mini-list" id="playerMiniList"></div>
         </div>
 
         <!-- Retain / pre-assign players -->
-        <div class="card">
+        <div class="card auction-only">
           <h3 id="retainFormTitle">Retain / Pre-assign Player</h3>
           <input type="hidden" id="retainEditId" />
           <p class="hint">Players a team keeps from last season. They go straight into the squad (not the auction). Price is optional — it's just for the record and is <strong>not</strong> deducted from the new-season purse.</p>

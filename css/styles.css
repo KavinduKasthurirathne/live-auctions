@@ -612,6 +612,23 @@ body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
   display: none !important;
 }
 
+/* ===================== AUCTION-MODE GATING ===================== */
+/* A tournament without a player auction (hasAuction === false) runs as a normal
+   fixed-squad tournament. js/app.js toggles .no-auction on <body> to follow the
+   VIEWED tournament, hiding the Auctions tab and every purse / base-price field.
+   .auction-only  = shown only for auction tournaments.
+   .no-auction-only = shown only for fixed-squad tournaments (e.g. the Team picker
+   in the Add Player form, which replaces bidding). */
+body.no-auction .auction-only,
+body.no-auction .tab[data-tab="auctions"] {
+  display: none !important;
+}
+/* .no-auction-only shows ONLY in fixed-squad mode. Hide it otherwise with a
+   selector specific enough to beat the card's `label { display:block }` rules;
+   in no-auction mode the selector doesn't match, so the element keeps its
+   natural display. */
+body:not(.no-auction) .no-auction-only { display: none; }
+
 /* ===================== SQUAD TRACKER (Phase E) ===================== */
 .squad-tracker { margin-top: 22px; }
 .tracker-title { font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }

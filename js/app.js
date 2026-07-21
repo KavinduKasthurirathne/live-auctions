@@ -110,6 +110,30 @@ function auStripTeam(t)   { const c = auStrip(t); delete c.logo;  return c; }
 function auApplyImages() {
   state.players.forEach(p => { p.photo = auImg.playerPhotos.get(p.id) || ""; });
   state.teams.forEach(t => { t.logo = auImg.teamLogos.get(t.id) || ""; });
+  publishTeamLogos();
+}
+
+// --- Global team-logo registry (for the standalone Rankings board) ---
+// The Rankings page is not tied to a tournament, but its crests come from team
+// logos. Reading them from the currently-viewed tournament's state.teams made
+// them vanish on every tournament switch. Instead we mirror each team's logo,
+// keyed by (normalized) team NAME, into ranking/logos/teams/{key} - one doc per
+// team (base64 logos would blow a single doc's size cap). Editors write, everyone
+// reads (firestore.rules: ranking/**). ranking.js reads this, decoupled from the
+// viewed tournament, so logos persist across switches / "set default".
+const auLogoRegCache = new Map();      // nameKey -> logo we last published (skip no-op writes)
+function auTeamNameKey(name) { return String(name || "").trim().toLowerCase().replace(/[^\w -]/g, "").slice(0, 120); }
+function publishTeamLogos() {
+  const H = window.HCCL, fs = auApi();
+  if (!H || !H.configured || !H.user || !auDb() || !fs || !fs.doc || !fs.setDoc || !auCanEdit()) return;
+  state.teams.forEach(t => {
+    const key = auTeamNameKey(t.name);
+    const logo = t.logo || "";
+    if (!key || !logo || auLogoRegCache.get(key) === logo) return; // nothing new to publish
+    auLogoRegCache.set(key, logo);
+    try { fs.setDoc(fs.doc(auDb(), "ranking", "logos", "teams", key), { name: t.name, logo }); }
+    catch (e) { /* registry is a convenience mirror - never block the auction on it */ }
+  });
 }
 // Build set/delete ops for an image collection by comparing current images to the mirror.
 function auDiffImages(coll, items, getImg, ops) {
@@ -1046,6 +1070,10 @@ function renderSquads() {
 }
 
 /* ---------- SETUP ---------- */
+// True when the VIEWED tournament runs without a player auction (fixed-squad).
+// js/app.js:syncAuctionMode() keeps body.no-auction in step with HCCLSeries.
+function noAuctionMode() { return document.body.classList.contains("no-auction"); }
+
 function fillSettingsInputs() {
   $("#setSeasonName").value = state.settings.seasonName;
   $("#setSeasonNumber").value = state.settings.seasonNumber;
@@ -1056,6 +1084,10 @@ function fillSettingsInputs() {
 }
 
 function renderSetup() {
+  // A fixed-squad (non-auction) tournament hides purse/base-price and adds
+  // players straight into a team, so the Setup lists read differently.
+  const noAuction = noAuctionMode();
+
   // team list
   const tl = $("#teamMiniList");
   tl.innerHTML = "";
@@ -1063,16 +1095,19 @@ function renderSetup() {
   state.teams.forEach(t => {
     const row = document.createElement("div");
     row.className = "mini-row";
+    const sub = noAuction ? `${teamCap(t)} players` : `${money(teamPurse(t))} · ${teamCap(t)} players`;
     row.innerHTML = `
       ${logoHTML("ml-logo", t.logo, t.name)}
       <span class="ml-name">${esc(t.name)}</span>
-      <span class="ml-sub">${money(teamPurse(t))} · ${teamCap(t)} players</span>
+      <span class="ml-sub">${sub}</span>
       <button class="icon-btn" data-edit-team="${t.id}" title="Edit">✎</button>
       <button class="icon-btn del" data-del-team="${t.id}" title="Delete">✕</button>`;
     tl.appendChild(row);
   });
 
-  // auction player list (retained players are managed separately, below)
+  // player list (retained players are managed separately, below). In auction
+  // mode this is the auction queue (order + base price); in non-auction mode
+  // it lists each player's squad + role, and the reorder arrows don't apply.
   const pl = $("#playerMiniList");
   pl.innerHTML = "";
   const queue = state.players.filter(p => !p.retained);
@@ -1080,23 +1115,36 @@ function renderSetup() {
   queue.forEach(p => {
     const row = document.createElement("div");
     row.className = "mini-row";
+    let sub, reorder;
+    if (noAuction) {
+      const t = getTeam(p.soldTo);
+      sub = `${t ? esc(t.name) : "Unassigned"}${p.role ? " · " + esc(p.role) : ""}`;
+      reorder = "";
+    } else {
+      sub = `${money(p.basePrice)} · ${p.status}`;
+      reorder = `
+      <button class="icon-btn" data-up="${p.id}" title="Move up">▲</button>
+      <button class="icon-btn" data-down="${p.id}" title="Move down">▼</button>`;
+    }
     row.innerHTML = `
       ${logoHTML("ml-logo", p.photo, p.name)}
       <span class="ml-name">${esc(p.name)}</span>
-      <span class="ml-sub">${money(p.basePrice)} · ${p.status}</span>
-      <button class="icon-btn" data-up="${p.id}" title="Move up">▲</button>
-      <button class="icon-btn" data-down="${p.id}" title="Move down">▼</button>
+      <span class="ml-sub">${sub}</span>${reorder}
       <button class="icon-btn" data-edit-player="${p.id}" title="Edit">✎</button>
       <button class="icon-btn del" data-del-player="${p.id}" title="Delete">✕</button>`;
     pl.appendChild(row);
   });
 
-  // retained team dropdown (preserve current selection)
-  const rt = $("#retainTeam");
-  const cur = rt.value;
-  rt.innerHTML = state.teams.length
+  // Team dropdowns (preserve current selection) - #pTeam for the non-auction
+  // Add Player form, #retainTeam for the auction retain form.
+  const teamOpts = state.teams.length
     ? state.teams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join("")
     : `<option value="">Add a team first</option>`;
+  const pt = $("#pTeam");
+  if (pt) { const curPt = pt.value; pt.innerHTML = teamOpts; if ([...pt.options].some(o => o.value === curPt)) pt.value = curPt; }
+  const rt = $("#retainTeam");
+  const cur = rt.value;
+  rt.innerHTML = teamOpts;
   if ([...rt.options].some(o => o.value === cur)) rt.value = cur;
 
   // retained player list
@@ -1157,6 +1205,7 @@ async function saveTeam() {
   clearTeamForm();
   save();
   renderAll();
+  publishTeamLogos(); // mirror the crest into the global registry for Rankings
   toast("Team saved", "good");
 }
 function editTeam(id) {
@@ -1201,8 +1250,15 @@ function deleteTeam(id) {
 async function savePlayer() {
   const name = $("#pName").value.trim();
   if (!name) { toast("Enter a player name", "bad"); return; }
-  const base = parseFloat($("#pBase").value);
-  if (isNaN(base) || base < 0) { toast("Enter a valid base price", "bad"); return; }
+  const noAuction = noAuctionMode();
+  // Auction tournaments need a base price; fixed-squad ones need a team instead.
+  const teamId = noAuction ? $("#pTeam").value : "";
+  const base = noAuction ? 0 : parseFloat($("#pBase").value);
+  if (noAuction) {
+    if (!getTeam(teamId)) { toast("Add a team first, then pick it here", "bad"); return; }
+  } else if (isNaN(base) || base < 0) {
+    toast("Enter a valid base price", "bad"); return;
+  }
   const role = $("#pRole").value.trim();
   const f = $("#pPhotoFile").files[0];
   let photo = null;
@@ -1212,8 +1268,22 @@ async function savePlayer() {
   const stats = readStatsForm();
   if (editId) {
     const p = getPlayer(editId);
-    if (p) { p.name = name; p.role = role; p.basePrice = base; if (photo) p.photo = photo;
-      if (stats) p.stats = stats; else delete p.stats; }
+    if (p) {
+      p.name = name; p.role = role;
+      if (noAuction) {
+        // Fixed-squad: player belongs directly to a team (no auction, no price).
+        p.status = "sold"; p.soldTo = teamId; p.soldPrice = null; p.basePrice = 0;
+      } else {
+        p.basePrice = base;
+      }
+      if (photo) p.photo = photo;
+      if (stats) p.stats = stats; else delete p.stats;
+    }
+  } else if (noAuction) {
+    // Not retained, so the squad shows its role (no RET tag) and no price.
+    const np = { id: uid(), name, role, basePrice: 0, photo: photo || "", status: "sold", soldTo: teamId, soldPrice: null };
+    if (stats) np.stats = stats;
+    state.players.push(np);
   } else {
     const np = { id: uid(), name, role, basePrice: base, photo: photo || "", status: "available", soldTo: null, soldPrice: null };
     if (stats) np.stats = stats;
@@ -1230,6 +1300,7 @@ function editPlayer(id) {
   $("#pName").value = p.name;
   $("#pRole").value = p.role || "";
   $("#pBase").value = p.basePrice;
+  if ($("#pTeam")) $("#pTeam").value = p.soldTo || "";
   fillStatsForm(p.stats);
   $("#playerFormTitle").textContent = "Edit Player";
   $("#btnSavePlayer").textContent = "Save Changes";
@@ -1239,6 +1310,7 @@ function editPlayer(id) {
 }
 function clearPlayerForm() {
   $("#playerEditId").value = ""; $("#pName").value = ""; $("#pRole").value = ""; $("#pBase").value = ""; $("#pPhotoFile").value = "";
+  if ($("#pTeam")) $("#pTeam").value = "";
   fillStatsForm(null);
   $("#playerFormTitle").textContent = "Add Player";
   $("#btnSavePlayer").textContent = "Add Player";

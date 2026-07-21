@@ -100,6 +100,30 @@
   // enforce who can publish. The bundled CSV is the fallback when no import
   // exists yet.
   let statsSyncStarted = false;
+
+  /* ---- global team-logo registry (ranking/logos/teams) ----
+     Mirrored by app.js (publishTeamLogos), keyed by team name. Read here so the
+     standalone board's crests don't depend on the currently-viewed tournament. */
+  let logoRegistry = [];        // [{ nameKey, name, logo }]
+  let logoSyncStarted = false;
+  function startLogoSync() {
+    const H = window.HCCL;
+    if (logoSyncStarted || !H || !H.configured || !H.user || !H.db || !H.fs) return;
+    const fs = H.fs;
+    if (!fs.collection || !fs.onSnapshot) return;
+    logoSyncStarted = true;
+    const col = fs.collection(H.db, "ranking", "logos", "teams");
+    fs.onSnapshot(col, snap => {
+      const out = [];
+      snap.forEach(doc => {
+        const d = doc.data() || {};
+        if (d.name && d.logo) out.push({ nameKey: String(d.name).toLowerCase(), name: d.name, logo: d.logo });
+      });
+      logoRegistry = out;
+      render();
+    }, err => console.error("ranking logos snapshot error:", err));
+  }
+
   function startStatsSync() {
     const H = window.HCCL;
     if (statsSyncStarted || !H || !H.configured || !H.user || !H.db || !H.fs) return;
@@ -193,15 +217,24 @@
     for (let i = 0; i < team.length; i++) h = (h * 31 + team.charCodeAt(i)) | 0;
     return TEAM_COLORS[Math.abs(h) % TEAM_COLORS.length];
   }
-  // Auction team logo if one matches (auction `state` is a top-level
-  // binding in app.js - same global scope, may not be loaded/synced yet).
+  // Team crest for a ranking row. The Rankings board is standalone (not tied to a
+  // tournament), so we resolve the logo from a GLOBAL registry (ranking/logos/teams,
+  // mirrored by app.js keyed by team name) - this survives tournament switches and
+  // "set default", unlike the old approach of reading the viewed tournament's
+  // state.teams. state.teams remains a fallback for fully-offline mode.
   function teamLogo(team) {
     try {
-      if (typeof state === "undefined" || !state || !Array.isArray(state.teams)) return "";
-      const kw = team.toLowerCase();
-      const t = state.teams.find(x => (x.name || "").toLowerCase().includes(kw));
-      return (t && t.logo) || "";
-    } catch (e) { return ""; }
+      const kw = String(team || "").toLowerCase();
+      if (!kw) return "";
+      // 1) Global registry (preferred - independent of which tournament is loaded).
+      for (const e of logoRegistry) { if (e.logo && e.nameKey.includes(kw)) return e.logo; }
+      // 2) Offline / not-yet-synced fallback: the currently-loaded auction teams.
+      if (typeof state !== "undefined" && state && Array.isArray(state.teams)) {
+        const t = state.teams.find(x => (x.name || "").toLowerCase().includes(kw));
+        if (t && t.logo) return t.logo;
+      }
+    } catch (e) {}
+    return "";
   }
   function teamIcon(team) {
     const logo = teamLogo(team);
@@ -330,10 +363,17 @@
     document.addEventListener("click", e => {
       if (e.target.closest('[data-tab="rankings"], [data-subtab="ranking"]')) render();
     });
-    // Subscribe to the shared imported CSV, and re-render when the signed-in
-    // role changes so the editor-only Import button shows/hides correctly.
+    // Subscribe to the shared imported CSV + the global team-logo registry, and
+    // re-render when the signed-in role changes so the editor-only Import button
+    // shows/hides correctly.
     if (window.HCCL && typeof window.HCCL.onChange === "function") {
-      window.HCCL.onChange(() => { startStatsSync(); render(); });
+      window.HCCL.onChange(() => { startStatsSync(); startLogoSync(); render(); });
+    }
+    // The board is standalone, but redraw on a tournament switch / "set default"
+    // so the offline-fallback crests refresh (the registry keeps cloud crests
+    // stable regardless).
+    if (window.HCCLSeries && typeof window.HCCLSeries.onChange === "function") {
+      window.HCCLSeries.onChange(() => render());
     }
     render();
   }

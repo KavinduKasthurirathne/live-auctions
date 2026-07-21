@@ -642,8 +642,8 @@
           </select>
         </label>
         <label class="ser-check">
-          <input type="checkbox" id="serHasAuction"${(editing ? editing.hasAuction !== false : true) ? " checked" : ""} />
-          <span>This tournament has a <b>player auction</b> (base prices &amp; team purses). Turn off for a fixed-squad tournament - the Auctions tab and all purse / base-price fields disappear for it.</span>
+          <input type="checkbox" id="serHasAuction"${(editing ? editing.hasAuction !== false : false) ? " checked" : ""} />
+          <span>This tournament has a <b>player auction</b> (base prices &amp; team purses). Leave off for a normal fixed-squad tournament - add teams &amp; players directly in Setup. Turn on only to run a live auction: the Auctions tab and all purse / base-price fields appear for it.</span>
         </label>
         <label>Tournament logo${editing && editing.logo ? " (leave empty to keep current)" : ""}
           <input type="file" id="serLogoFile" accept="image/*" />
@@ -908,8 +908,9 @@
   }
 
   /* ---- Squads ---- */
-  function auctionSquadsHtml() {
+  function auctionSquadsHtml(m) {
     const A = window.HCCLAuction, mfmt = A.money || (n => n);
+    const showPrice = !m || m.hasAuction !== false; // fixed-squad = no auction price
     return `<div class="squads-grid">${A.teams().map(t => {
       const sq = A.squad(t.id);
       const rows = sq.length ? sq.map(p => `
@@ -917,7 +918,7 @@
           <span class="mini-photo" style="${p.photo ? `background-image:url('${p.photo}')` : ""}">${p.photo ? "" : esc(initials(p.name))}</span>
           <span class="sr-name">${esc(p.name)}</span>
           ${p.retained ? `<span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : (p.role ? `<span class="sr-role">${esc(p.role)}</span>` : "")}
-          <span class="sr-price">${p.soldPrice ? mfmt(p.soldPrice) : ""}</span>
+          ${showPrice ? `<span class="sr-price">${p.soldPrice ? mfmt(p.soldPrice) : ""}</span>` : ""}
         </div>`).join("") : `<div class="squad-empty">No players yet.</div>`;
       return `<div class="squad-card">
         <div class="squad-head">${teamBadge(t.logo, t.name)}<div class="purse-name">${esc(t.name)}</div></div>
@@ -940,7 +941,7 @@
     const manage = (editorOn() && (cloudOn() || api.isLegacy(m.id)) && hasDataRoots(m))
       ? `<div class="hub-manage-row"><button class="btn btn-yellow" data-goto="setup">⚙️ Manage teams &amp; players</button>
          <span class="hint"></span></div>` : "";
-    if (isLiveViewed(m) && window.HCCLAuction.teams().length) return manage + auctionSquadsHtml();
+    if (isLiveViewed(m) && window.HCCLAuction.teams().length) return manage + auctionSquadsHtml(m);
     const rows = tournamentRows(m);
     if (rows && rows.length) {
       const groups = window.HCCLSeasonArchive.squadsFromRows(rows);
@@ -964,12 +965,14 @@
     if (isLiveViewed(m) && window.HCCLAuction.players().length) {
       const A = window.HCCLAuction, mfmt = A.money || (n => n);
       const ps = A.players();
+      // Fixed-squad tournaments have no auction price - drop the Price column.
+      const showPrice = m.hasAuction !== false;
       return `<div class="hub-table-wrap"><table class="hub-ptable">
-        <thead><tr><th>Player</th><th>Role</th><th>Team</th><th class="num">Price</th></tr></thead>
+        <thead><tr><th>Player</th><th>Role</th><th>Team</th>${showPrice ? `<th class="num">Price</th>` : ""}</tr></thead>
         <tbody>${ps.map(p => { const t = p.soldTo ? A.team(p.soldTo) : null; return `<tr>
           <td>${esc(p.name)}${p.retained ? ` <span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : ""}</td>
           <td>${esc(p.role || "—")}</td><td>${t ? esc(t.name) : (p.status === "available" ? "Available" : "—")}</td>
-          <td class="num">${p.soldPrice ? mfmt(p.soldPrice) : "—"}</td>
+          ${showPrice ? `<td class="num">${p.soldPrice ? mfmt(p.soldPrice) : "—"}</td>` : ""}
         </tr>`; }).join("")}</tbody></table></div>`;
     }
     const rows = tournamentRows(m);
