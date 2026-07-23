@@ -81,6 +81,35 @@
   }
   const fromLocalInput = v => { const t = Date.parse(v); return isFinite(t) ? t : 0; };
 
+  // A Test match runs over several days, so its date is a RANGE (start .. end),
+  // entered as two <input type="date"> and shown day-only (no kick-off time).
+  function toLocalDate(ms) {
+    if (!ms) return "";
+    const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000);
+    return isNaN(d) ? "" : d.toISOString().slice(0, 10);
+  }
+  // "YYYY-MM-DD" alone parses as UTC; pin it to local midnight so the day is stable.
+  const fromLocalDate = v => { const t = Date.parse(v + "T00:00"); return isFinite(t) ? t : 0; };
+  function fmtDay(ms) {
+    const d = new Date(ms);
+    return isNaN(d) ? "" : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  }
+  const yearOf = ms => { const d = new Date(ms); return isNaN(d) ? "" : d.getFullYear(); };
+
+  // The "when" line for a match. Test matches show the multi-day range; everything
+  // else keeps the single date-and-time.
+  function whenText(m) {
+    if (eng().isTestMatch(m) && m.scheduledAt) {
+      const start = fmtDay(m.scheduledAt);
+      if (m.endAt && m.endAt > m.scheduledAt) {
+        const days = Math.round((m.endAt - m.scheduledAt) / 86400000) + 1;
+        return `${start} – ${fmtDay(m.endAt)} ${yearOf(m.endAt)} · ${days} days`;
+      }
+      return `${start} ${yearOf(m.scheduledAt)}`;
+    }
+    return fmtDate(m.scheduledAt);
+  }
+
   const isDone = m => m.status === "completed";
   const visible = m => m.published !== false || canEdit();   // drafts: editors only
   const sortUpcoming = (a, b) => (a.scheduledAt || Infinity) - (b.scheduledAt || Infinity);
@@ -160,7 +189,7 @@
     return {
       id: uid(),
       homeTeamId: "", awayTeamId: "",
-      scheduledAt: 0, venue: "", format: "Last Man Stands",
+      scheduledAt: 0, endAt: 0, venue: "", format: "Last Man Stands",
       oversPerSide: 0,         // per-side over quota; drives the official NRR rule
       // Match type. Defaults from the tournament's setting so a Test tournament's
       // matches start as Test; the admin can still override per match below.
@@ -236,7 +265,7 @@
     return `<article class="fx-card" data-fx-open="${esc(m.id)}" tabindex="0" role="button" aria-label="Open match details">
       <header class="fx-card-head">
         <div class="fx-chips">${stageChip(m)}${statusChip(m)}${so}${draftChip(m)}</div>
-        <time class="fx-when">${esc(fmtDate(m.scheduledAt))}</time>
+        <time class="fx-when">${esc(whenText(m))}</time>
       </header>
       <div class="fx-teams">
         <div class="fx-team${hw}">
@@ -502,13 +531,23 @@
           ${stageNote}
         </label>
         <div class="fx-form-row">
-          <label>Date &amp; time
-            <input type="datetime-local" id="fxWhen" value="${esc(toLocalInput(d.scheduledAt))}" />
-          </label>
-          <label>Venue / location
-            <input type="text" id="fxVenue" placeholder="e.g. Stumps Arena" value="${esc(d.venue)}" />
-          </label>
+          ${isTest
+        ? `<label>Start date
+              <input type="date" id="fxStartDate" value="${esc(toLocalDate(d.scheduledAt))}" />
+            </label>
+            <label>End date <span class="fx-opt">(Test matches run over several days)</span>
+              <input type="date" id="fxEndDate" value="${esc(toLocalDate(d.endAt))}" />
+            </label>`
+        : `<label>Date &amp; time
+              <input type="datetime-local" id="fxWhen" value="${esc(toLocalInput(d.scheduledAt))}" />
+            </label>
+            <label>Venue / location
+              <input type="text" id="fxVenue" placeholder="e.g. Stumps Arena" value="${esc(d.venue)}" />
+            </label>`}
         </div>
+        ${isTest ? `<label>Venue / location
+          <input type="text" id="fxVenue" placeholder="e.g. Stumps Arena" value="${esc(d.venue)}" />
+        </label>` : ""}
         <div class="fx-form-row">
           <label>Format
             <select id="fxFormat">${fmtOpts}</select>
@@ -545,7 +584,10 @@
     const get = id => document.getElementById(id);
     if (get("fxHome")) d.homeTeamId = get("fxHome").value;
     if (get("fxAway")) d.awayTeamId = get("fxAway").value;
-    if (get("fxWhen")) d.scheduledAt = fromLocalInput(get("fxWhen").value);
+    // Limited overs: one datetime. Test: a start..end day range.
+    if (get("fxWhen")) { d.scheduledAt = fromLocalInput(get("fxWhen").value); d.endAt = 0; }
+    if (get("fxStartDate")) d.scheduledAt = fromLocalDate(get("fxStartDate").value);
+    if (get("fxEndDate")) d.endAt = fromLocalDate(get("fxEndDate").value);
     if (get("fxVenue")) d.venue = get("fxVenue").value.trim();
     if (get("fxMatchType")) d.isTest = get("fxMatchType").value === "test";
     if (get("fxFormat")) d.format = get("fxFormat").value;
@@ -561,6 +603,9 @@
     const d = modal.draft;
     if (!d.homeTeamId || !d.awayTeamId) return toast("Pick both teams", "bad");
     if (d.homeTeamId === d.awayTeamId) return toast("A team can't play itself", "bad");
+    if (d.isTest && d.endAt && d.scheduledAt && d.endAt < d.scheduledAt)
+      return toast("The end date can't be before the start date", "bad");
+    if (!d.isTest) d.endAt = 0;   // a limited-overs match has no range
     // Snapshot the squads from the auction data at save time.
     d.homeSquad = squadOf(d.homeTeamId);
     d.awaySquad = squadOf(d.awayTeamId);
@@ -662,12 +707,13 @@
     }
 
     const stage = eng().stageMeta(eng().stageOf(m));
+    const testM = eng().isTestMatch(m);
     const facts = `<dl class="fx-facts">
       <div><dt>Stage</dt><dd>${esc(stage.label)}</dd></div>
-      <div><dt>Date &amp; time</dt><dd>${esc(fmtDate(m.scheduledAt))}</dd></div>
+      <div><dt>${testM ? "Dates" : "Date &amp; time"}</dt><dd>${esc(whenText(m))}</dd></div>
       <div><dt>Venue</dt><dd>${esc(m.venue || "")}</dd></div>
-      <div><dt>Format</dt><dd>${esc(m.format || "")}</dd></div>
-      <div><dt>Overs per side</dt><dd>${esc(String(m.oversPerSide || eng().oversFromFormat(m.format) || ""))}</dd></div>
+      <div><dt>Format</dt><dd>${testM ? "Test match" : esc(m.format || "")}</dd></div>
+      ${testM ? "" : `<div><dt>Overs per side</dt><dd>${esc(String(m.oversPerSide || eng().oversFromFormat(m.format) || ""))}</dd></div>`}
       <div><dt>Toss</dt><dd>${esc(m.toss || "")}</dd></div>
     </dl>
     ${stage.table ? "" : `<p class="hint fx-hint-knockout">🏆 Knockout match  this result does not count towards the standings.</p>`}`;
