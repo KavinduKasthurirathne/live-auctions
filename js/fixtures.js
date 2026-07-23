@@ -162,6 +162,9 @@
       homeTeamId: "", awayTeamId: "",
       scheduledAt: 0, venue: "", format: "Last Man Stands",
       oversPerSide: 0,         // per-side over quota; drives the official NRR rule
+      // Match type. Defaults from the tournament's setting so a Test tournament's
+      // matches start as Test; the admin can still override per match below.
+      isTest: tournamentIsTest(),
       stage: eng() ? eng().DEFAULT_STAGE : "group",
       status: "scheduled", toss: "", notes: "",
       homeSquad: [], awaySquad: [],
@@ -263,11 +266,17 @@
   // can never disagree with how the table is actually scored.
   const pts = n => `${n} Point${n === 1 ? "" : "s"}`;
 
-  // Is the tournament we're viewing a Test championship? Drives the standings
-  // table, the result-entry form and the match detail.
-  function isTestMode() {
+  // Does the tournament we're in default to Test matches? Used to pre-select the
+  // Match type when creating a new fixture.
+  function tournamentIsTest() {
     const S = window.HCCLSeries;
-    if (S && typeof S.isTest === "function" && S.isTest()) return true;
+    return !!(S && typeof S.isTest === "function" && S.isTest());
+  }
+  // Is the CURRENT view a Test championship? Drives the standings table, the
+  // result-entry form and the match detail. True if the tournament is Test, or
+  // any visible match is individually flagged Test.
+  function isTestMode() {
+    if (tournamentIsTest()) return true;
     return matches.some(m => eng().isTestMatch(m));
   }
 
@@ -464,6 +473,12 @@
     const stageNote = eng().stageMeta(curStage).table
       ? `<span class="hint">✅ Group stage  the result <b>counts</b> towards the standings.</span>`
       : `<span class="hint fx-hint-knockout">🏆 Knockout  the result will <b>not</b> add points to the standings.</span>`;
+    // Match type. Test switches this match to the Test Championship points table
+    // (12/6/4/0 + per-innings bonuses, no NRR) and to two-innings result entry.
+    const isTest = !!d.isTest;
+    const typeNote = isTest
+      ? `<span class="hint fx-hint-test">🏏 Test  standings use win 12 &middot; draw 6 &middot; tie 4 &middot; loss 0 with per-innings bonuses. Overs don&rsquo;t affect the points; results are entered as two innings per team.</span>`
+      : `<span class="hint">Limited overs  standings use win 2 &middot; tie 1 &middot; loss 0 with net run rate.</span>`;
 
     const body = `
       <div class="fx-form">
@@ -475,6 +490,13 @@
             <select id="fxAway">${opts(d.awayTeamId, d.homeTeamId)}</select>
           </label>
         </div>
+        <label>Match type
+          <select id="fxMatchType">
+            <option value="limited"${isTest ? "" : " selected"}>Limited overs</option>
+            <option value="test"${isTest ? " selected" : ""}>Test match</option>
+          </select>
+          ${typeNote}
+        </label>
         <label>Match stage
           <select id="fxStage">${stageOpts}</select>
           ${stageNote}
@@ -495,11 +517,11 @@
             <select id="fxStatus">${statusOpts}</select>
           </label>
         </div>
-        <label>Overs per side <span class="fx-opt">(used for net run rate)</span>
+        ${isTest ? "" : `<label>Overs per side <span class="fx-opt">(used for net run rate)</span>
           <input type="number" min="0" step="1" id="fxOvers" placeholder="e.g. 6"
             value="${esc(String(d.oversPerSide || eng().oversFromFormat(d.format) || ""))}" />
           <span class="hint">A side bowled out early is charged its <b>full quota</b> in the NRR, per official rules. Imported Stumps reports fill this in automatically.</span>
-        </label>
+        </label>`}
         <label>Toss <span class="fx-opt">(optional)</span>
           <input type="text" id="fxToss" placeholder="e.g. Zyco Kings won the toss and chose to bat" value="${esc(d.toss)}" />
         </label>
@@ -525,6 +547,7 @@
     if (get("fxAway")) d.awayTeamId = get("fxAway").value;
     if (get("fxWhen")) d.scheduledAt = fromLocalInput(get("fxWhen").value);
     if (get("fxVenue")) d.venue = get("fxVenue").value.trim();
+    if (get("fxMatchType")) d.isTest = get("fxMatchType").value === "test";
     if (get("fxFormat")) d.format = get("fxFormat").value;
     if (get("fxOvers")) d.oversPerSide = Math.max(0, parseInt(get("fxOvers").value, 10) || 0);
     if (get("fxStage")) d.stage = get("fxStage").value;
@@ -1094,7 +1117,9 @@
   function onChange(e) {
     if (!modal) return;
     if (modal.type === "form") {
-      if (e.target.closest("#fxHome") || e.target.closest("#fxAway") || e.target.closest("#fxStage")) {
+      // Match type also re-renders: it shows/hides the Overs field and swaps note.
+      if (e.target.closest("#fxHome") || e.target.closest("#fxAway")
+        || e.target.closest("#fxStage") || e.target.closest("#fxMatchType")) {
         readForm();
         renderModal();
       }

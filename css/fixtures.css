@@ -199,7 +199,8 @@
 .fx-scorebox input { background: var(--panel); }
 
 /* --------------------- TEST match: innings & entry -------------------- */
-.fx-test-note { color: var(--yellow); }
+.fx-test-note, .fx-hint-test { color: var(--yellow); }
+.fx-hint-test b { color: var(--yellow); }
 .fx-inn-box { grid-template-columns: 1fr; }
 .fx-inn-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
 .fx-inn-allout { align-self: center; padding-bottom: 10px; }
