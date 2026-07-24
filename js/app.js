@@ -97,7 +97,6 @@ window.HCCLSync = (function () {
   return {
     isTerminal, backoff,
     onReconnect(cb) { cbs.add(cb); return () => cbs.delete(cb); },
-    online: () => navigator.onLine !== false,
   };
 })();
 
@@ -130,8 +129,6 @@ let auImgStarted = false;  // lazy image listeners attached for this generation
 let auImgLoaded = new Set();
 let auRetries = 0;         // consecutive transient failures (drives the backoff)
 let auSlow = false;        // watchdog tripped: still connecting, NOT fallen back
-let auFromCache = false;   // latest snapshot came from the local cache, not the server
-let auFellBackMsg = "";    // why we gave up (shown in the header chip)
 
 function auCanEdit() { const H = window.HCCL; return !H || !H.configured || H.canEdit(); }
 const auApi = () => window.HCCL && window.HCCL.fs;
@@ -216,13 +213,6 @@ function auNormPlayer(id, d) {
 }
 const auDropOrder = x => { const c = { ...x }; delete c.order; return c; };
 
-// Track whether what we're showing came off the local cache rather than the
-// server, so the header chip can say so honestly.
-function auNoteMeta(snap) {
-  const c = !!(snap && snap.metadata && snap.metadata.fromCache);
-  if (c !== auFromCache) { auFromCache = c; renderSyncChip(); }
-}
-
 function startAuctionSync() {
   const api = auApi();
   // Generation-tagged so anything armed before a tournament switch (or a
@@ -232,16 +222,16 @@ function startAuctionSync() {
 
   // --- core text docs: tiny, and all the board actually needs to render ---
   auUnsubs.push(api.onSnapshot(auCollRef("teams"),
-    snap => { auNoteMeta(snap); const items = snap.docs.map(s => auNormTeam(s.id, s.data())).sort((a, b) => a.order - b.order);
+    snap => {const items = snap.docs.map(s => auNormTeam(s.id, s.data())).sort((a, b) => a.order - b.order);
       auMirror.teams = auClone(items); state.teams = items.map(auDropOrder); auApplyImages(); auLoaded("teams"); }, auErr));
   auUnsubs.push(api.onSnapshot(auCollRef("players"),
-    snap => { auNoteMeta(snap); const items = snap.docs.map(s => auNormPlayer(s.id, s.data())).sort((a, b) => a.order - b.order);
+    snap => {const items = snap.docs.map(s => auNormPlayer(s.id, s.data())).sort((a, b) => a.order - b.order);
       auMirror.players = auClone(items); state.players = items.map(auDropOrder); auApplyImages(); auLoaded("players"); }, auErr));
   auUnsubs.push(api.onSnapshot(auStateRef("settings"),
-    snap => { auNoteMeta(snap); if (snap.exists()) { auMirror.settings = auClone(snap.data()); state.settings = { ...defaultState().settings, ...snap.data() }; }
+    snap => {if (snap.exists()) { auMirror.settings = auClone(snap.data()); state.settings = { ...defaultState().settings, ...snap.data() }; }
       else auMirror.settings = null; auLoaded("settings"); }, auErr));
   auUnsubs.push(api.onSnapshot(auStateRef("live"),
-    snap => { auNoteMeta(snap); if (snap.exists()) { const d = snap.data(); auMirror.live = auClone(d);
+    snap => {if (snap.exists()) { const d = snap.data(); auMirror.live = auClone(d);
         state.auction = { ...defaultState().auction, ...(d.auction || {}) };
         if (!Array.isArray(state.auction.bidLog)) state.auction.bidLog = [];
         state.lastAction = d.lastAction || null; }
@@ -265,15 +255,18 @@ function startAuctionImageSync() {
 }
 const auImgReady = () => auImgLoaded.size === 2;
 
-/* The watchdog only WARNS. It used to unsubscribe everything, which turned a
-   slow connection into a permanent "this device only" - Firestore would have
-   delivered seconds later. Skipped while the tab is hidden: a backgrounded
-   phone stalls its network while timers keep ticking. */
+/* The watchdog only notes that we're slow - it does NOT touch the UI and never
+   unsubscribes. Tearing the listeners down here is what used to turn a slow
+   connection into a permanent "this device only" seconds before Firestore would
+   have delivered. The flag it sets just lets a later reconnect know a retry is
+   worthwhile. Skipped while the tab is hidden: a backgrounded phone stalls its
+   network while timers keep ticking. */
 function auArmWatchdog(gen) {
   setTimeout(() => {
     if (gen !== auGen || auFsReady || auFellBack) return;
     if (document.hidden) { auArmWatchdog(gen); return; }  // re-arm, don't judge
-    auSlow = true; renderSyncChip();
+    auSlow = true;
+    console.warn("auction sync still connecting after 8s - listeners left open, Firestore keeps retrying");
   }, 8000);
 }
 
@@ -287,7 +280,6 @@ function auLoaded(which) {
     auFsReady = true;
     startAuctionImageSync();  // board is up; now stream the heavy images
   }
-  renderSyncChip();
   auRemote();
 }
 
@@ -314,7 +306,7 @@ function auRetryLater() {
   const gen = ++auGen;  // disarm the dead listeners' watchdog
   auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
   const wait = window.HCCLSync.backoff(auRetries++);
-  auSlow = true; renderSyncChip();
+  auSlow = true;
   setTimeout(() => {
     auRetryPending = false;
     if (gen === auGen && !auFellBack && auUsingFirestore) startAuctionSync();
@@ -333,8 +325,7 @@ function auFallback(msg) {
   // never show it while another tournament is being viewed.
   if (!auFsLoaded.size)
     state = (!window.HCCLSeries || window.HCCLSeries.isLegacy()) ? normalize(load()) : normalize(null);
-  toast(msg, "bad");
-  auFellBackMsg = msg; renderSyncChip();
+  toast(msg, "bad");   // the existing transient toast is the only user-facing signal
   fillSettingsInputs(); renderAll(); updateCloudUploadBtn();
 }
 
@@ -347,7 +338,7 @@ function auRetrySync() {
   if (!H || !H.configured || !H.user) return;
   auGen++;
   auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
-  auFellBack = false; auFellBackMsg = ""; auRetries = 0;
+  auFellBack = false; auRetries = 0;
   auUsingFirestore = true;
   startAuctionSync();
   updateCloudUploadBtn();
@@ -593,37 +584,6 @@ function toast(msg, kind = "") {
 /* Header status chip for live sync. A toast lasts 2.4s; someone who looks away
    during a slow load used to be left with an empty board and no explanation.
    This stays on screen for as long as the condition does, and offers a Retry. */
-let auChipSig = null;   // last painted state - this runs on every snapshot
-function renderSyncChip() {
-  const el = $("#syncChip"); if (!el) return;
-  const paint = (c, h) => {
-    const sig = c + "|" + h;
-    if (sig === auChipSig) return;                 // nothing changed; don't touch the DOM
-    auChipSig = sig;
-    el.className = c ? "sync-chip " + c : "sync-chip hidden";
-    el.innerHTML = h;
-    const b = $("#syncRetry"); if (b) b.onclick = auRetrySync;
-  };
-  const H = window.HCCL;
-  let cls = "", html = "";
-  if (!H || !H.configured || !H.user) { paint("", ""); return; }   // offline / signed-out
-  const offline = window.HCCLSync && !window.HCCLSync.online();
-  if (auFellBack) {                        // terminal: rules / no database
-    cls = "bad";
-    html = `<span>⚠ ${esc(auFellBackMsg || "Not synced")}</span><button class="sync-retry" id="syncRetry">Retry</button>`;
-  } else if (!auFsReady && auSlow) {       // nothing yet, and it's taking a while
-    cls = "warn";
-    html = offline
-      ? `<span>⚠ You're offline - reconnecting…</span>`
-      : `<span>⟳ Still connecting…</span><button class="sync-retry" id="syncRetry">Retry</button>`;
-  } else if (!auFsReady) {                 // normal first load
-    cls = "warn"; html = `<span>⟳ Connecting…</span>`;
-  } else if (auSlow || auFromCache) {      // we have data, but it isn't live
-    cls = "warn"; html = `<span>⚠ ${offline ? "You're offline" : "Not live"} - showing saved copy</span>`;
-  }
-  paint(cls, html);                        // cls "" => hidden (healthy)
-}
-
 /* ============================================================
    TABS
    ============================================================ */
@@ -1966,7 +1926,7 @@ function auOnSeriesChange(S) {
   auTid = tid;
   auGen++; // disarm any pending watchdog / retry from the old subscriptions
   auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
-  auFsReady = false; auFsLoaded.clear(); auFellBack = false; auFellBackMsg = "";
+  auFsReady = false; auFsLoaded.clear(); auFellBack = false;
   auImgStarted = false; auImgLoaded.clear();
   auRetries = 0; auSlow = false;
   auMirror.teams = []; auMirror.players = []; auMirror.settings = null; auMirror.live = null;
@@ -1993,7 +1953,7 @@ function init() {
       // If the role drops to viewer while Setup is open, kick back to Home.
       const setupView = $("#view-setup");
       if (!auCanEdit() && setupView && setupView.classList.contains("active")) switchTab("home");
-      renderAll(); updateCloudUploadBtn(); renderSyncChip(); // re-render so gating applies live
+      renderAll(); updateCloudUploadBtn(); // re-render so gating applies live
     });
   }
   // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
@@ -2001,7 +1961,6 @@ function init() {
   // Network / tab came back: retry the cloud instead of waiting for a reload.
   if (window.HCCLSync) window.HCCLSync.onReconnect(auRetrySync);
   syncAuctionMode();
-  renderSyncChip();
 }
 // Defer to DOMContentLoaded so the firebase-init.js MODULE (deferred) has already run
 // and exposed window.HCCL - otherwise the onChange hook above never registers and the
