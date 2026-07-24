@@ -67,6 +67,41 @@ function save() {
 }
 
 /* ============================================================
+   SHARED SYNC HELPERS (window.HCCLSync)
+   Used by this file, fantasy.js and fixtures.js - app.js loads first
+   (see index.html), same as window.HCCLAuction / window.HCCLSeries.
+
+   The key fact these exist for: onSnapshot's error callback is TERMINAL - the
+   listener is dead once it fires. So a transient error (a tunnel, a flaky
+   hotspot, a backgrounded phone) has to be answered with an explicit
+   resubscribe. Tearing the connection down and never retrying - which is what
+   this app used to do - turns a two-second blip into "this device only" until
+   the user reloads.
+   ============================================================ */
+window.HCCLSync = (function () {
+  // Terminal: retrying can't help, the setup itself is wrong. Everything else
+  // (unavailable, deadline-exceeded, resource-exhausted, internal, cancelled,
+  // aborted, and anything unrecognised) is treated as transient and retried.
+  const TERMINAL = new Set(["permission-denied", "not-found", "unauthenticated"]);
+  const isTerminal = err => TERMINAL.has(err && err.code);
+  // 2s, 4s, 8s, 16s, then every 30s.
+  const backoff = attempt => Math.min(30000, 2000 * Math.pow(2, Math.max(0, attempt)));
+
+  // Fire cb when the network or the tab comes back. Both matter: a phone that
+  // was backgrounded mid-load stalls its requests while timers keep running.
+  const cbs = new Set();
+  function wake() { cbs.forEach(cb => { try { cb(); } catch (e) { console.error(e); } }); }
+  window.addEventListener("online", wake);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) wake(); });
+
+  return {
+    isTerminal, backoff,
+    onReconnect(cb) { cbs.add(cb); return () => cbs.delete(cb); },
+    online: () => navigator.onLine !== false,
+  };
+})();
+
+/* ============================================================
    FIRESTORE REAL-TIME SYNC (Phase D)
    When Firebase is configured AND signed in, auction data lives in Firestore:
      auction/league/teams/{id}, auction/league/players/{id},
@@ -75,6 +110,12 @@ function save() {
    With no Firebase (or if unreachable) we stay on localStorage, as before.
    ============================================================ */
 const AU_COLLS = ["teams", "players"];
+// Readiness is gated on the CORE text docs only. The image collections are
+// base64 blobs (one doc per player/team) and can run to several MB on a full
+// roster - waiting for them before declaring the connection healthy is what
+// used to trip the "Live sync unavailable" fallback on mobile data, even though
+// the text data had already arrived. They now stream in afterwards.
+const AU_CORE = ["teams", "players", "settings", "live"];
 let auUsingFirestore = false;
 let auFsReady = false;
 const auFsLoaded = new Set();
@@ -85,6 +126,12 @@ let auSyncing = false, auSyncAgain = false;
 let auFellBack = false;
 let auGen = 0;      // subscription generation (bumped on every (re)subscribe)
 let auTid = null;   // tournament id the current subscriptions belong to
+let auImgStarted = false;  // lazy image listeners attached for this generation
+let auImgLoaded = new Set();
+let auRetries = 0;         // consecutive transient failures (drives the backoff)
+let auSlow = false;        // watchdog tripped: still connecting, NOT fallen back
+let auFromCache = false;   // latest snapshot came from the local cache, not the server
+let auFellBackMsg = "";    // why we gave up (shown in the header chip)
 
 function auCanEdit() { const H = window.HCCL; return !H || !H.configured || H.canEdit(); }
 const auApi = () => window.HCCL && window.HCCL.fs;
@@ -136,15 +183,20 @@ function publishTeamLogos() {
   });
 }
 // Build set/delete ops for an image collection by comparing current images to the mirror.
-function auDiffImages(coll, items, getImg, ops) {
+// `allowDeletes` is false until this collection's listener has delivered once:
+// deletions are inferred from the mirror, and an empty mirror during the lazy
+// image load would otherwise read as "every photo was removed". Set-ops stay
+// unconditional so a photo uploaded during that window is never dropped.
+function auDiffImages(coll, items, getImg, ops, allowDeletes) {
   const map = auImg[coll];
   const curIds = new Set(items.map(x => x.id));
   items.forEach(x => {
     const img = getImg(x) || "";
     if (img && map.get(x.id) !== img) ops.push({ t: "set", ref: auItemRef(coll, x.id), data: { data: img } });
-    else if (!img && map.has(x.id)) ops.push({ t: "del", ref: auItemRef(coll, x.id) });
+    else if (!img && map.has(x.id) && allowDeletes) ops.push({ t: "del", ref: auItemRef(coll, x.id) });
   });
-  map.forEach((_, id) => { if (!curIds.has(id)) ops.push({ t: "del", ref: auItemRef(coll, id) }); });
+  if (allowDeletes)
+    map.forEach((_, id) => { if (!curIds.has(id)) ops.push({ t: "del", ref: auItemRef(coll, id) }); });
 }
 
 function auNormTeam(id, d) {
@@ -164,56 +216,141 @@ function auNormPlayer(id, d) {
 }
 const auDropOrder = x => { const c = { ...x }; delete c.order; return c; };
 
+// Track whether what we're showing came off the local cache rather than the
+// server, so the header chip can say so honestly.
+function auNoteMeta(snap) {
+  const c = !!(snap && snap.metadata && snap.metadata.fromCache);
+  if (c !== auFromCache) { auFromCache = c; renderSyncChip(); }
+}
+
 function startAuctionSync() {
   const api = auApi();
+  // Generation-tagged so anything armed before a tournament switch (or a
+  // resubscribe) can't act against the NEW subscriptions.
+  const gen = ++auGen;
+  auImgStarted = false; auImgLoaded.clear();
+
+  // --- core text docs: tiny, and all the board actually needs to render ---
   auUnsubs.push(api.onSnapshot(auCollRef("teams"),
-    snap => { const items = snap.docs.map(s => auNormTeam(s.id, s.data())).sort((a, b) => a.order - b.order);
+    snap => { auNoteMeta(snap); const items = snap.docs.map(s => auNormTeam(s.id, s.data())).sort((a, b) => a.order - b.order);
       auMirror.teams = auClone(items); state.teams = items.map(auDropOrder); auApplyImages(); auLoaded("teams"); }, auErr));
   auUnsubs.push(api.onSnapshot(auCollRef("players"),
-    snap => { const items = snap.docs.map(s => auNormPlayer(s.id, s.data())).sort((a, b) => a.order - b.order);
+    snap => { auNoteMeta(snap); const items = snap.docs.map(s => auNormPlayer(s.id, s.data())).sort((a, b) => a.order - b.order);
       auMirror.players = auClone(items); state.players = items.map(auDropOrder); auApplyImages(); auLoaded("players"); }, auErr));
-  auUnsubs.push(api.onSnapshot(auCollRef("playerPhotos"),
-    snap => { auImg.playerPhotos = new Map(snap.docs.map(s => [s.id, s.data().data || ""]));
-      auApplyImages(); auLoaded("playerPhotos"); }, auErr));
-  auUnsubs.push(api.onSnapshot(auCollRef("teamLogos"),
-    snap => { auImg.teamLogos = new Map(snap.docs.map(s => [s.id, s.data().data || ""]));
-      auApplyImages(); auLoaded("teamLogos"); }, auErr));
   auUnsubs.push(api.onSnapshot(auStateRef("settings"),
-    snap => { if (snap.exists()) { auMirror.settings = auClone(snap.data()); state.settings = { ...defaultState().settings, ...snap.data() }; }
+    snap => { auNoteMeta(snap); if (snap.exists()) { auMirror.settings = auClone(snap.data()); state.settings = { ...defaultState().settings, ...snap.data() }; }
       else auMirror.settings = null; auLoaded("settings"); }, auErr));
   auUnsubs.push(api.onSnapshot(auStateRef("live"),
-    snap => { if (snap.exists()) { const d = snap.data(); auMirror.live = auClone(d);
+    snap => { auNoteMeta(snap); if (snap.exists()) { const d = snap.data(); auMirror.live = auClone(d);
         state.auction = { ...defaultState().auction, ...(d.auction || {}) };
         if (!Array.isArray(state.auction.bidLog)) state.auction.bidLog = [];
         state.lastAction = d.lastAction || null; }
       else auMirror.live = null; auLoaded("live"); }, auErr));
-  // Generation-tagged so a timer armed before a tournament switch can't
-  // trigger a bogus fallback against the NEW subscriptions.
-  const gen = ++auGen;
-  setTimeout(() => { if (gen === auGen) auFallback("Live sync unavailable - this device only"); }, 6000);
+
+  auArmWatchdog(gen);
 }
+
+/* Photos & logos: megabytes of base64, subscribed only AFTER the board has
+   rendered. Squads show their initials placeholder until these land. */
+function startAuctionImageSync() {
+  if (auImgStarted) return;
+  auImgStarted = true;
+  const api = auApi();
+  auUnsubs.push(api.onSnapshot(auCollRef("playerPhotos"),
+    snap => { auImg.playerPhotos = new Map(snap.docs.map(s => [s.id, s.data().data || ""]));
+      auImgLoaded.add("playerPhotos"); auApplyImages(); auRemote(); }, auErr));
+  auUnsubs.push(api.onSnapshot(auCollRef("teamLogos"),
+    snap => { auImg.teamLogos = new Map(snap.docs.map(s => [s.id, s.data().data || ""]));
+      auImgLoaded.add("teamLogos"); auApplyImages(); auRemote(); }, auErr));
+}
+const auImgReady = () => auImgLoaded.size === 2;
+
+/* The watchdog only WARNS. It used to unsubscribe everything, which turned a
+   slow connection into a permanent "this device only" - Firestore would have
+   delivered seconds later. Skipped while the tab is hidden: a backgrounded
+   phone stalls its network while timers keep ticking. */
+function auArmWatchdog(gen) {
+  setTimeout(() => {
+    if (gen !== auGen || auFsReady || auFellBack) return;
+    if (document.hidden) { auArmWatchdog(gen); return; }  // re-arm, don't judge
+    auSlow = true; renderSyncChip();
+  }, 8000);
+}
+
 function auLoaded(which) {
   auFsLoaded.add(which);
-  if (!auFsReady && auFsLoaded.size === 6) auFsReady = true;
+  auRetries = 0; auSlow = false;
+  // Not just on the false->true edge: a transient retry resubscribes the core
+  // listeners while auFsReady is still true, and the images (dropped along with
+  // them) have to come back too. startAuctionImageSync is idempotent.
+  if (AU_CORE.every(c => auFsLoaded.has(c))) {
+    auFsReady = true;
+    startAuctionImageSync();  // board is up; now stream the heavy images
+  }
+  renderSyncChip();
   auRemote();
 }
+
 function auErr(err) {
   console.error("auction snapshot error:", err);
+  // onSnapshot's error callback is terminal - this listener is already dead.
+  // Drop the whole set and resubscribe as one, so all six stay in step.
+  if (window.HCCLSync && !window.HCCLSync.isTerminal(err)) { auRetryLater(); return; }
   const code = err && err.code;
   auFallback(code === "permission-denied" ? "Cloud blocked: publish the latest Firestore rules"
     : code === "not-found" ? "Firestore database not created yet"
     : "Live sync unavailable - this device only");
 }
+
+/* Transient failure: keep cloud mode on (so edits still queue through
+   Firestore) and resubscribe with backoff.
+   Debounced: when the network drops, EVERY listener's error callback fires, and
+   without the guard four of them would each cancel the previous retry and count
+   four failures against the backoff - jumping straight to a 16s wait. */
+let auRetryPending = false;
+function auRetryLater() {
+  if (auFellBack || !auUsingFirestore || auRetryPending) return;
+  auRetryPending = true;
+  const gen = ++auGen;  // disarm the dead listeners' watchdog
+  auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+  const wait = window.HCCLSync.backoff(auRetries++);
+  auSlow = true; renderSyncChip();
+  setTimeout(() => {
+    auRetryPending = false;
+    if (gen === auGen && !auFellBack && auUsingFirestore) startAuctionSync();
+  }, wait);
+}
+
+/* Terminal failure only (bad rules, no database). */
 function auFallback(msg) {
   if (auFellBack || auFsReady) return;
   auFellBack = true;
   auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
   auUsingFirestore = false;
-  // The local backup only holds the LEGACY tournament - never show it while
-  // another tournament is being viewed.
-  state = (!window.HCCLSeries || window.HCCLSeries.isLegacy()) ? normalize(load()) : normalize(null);
+  // Only blank the board if nothing ever arrived. With the persistent cache a
+  // snapshot usually HAS landed, and wiping it was what left users staring at
+  // an empty auction. The local backup only holds the LEGACY tournament, so
+  // never show it while another tournament is being viewed.
+  if (!auFsLoaded.size)
+    state = (!window.HCCLSeries || window.HCCLSeries.isLegacy()) ? normalize(load()) : normalize(null);
   toast(msg, "bad");
+  auFellBackMsg = msg; renderSyncChip();
   fillSettingsInputs(); renderAll(); updateCloudUploadBtn();
+}
+
+/* Network or tab came back, or the user tapped Retry: try the cloud again.
+   Recovery no longer needs a page reload. */
+function auRetrySync() {
+  if (!auUsingFirestore && !auFellBack) { auMaybeStartSync(); return; }
+  if (auFsReady && !auSlow) return;              // already healthy
+  const H = window.HCCL;
+  if (!H || !H.configured || !H.user) return;
+  auGen++;
+  auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+  auFellBack = false; auFellBackMsg = ""; auRetries = 0;
+  auUsingFirestore = true;
+  startAuctionSync();
+  updateCloudUploadBtn();
 }
 function auRemote() {
   updateCloudUploadBtn();
@@ -223,6 +360,13 @@ function auRemote() {
   fillSettingsInputs(); renderAll();
 }
 
+/* NOTE ON await: with the persistent cache enabled, batch.commit() resolves
+   only when the SERVER acks. Awaiting the commits in series would leave
+   auSyncing pinned true for the whole time a device is offline, and every later
+   save would collapse into auSyncAgain and never replay. So the batches are
+   fired and the lock is released once they're ENQUEUED - the SDK preserves
+   per-client write order, and Firestore's own queue flushes them on reconnect.
+   Failures are reported from allSettled below. */
 async function auctionSyncDiff() {
   if (!auFsReady) return;                 // never push until we have the server baseline
   if (auSyncing) { auSyncAgain = true; return; }
@@ -250,18 +394,24 @@ async function auctionSyncDiff() {
       ops.push({ t: "set", ref: auStateRef("live"), data: auClone(live) });
     // Images go to their own one-per-doc collections (kept out of the text docs above).
     const imgOps = [];
-    auDiffImages("playerPhotos", state.players, p => p.photo, imgOps);
-    auDiffImages("teamLogos",   state.teams,   t => t.logo,  imgOps);
+    const canDelImg = auImgReady();
+    auDiffImages("playerPhotos", state.players, p => p.photo, imgOps, canDelImg);
+    auDiffImages("teamLogos",   state.teams,   t => t.logo,  imgOps, canDelImg);
+    const commits = [];
     for (let i = 0; i < ops.length; i += 50) {   // text docs are light
       const batch = api.writeBatch(auDb());
       ops.slice(i, i + 50).forEach(op => op.t === "set" ? batch.set(op.ref, op.data) : batch.delete(op.ref));
-      await batch.commit();
+      commits.push(batch.commit());
     }
     for (let i = 0; i < imgOps.length; i += 6) {  // images are big - tiny batches stay under the request-size cap
       const batch = api.writeBatch(auDb());
       imgOps.slice(i, i + 6).forEach(op => op.t === "set" ? batch.set(op.ref, op.data) : batch.delete(op.ref));
-      await batch.commit();
+      commits.push(batch.commit());
     }
+    Promise.allSettled(commits).then(rs => {
+      const bad = rs.find(r => r.status === "rejected");
+      if (bad) { console.error("auction sync failed:", bad.reason); toast("Couldn't save to the cloud", "bad"); }
+    });
     auMirror.teams = auClone(state.teams.map((t, i) => ({ ...t, order: i })));
     auMirror.players = auClone(state.players.map((p, i) => ({ ...p, order: i })));
     auMirror.settings = auClone(state.settings);
@@ -438,6 +588,40 @@ function toast(msg, kind = "") {
   t.className = "toast " + kind;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.add("hidden"), 2400);
+}
+
+/* Header status chip for live sync. A toast lasts 2.4s; someone who looks away
+   during a slow load used to be left with an empty board and no explanation.
+   This stays on screen for as long as the condition does, and offers a Retry. */
+let auChipSig = null;   // last painted state - this runs on every snapshot
+function renderSyncChip() {
+  const el = $("#syncChip"); if (!el) return;
+  const paint = (c, h) => {
+    const sig = c + "|" + h;
+    if (sig === auChipSig) return;                 // nothing changed; don't touch the DOM
+    auChipSig = sig;
+    el.className = c ? "sync-chip " + c : "sync-chip hidden";
+    el.innerHTML = h;
+    const b = $("#syncRetry"); if (b) b.onclick = auRetrySync;
+  };
+  const H = window.HCCL;
+  let cls = "", html = "";
+  if (!H || !H.configured || !H.user) { paint("", ""); return; }   // offline / signed-out
+  const offline = window.HCCLSync && !window.HCCLSync.online();
+  if (auFellBack) {                        // terminal: rules / no database
+    cls = "bad";
+    html = `<span>⚠ ${esc(auFellBackMsg || "Not synced")}</span><button class="sync-retry" id="syncRetry">Retry</button>`;
+  } else if (!auFsReady && auSlow) {       // nothing yet, and it's taking a while
+    cls = "warn";
+    html = offline
+      ? `<span>⚠ You're offline - reconnecting…</span>`
+      : `<span>⟳ Still connecting…</span><button class="sync-retry" id="syncRetry">Retry</button>`;
+  } else if (!auFsReady) {                 // normal first load
+    cls = "warn"; html = `<span>⟳ Connecting…</span>`;
+  } else if (auSlow || auFromCache) {      // we have data, but it isn't live
+    cls = "warn"; html = `<span>⚠ ${offline ? "You're offline" : "Not live"} - showing saved copy</span>`;
+  }
+  paint(cls, html);                        // cls "" => hidden (healthy)
 }
 
 /* ============================================================
@@ -1780,9 +1964,11 @@ function auOnSeriesChange(S) {
   if (!auUsingFirestore) { auMaybeStartSync(); return; }
   if (tid === auTid) return;
   auTid = tid;
-  auGen++; // disarm any pending fallback timer from the old subscriptions
+  auGen++; // disarm any pending watchdog / retry from the old subscriptions
   auUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
-  auFsReady = false; auFsLoaded.clear(); auFellBack = false;
+  auFsReady = false; auFsLoaded.clear(); auFellBack = false; auFellBackMsg = "";
+  auImgStarted = false; auImgLoaded.clear();
+  auRetries = 0; auSlow = false;
   auMirror.teams = []; auMirror.players = []; auMirror.settings = null; auMirror.live = null;
   auImg.playerPhotos = new Map(); auImg.teamLogos = new Map();
   state = normalize(null); // blank while the new tournament streams in
@@ -1807,12 +1993,15 @@ function init() {
       // If the role drops to viewer while Setup is open, kick back to Home.
       const setupView = $("#view-setup");
       if (!auCanEdit() && setupView && setupView.classList.contains("active")) switchTab("home");
-      renderAll(); updateCloudUploadBtn(); // re-render so gating applies live
+      renderAll(); updateCloudUploadBtn(); renderSyncChip(); // re-render so gating applies live
     });
   }
   // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
   if (window.HCCLSeries) window.HCCLSeries.onChange(auOnSeriesChange);
+  // Network / tab came back: retry the cloud instead of waiting for a reload.
+  if (window.HCCLSync) window.HCCLSync.onReconnect(auRetrySync);
   syncAuctionMode();
+  renderSyncChip();
 }
 // Defer to DOMContentLoaded so the firebase-init.js MODULE (deferred) has already run
 // and exposed window.HCCL - otherwise the onChange hook above never registers and the

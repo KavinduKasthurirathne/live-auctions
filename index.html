@@ -40,7 +40,14 @@
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
       <button class="tab" data-tab="setup">⚙️ Setup</button>
     </nav>
-    <div class="auth-box" id="authBox"></div>
+    <!-- Chip + auth share ONE wrapper so they count as a single flex item in the
+         wrapping header row - as separate children the chip pushed the row over
+         its width and dropped the whole group onto a second line. -->
+    <div class="header-right">
+      <!-- Live-sync status. Empty (and invisible) while everything is healthy. -->
+      <div class="sync-chip hidden" id="syncChip"></div>
+      <div class="auth-box" id="authBox"></div>
+    </div>
     <!-- Mobile only: opens the drawer. While it's open the drawer's own ✕ sits
          in this exact spot, so the icon reads as a hamburger that became a close. -->
     <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="tabs">

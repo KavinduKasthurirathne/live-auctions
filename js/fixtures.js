@@ -31,6 +31,7 @@
   let syncStarted = false;
   let fxUnsub = null;          // active snapshot listener (dropped on tournament switch)
   let fxTid = null;            // tournament id the listener belongs to
+  let fxRetries = 0;           // consecutive transient failures (drives the backoff)
   // Tournament namespace (js/series.js): [] = legacy root, else ["tournaments", tid].
   const fxPrefix = () => (window.HCCLSeries ? window.HCCLSeries.prefix() : []);
   const fxIsLegacy = () => !window.HCCLSeries || window.HCCLSeries.isLegacy();
@@ -139,15 +140,33 @@
       const docs = [];
       snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
       matches = docs;
+      fxRetries = 0;
       render();
     }, err => {
       console.error("matches snapshot error:", err);
+      // onSnapshot's error callback is terminal, so a transient failure needs an
+      // explicit resubscribe - dropping to "this device only" on the first blip
+      // (with no retry) is what stranded users until they reloaded.
+      if (window.HCCLSync && !window.HCCLSync.isTerminal(err)) { fxRetryLater(); return; }
       cloud = false; syncStarted = false;
       // The local backup only holds the LEGACY tournament's matches.
       if (fxIsLegacy()) loadLocal(); else matches = [];
       toast("Match sync unavailable - this device only", "bad");
       render();
     });
+  }
+
+  /* Transient failure: resubscribe with backoff, generation-tagged so a
+     tournament switch in the meantime cancels it. */
+  function fxRetryLater() {
+    if (fxUnsub) { try { fxUnsub(); } catch (e) {} fxUnsub = null; }
+    syncStarted = false;
+    const tid = fxTid;
+    const wait = window.HCCLSync.backoff(fxRetries++);
+    setTimeout(() => {
+      if (tid !== fxTid || syncStarted) return;   // switched tournaments, or already back
+      startSync();
+    }, wait);
   }
 
   /* Viewed tournament changed (js/series.js): drop the listener, resubscribe. */
@@ -1213,6 +1232,8 @@
     }
     // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
     if (window.HCCLSeries) window.HCCLSeries.onChange(onSeriesChange);
+    // Network / tab came back: retry the cloud instead of waiting for a reload.
+    if (window.HCCLSync) window.HCCLSync.onReconnect(() => { fxRetries = 0; startSync(); });
     render();
   }
 

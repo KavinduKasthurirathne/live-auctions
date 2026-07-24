@@ -11,7 +11,8 @@ import {
   signOut, onAuthStateChanged, setPersistence, browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp,
+  initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
+  doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp,
   collection, getDocs, writeBatch, query, orderBy, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -219,7 +220,23 @@ try {
     // plain XHR long-polling on restrictive networks/proxies. (Does NOT defeat
     // a deliberate ad-block rule on firestore.googleapis.com - that needs the
     // user to whitelist the site.)
-    const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+    //
+    // Persistent (IndexedDB) cache: onSnapshot then fires IMMEDIATELY from disk
+    // on a repeat visit, so the app paints before the network is even consulted
+    // and an offline reload shows real data instead of an empty board. Must use
+    // the MULTI-tab manager - the single-tab one throws the moment a second tab
+    // is opened. Falls back to the in-memory cache where IndexedDB is
+    // unavailable (private browsing, locked-down browsers).
+    let db;
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        experimentalAutoDetectLongPolling: true,
+      });
+    } catch (e) {
+      console.warn("persistent cache unavailable, using in-memory cache:", e);
+      db = getFirestore(app);
+    }
     const provider = new GoogleAuthProvider();
 
     window.HCCL.configured = true;

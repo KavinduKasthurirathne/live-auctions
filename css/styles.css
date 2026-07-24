@@ -505,6 +505,32 @@ html.nav-locked { overflow: hidden; }
   .auth-btn { padding: 8px 10px; font-size: 12px; }
 }
 
+/* ===================== LIVE-SYNC STATUS CHIP ===================== */
+/* Sits beside the auth box. Hidden whenever live sync is healthy, so it only
+   ever appears to explain something the user would otherwise have to guess. */
+.header-right { display: flex; align-items: center; gap: 10px; }
+.sync-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px; border: 1px solid var(--border);
+  background: var(--panel-3); color: var(--muted);
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.sync-chip.warn { color: var(--gold); border-color: rgba(212, 175, 55, 0.45); }
+.sync-chip.bad  { color: #ff9a9a; border-color: rgba(255, 120, 120, 0.45); }
+.sync-retry {
+  background: transparent; border: 1px solid currentColor; color: inherit;
+  border-radius: 999px; padding: 2px 9px;
+  font: inherit; font-size: 11px; cursor: pointer;
+}
+.sync-retry:hover { filter: brightness(1.15); }
+@media (max-width: 560px) {
+  /* The header is tight on phones - keep the state, drop the wording. */
+  .header-right { gap: 6px; }
+  .sync-chip { padding: 6px 9px; font-size: 11px; }
+  .sync-chip span { max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
 /* ===================== AUTH (sign-in + roles) ===================== */
 .auth-box { display: flex; align-items: center; min-height: 40px; }
 .auth-connecting { color: var(--muted); font-size: 13px; }

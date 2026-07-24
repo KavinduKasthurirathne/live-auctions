@@ -1,13 +1,13 @@
 /* ============================================================
    HCCL Fantasy League  (self-contained - does not touch the auction)
    Stored separately in localStorage under "hccl_fantasy_v1".
-   Reads the auction key only for the optional "Import" button.
+   Reads the live auction (window.HCCLAuction) only for the optional
+   "Import from auction" button.
    ============================================================ */
 (function () {
   "use strict";
 
   const FKEY = "hccl_fantasy_v1";
-  const AKEY = "hccl_auction_v1";
 
   /* ---------------- state ---------------- */
   function defaultFantasy() {
@@ -61,6 +61,7 @@
   let pendingRender = false;           // defer re-render while an editor is typing
   let fsSyncing = false, fsSyncAgain = false;
   let fsFellBack = false, fsFellBackMsg = "";  // cloud unreachable -> local-only
+  let fsRetries = 0;  // consecutive transient failures (drives the backoff)
   let fsGen = 0;      // subscription generation (bumped on every (re)subscribe)
   let fanTid = null;  // tournament id the current subscriptions belong to
 
@@ -90,16 +91,40 @@
     return { id, name: d.name || "" }; // teams, contestants
   }
 
+  /* Terminal failure only (bad rules, no database). Never called for a merely
+     slow or flaky connection - see fanRetryLater. */
   function fallbackToLocal(msg) {
     if (fsFellBack || fsReady) return;     // already loaded fine, or already fell back
     fsFellBack = true; fsFellBackMsg = msg;
     fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
     usingFirestore = false;
-    // The local backup only holds the LEGACY tournament's fantasy data.
-    F = (!window.HCCLSeries || window.HCCLSeries.isLegacy()) ? loadF() : defaultFantasy();
+    // Only blank the board if nothing ever arrived - with the persistent cache
+    // a snapshot usually HAS landed. The local backup only holds the LEGACY
+    // tournament's fantasy data.
+    if (!fsLoaded.size)
+      F = (!window.HCCLSeries || window.HCCLSeries.isLegacy()) ? loadF() : defaultFantasy();
     ftoast(msg, "bad");
     renderFantasy();
   }
+
+  /* Transient failure: onSnapshot's error callback is terminal, so the dead
+     listeners are dropped and the whole set resubscribed with backoff. Cloud
+     mode stays ON, so edits keep queueing through Firestore.
+     Debounced - all four collections error together when the network drops, and
+     un-guarded they'd each cancel the previous retry and inflate the backoff. */
+  let fsRetryPending = false;
+  function fanRetryLater() {
+    if (fsFellBack || !usingFirestore || fsRetryPending) return;
+    fsRetryPending = true;
+    const gen = ++fsGen;
+    fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+    const wait = window.HCCLSync ? window.HCCLSync.backoff(fsRetries++) : 4000;
+    setTimeout(() => {
+      fsRetryPending = false;
+      if (gen === fsGen && !fsFellBack && usingFirestore) startFantasySync();
+    }, wait);
+  }
+
   function startFantasySync() {
     const api = fsApi(), db = fsDb();
     const gen = ++fsGen;
@@ -110,11 +135,13 @@
           fsMirror[coll] = clone(items);
           F[coll] = items;
           fsLoaded.add(coll);
+          fsRetries = 0;
           if (!fsReady && fsLoaded.size === FS_COLLS.length) fsReady = true;
           onRemoteChange();
         },
         err => {
           console.error("fantasy snapshot error:", coll, err);
+          if (window.HCCLSync && !window.HCCLSync.isTerminal(err)) { fanRetryLater(); return; }
           const code = err && err.code;
           fallbackToLocal(
             code === "permission-denied" ? "Cloud blocked: publish the latest Firestore rules"
@@ -124,10 +151,20 @@
       );
       fsUnsubs.push(unsub);
     });
-    // If Firestore just hangs (blocked/offline, no error fired), don't sit on
-    // "Loading…". Generation-tagged so a timer armed before a tournament
-    // switch can't trip a bogus fallback against the NEW subscriptions.
-    setTimeout(() => { if (gen === fsGen) fallbackToLocal("Live sync unavailable - this device only"); }, 6000);
+  }
+
+  /* Network or tab came back: try the cloud again rather than making the user
+     reload. */
+  function fanRetrySync() {
+    const H = window.HCCL;
+    if (!H || !H.configured || !H.user) return;
+    if (!usingFirestore && !fsFellBack) { fanMaybeStartSync(); return; }
+    if (fsReady) return;                 // already healthy
+    fsGen++;
+    fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+    fsFellBack = false; fsFellBackMsg = ""; fsRetries = 0;
+    usingFirestore = true;
+    startFantasySync();
   }
 
   /* Start syncing once BOTH auth (HCCL) and the tournament registry
@@ -148,9 +185,9 @@
     if (!usingFirestore) { fanMaybeStartSync(); return; }
     if (tid === fanTid) return;
     fanTid = tid;
-    fsGen++; // disarm any pending fallback timer
+    fsGen++; // disarm any pending retry from the old subscriptions
     fsUnsubs.splice(0).forEach(u => { try { u(); } catch (e) {} });
-    fsReady = false; fsLoaded.clear(); fsFellBack = false; fsFellBackMsg = "";
+    fsReady = false; fsLoaded.clear(); fsFellBack = false; fsFellBackMsg = ""; fsRetries = 0;
     fsMirror.teams = []; fsMirror.players = []; fsMirror.contestants = []; fsMirror.days = [];
     F = defaultFantasy();
     UI.dayId = null; UI.editEntryId = null; UI.editTeamId = null; UI.editPlayerId = null;
@@ -215,6 +252,9 @@
   const fDay = id => F.days.find(d => d.id === id);
   const pname = id => { const p = fPlayer(id); return p ? p.name : ""; };
   const teamName = id => { const t = fTeam(id); return t ? t.name : "-"; };
+  // Does the VIEWED tournament run an auction? Only labelling - a fixed-squad
+  // tournament imports exactly the same way (its players are status:"sold" too).
+  const fanHasAuction = () => !window.HCCLSeries || window.HCCLSeries.hasAuction();
   // Team logo for the Player of the Season board: resolved from the generated
   // js/asset-manifest.js (tools/gen-assets.js), which indexes every league's
   // badge folder by lowercased basename - same set the MVP / home boards use.
@@ -655,8 +695,10 @@
       </div>
 
       <div class="card"><h3>Data &amp; Backup</h3>
-        <p class="hint">Pull tournament teams &amp; players straight from your auction squads (sold + retained).</p>
-        <div class="form-row"><button class="btn btn-yellow" data-import-auction>⬇ Import from auction</button></div>
+        <p class="hint">${fanHasAuction()
+          ? "Pull tournament teams &amp; players straight from your auction squads (sold + retained)."
+          : "Pull tournament teams &amp; players straight from this tournament's squads."}</p>
+        <div class="form-row"><button class="btn btn-yellow" data-import-auction>⬇ ${fanHasAuction() ? "Import from auction" : "Import squads"}</button></div>
         <hr/>
         <div class="form-row"><button class="btn btn-dark" data-export>Export fantasy backup</button>
           <label class="btn btn-dark file-btn">Import backup<input type="file" id="fanImportFile" accept="application/json" hidden/></label></div>
@@ -825,13 +867,23 @@
     saveF(); renderFanBody();
   }
 
+  /* Import the squads of the tournament currently being VIEWED.
+     Reads the live auction state through window.HCCLAuction (js/app.js), which
+     follows HCCLSeries - NOT localStorage. In cloud mode app.js deliberately
+     stops writing the local auction backup (Firestore is the source of truth),
+     and it never writes it at all for a non-legacy tournament, so the old
+     localStorage read here saw a stale blob and reported "nothing sold". */
   function importFromAuction() {
-    let a; try { a = JSON.parse(localStorage.getItem(AKEY) || "null"); } catch (e) {}
-    if (!a || !Array.isArray(a.teams)) { ftoast("No auction data found in this browser", "bad"); return; }
-    const sold = (a.players || []).filter(p => p.status === "sold" && p.soldTo);
-    if (!sold.length) { ftoast("No players are sold/retained in the auction yet", "bad"); return; }
+    const A = window.HCCLAuction;
+    if (!A) { ftoast("Auction data isn't loaded yet - try again in a moment", "bad"); return; }
+    const aTeams = A.teams();
+    if (!aTeams.length) { ftoast("This tournament has no teams yet", "bad"); return; }
+    // Retained and fixed-squad players are stored status:"sold" with a soldTo too
+    // (app.js), so this one filter covers auctioned + retained + pre-assigned.
+    const sold = A.players().filter(p => p.status === "sold" && p.soldTo);
+    if (!sold.length) { ftoast("No players are sold/retained in this tournament yet", "bad"); return; }
     if ((F.teams.length || F.players.length) && !confirm("Replace the fantasy teams & players with your current auction squads?")) return;
-    F.teams = a.teams.map(t => ({ id: "ft_" + t.id, name: t.name }));
+    F.teams = aTeams.map(t => ({ id: "ft_" + t.id, name: t.name }));
     const ids = new Set(F.teams.map(t => t.id));
     F.players = sold.map(p => ({ id: "fp_" + p.id, name: p.name, teamId: "ft_" + p.soldTo })).filter(p => ids.has(p.teamId));
     saveF(); renderFanBody(); ftoast(`Imported ${F.teams.length} teams and ${F.players.length} players`, "good");
@@ -938,6 +990,8 @@
     }
     // Tournament switching (js/series.js) - resubscribe when the viewed one changes.
     if (window.HCCLSeries) window.HCCLSeries.onChange(fanOnSeriesChange);
+    // Network / tab came back: retry the cloud instead of waiting for a reload.
+    if (window.HCCLSync) window.HCCLSync.onReconnect(fanRetrySync);
     renderFantasy();
   }
   // Public hook: the tournament page (series.js) hosts #view-fantasy as its
