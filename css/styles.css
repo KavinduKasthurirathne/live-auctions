@@ -1436,6 +1436,65 @@ body:not(.can-edit) .news-composer { display: none; }
 }
 .news-modal-text { font-size: 15px; line-height: 1.65; overflow-wrap: break-word; }
 
+/* ---- like / comment / share ---- */
+.news-social { margin-top: 8px; }
+.news-actions { display: flex; align-items: center; gap: 6px; }
+.news-act {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: 1px solid transparent; border-radius: 999px;
+  padding: 5px 9px; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700;
+  cursor: pointer; line-height: 1; transition: background .15s ease, color .15s ease;
+}
+.news-act:hover { background: var(--panel-3); color: var(--text); }
+.news-act.liked { color: var(--red); }
+.news-act-icon { font-size: 15px; line-height: 1; }
+.news-act.liked .news-act-icon { animation: newsHeart .28s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes newsHeart { 40% { transform: scale(1.35); } }
+.news-act-label:empty { display: none; }
+.news-likes-sum {
+  display: block; margin-top: 2px; padding: 2px 9px;
+  background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px;
+  text-align: left; cursor: pointer;
+}
+.news-likes-sum:hover { color: var(--text); text-decoration: underline; }
+/* The story popup spells the actions out and rules them off from the text. */
+.news-modal [data-social-where="story"] { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.news-modal .news-act { font-size: 13.5px; padding: 7px 12px; background: var(--panel-2); }
+.news-modal .news-act:hover { background: var(--panel-3); }
+
+/* ---- comments (story popup only) ---- */
+.news-comments {
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.news-comments-empty { color: var(--muted); font-size: 13px; }
+.news-comment { display: flex; align-items: flex-start; gap: 10px; }
+.news-comment-body { flex: 1; min-width: 0; }
+.news-comment-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.news-comment-name { font-weight: 700; font-size: 13.5px; }
+.news-comment-time { color: var(--muted); font-size: 11.5px; }
+.news-comment-text { font-size: 14px; line-height: 1.5; margin-top: 2px; overflow-wrap: break-word; }
+.news-comment .icon-btn { flex: none; width: 26px; height: 26px; font-size: 11px; }
+/* flex-start so the avatar and Post button stay pinned to the box's FIRST line
+   as the textarea grows; the 4px nudges them onto that line's centre. */
+.news-comment-bar { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; }
+.news-comment-bar > .news-avatar, .news-comment-bar > .btn { margin-top: 4px; }
+.news-comment-input {
+  flex: 1; min-width: 0; min-height: 38px; max-height: 140px; resize: vertical;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+  color: var(--text); font: inherit; font-size: 14px; padding: 9px 12px;
+}
+.news-comment-input:focus { outline: none; border-color: var(--gold); }
+.news-comment-bar .btn { flex: none; }
+/* A 28px avatar for comment rows and the "Liked by" sheet. */
+.news-avatar.sm { width: 28px; height: 28px; font-size: 12px; }
+
+/* ---- "Liked by" sheet (reuses the story popup's backdrop + card) ---- */
+.news-likers { max-width: 420px; }
+.news-likers .news-modal-body { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; }
+.news-liker { display: flex; align-items: center; gap: 10px; }
+.news-liker-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+
 @media (max-width: 620px) {
   /* Phones: a smaller thumbnail keeps the headline readable; the standfirst
      drops (the story is one tap away anyway). */
@@ -1447,6 +1506,12 @@ body:not(.can-edit) .news-composer { display: none; }
   .news-modal { max-height: min(92vh, calc(100dvh - 12px)); }
   .news-modal-body { padding: 16px; }
   .news-modal-img { max-height: 260px; }
+  /* Tighter targets, and the like summary wraps under them rather than
+     pushing the row wide. */
+  .news-social { margin-top: 6px; }
+  .news-actions { gap: 2px; }
+  .news-act { padding: 5px 7px; }
+  .news-likes-sum { padding-left: 7px; font-size: 11.5px; }
 }
 
 /* ===================== SERIES DETAIL (tournament hub) ===================== */

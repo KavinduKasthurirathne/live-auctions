@@ -113,10 +113,13 @@ service cloud.firestore {
       allow write: if canEdit();
     }
 
-    // HC News (Home page feed): news/{postId} = { text, image, authorUid,
-    // authorName, authorPhoto, createdAt }. Moderators/admins post (only as
-    // themselves); everyone signed in reads; the author or an admin deletes.
-    // Posts are never edited - delete and repost instead.
+    // HC News (Home page feed): news/{postId} = { title, text, images: [dataURL],
+    // authorUid, authorName, authorPhoto, createdAt }. Moderators/admins post
+    // (only as themselves); everyone signed in reads; the author or an admin
+    // deletes. Posts are never edited - delete and repost instead. Likes and
+    // comments live OUTSIDE the post doc (see below) so a story's inlined images
+    // are never rewritten or re-pushed to every reader just because someone
+    // tapped the heart.
     match /news/{postId} {
       allow read: if signedIn();
       allow create: if canEdit()
@@ -126,6 +129,49 @@ service cloud.firestore {
                     && request.resource.data.text.size() <= 2000;
       allow delete: if isAdmin() || (canEdit() && resource.data.authorUid == request.auth.uid);
       allow update: if false;
+
+      // Comments: news/{postId}/comments/{cid} = { uid, name, photo, text,
+      // createdAt }. ANY signed-in user (viewers included) may comment, but
+      // only as themselves. Never edited. Deleted by the comment's author, an
+      // admin, or the story's own author.
+      match /comments/{cid} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+                      && request.resource.data.uid == request.auth.uid
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() <= 500;
+        allow update: if false;
+        allow delete: if signedIn() && (
+                        resource.data.uid == request.auth.uid
+                        || isAdmin()
+                        || (canEdit()
+                            && exists(/databases/$(database)/documents/news/$(postId))
+                            && get(/databases/$(database)/documents/news/$(postId)).data.authorUid == request.auth.uid));
+      }
+    }
+
+    // Story likes: newsLikes/{postId} = { u: { <uid>: { n, p, t } } } - ONE small
+    // doc per story holding every liker, so the whole feed's like state is a
+    // single collection listener. The display name/photo are denormalized
+    // because a viewer cannot read anyone else's users/{uid} doc.
+    //
+    // The diff()/affectedKeys()/hasOnly() pairs are the whole security story: a
+    // signed-in user may add or remove ONLY their own uid key inside `u`, and
+    // may not introduce any other field. Counts therefore can't be forged.
+    match /newsLikes/{postId} {
+      allow read: if signedIn();
+      // First like on a story creates the doc. exists() keeps likes for
+      // nonexistent stories out of a collection every reader downloads.
+      allow create: if signedIn()
+                    && exists(/databases/$(database)/documents/news/$(postId))
+                    && request.resource.data.keys().hasOnly(['u'])
+                    && request.resource.data.u.keys().hasOnly([request.auth.uid]);
+      allow update: if signedIn()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['u'])
+                    && request.resource.data.u.diff(resource.data.u).affectedKeys().hasOnly([request.auth.uid]);
+      // Editors clear the doc when they delete the story it belongs to.
+      allow delete: if canEdit();
     }
   }
 }
