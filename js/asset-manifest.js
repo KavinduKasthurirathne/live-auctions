@@ -44,7 +44,7 @@ window.HCCL_ASSETS = {
       "sandun chinthana": "assets/Players/Sandun Chinthana.jpg",
       "sasindu ashen": "assets/Players/Sasindu Ashen.jpg",
       "sasindu madushan": "assets/Players/Sasindu Madushan.jpg",
-      "sasiru ranasinghe": "assets/Players/Sasiru Ranasinghe.jpg",
+      "sasiru ranasinghe": "assets/Players/Sasiru Ranasinghe.jpeg",
       "shanuka navarathna": "assets/Players/Shanuka Navarathna.jpg",
       "shenal theekshana": "assets/Players/Shenal Theekshana.jpg",
       "thenu pabeesha": "assets/Players/Thenu Pabeesha.jpg",
