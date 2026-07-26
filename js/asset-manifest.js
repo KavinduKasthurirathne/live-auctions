@@ -58,6 +58,7 @@ window.HCCL_ASSETS = {
       "wenura sandeepa": "assets/Players/Wenura Sandeepa.jpg",
       "yasantha ruwan": "assets/Players/Yasantha Ruwan.jpg",
       "yasitha nawod": "assets/Players/Yasitha Nawod.jpg",
+      "isuka thisen": "assets/Players/Isuka Thisen.jpeg",
       "yathish leyon": "assets/Players/Yathish Leyon.jpg"
     },
     "teamLogoIndex": {
