@@ -331,7 +331,6 @@
   /* Test Championship table: # / Team / M / W / L / D / T / PTS, sorted by PTS.
      No net run rate - a Test table doesn't use it. */
   function testStandingsTable(rows) {
-    const P = eng().CONFIG.test.points;
     const cutoff = eng().CONFIG.playoffCutoff;
     const showCutoff = rows.length > cutoff;
     const body = rows.map(r => `<tr${showCutoff && r.pos === cutoff ? ` class="fx-cutoff"` : ""}>
@@ -354,15 +353,7 @@
         </tr></thead>
         <tbody>${body}</tbody>
       </table>
-    </div>
-    <ul class="hint fx-points-note">
-      <li>W = ${pts(P.win)}</li>
-      <li>D = ${pts(P.draw)}</li>
-      <li>T = ${pts(P.tie)}</li>
-      <li>L = ${pts(P.loss)}</li>
-      <li>Bonus: 200+ runs in an innings = ${pts(1)}, 300+ = ${pts(2)}</li>
-      <li>Bonus: bowled out for 100 or less = ${pts(1)}, 50 or less = ${pts(2)}</li>
-    </ul>`;
+    </div>`;
   }
 
   function standingsTable() {
@@ -669,6 +660,53 @@
       <ul>${squad.map(p => `<li>${esc(p.name)}${p.role ? `<span class="fx-role">${esc(p.role)}</span>` : ""}</li>`).join("")}</ul></div>`;
   }
 
+  /* TEST scorecards: one batting + one bowling card PER INNINGS, so a player who
+     batted twice shows up in each innings separately (as in the Stumps report),
+     not merged into a single aggregate row. Rows come from the per-innings data
+     the parser kept on each player (p.innings / p.bowlSpells), keyed by innings
+     `seq`; the innings order + totals come from resultData.innings. */
+  function testBattingCard(players, seq, label, inn) {
+    const rows = [];
+    players.forEach(p => { const r = (p.innings || []).find(x => x.seq === seq); if (r) rows.push({ name: p.name, r }); });
+    if (!rows.length) return "";
+    const total = inn ? ` · ${inn.runs}/${inn.wickets}` : "";
+    return `<div class="fx-table-wrap"><table class="fx-table fx-card-table">
+      <thead><tr><th class="fx-stname">${esc(label)}${total}  Batting</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead>
+      <tbody>${rows.map(({ name, r }) => `<tr>
+        <td class="fx-stname">${esc(name)}${r.out ? "" : `<span class="fx-no">not out</span>`}</td>
+        <td class="fx-pts">${r.runs}</td><td>${r.balls}</td>
+        <td>${r.fours}</td><td>${r.sixes}</td><td>${r.sr}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+  function testBowlingCard(players, seq, battingTeamName) {
+    const rows = [];
+    players.forEach(p => { const s = (p.bowlSpells || []).find(x => x.seq === seq); if (s) rows.push({ name: p.name, s }); });
+    if (!rows.length) return "";
+    return `<div class="fx-table-wrap"><table class="fx-table fx-card-table">
+      <thead><tr><th class="fx-stname">Bowling to ${esc(battingTeamName)}</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th></tr></thead>
+      <tbody>${rows.map(({ name, s }) => `<tr>
+        <td class="fx-stname">${esc(name)}</td>
+        <td>${s.overs}</td><td>${s.maidens}</td><td>${s.runs}</td>
+        <td class="fx-pts">${s.wickets}</td><td>${s.eco}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+  // Does this scorecard carry per-innings detail (imported after the Test fix)?
+  function hasPerInnings(sc) {
+    return !!(sc && sc.players && sc.players.some(p => (p.innings && p.innings.length) || (p.bowlSpells && p.bowlSpells.length)));
+  }
+  function testScorecard(m) {
+    const sc = m.scorecardData, rd = m.resultData;
+    const innings = (rd && rd.innings) || [];
+    if (!innings.length) return "";
+    return innings.map(inn => {
+      const battingTeam = inn.team || teamName(inn.side === "home" ? m.homeTeamId : m.awayTeamId);
+      const label = `${battingTeam} — ${inn.order === 2 ? "2nd" : "1st"} innings`;
+      return testBattingCard(sc.players, inn.seq, label, inn) + testBowlingCard(sc.players, inn.seq, battingTeam);
+    }).join("");
+  }
+
   function detailModal() {
     const m = matches.find(x => x.id === modal.matchId);
     if (!m) return shell("Match", emptyState("Match not found", "It may have just been deleted."), "");
@@ -739,9 +777,11 @@
 
     // No scorecard yet: show nothing here. The "Result pending" state above
     // already says where the match stands, and the squads are listed below.
-    const cards = sc && sc.players && sc.players.length
-      ? (sc.teams || []).map(t => battingCard(sc.players, t.name) + bowlingCard(sc.players, t.name)).join("")
-      : "";
+    // TEST matches show each innings SEPARATELY; limited-overs (and any legacy
+    // Test import without per-innings data) fall back to the aggregate cards.
+    const cards = !(sc && sc.players && sc.players.length) ? ""
+      : (testM && hasPerInnings(sc)) ? testScorecard(m)
+        : (sc.teams || []).map(t => battingCard(sc.players, t.name) + bowlingCard(sc.players, t.name)).join("");
 
     const lineups = (!sc || !sc.players || !sc.players.length)
       ? `<div class="fx-squads">
