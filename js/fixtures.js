@@ -1094,7 +1094,10 @@
 
   // Shape the draft into the resultData the engine/summary expect.
   function buildResult(d) {
-    const decisive = d.resultType === "runs" || d.resultType === "wickets";
+    // Which types name a winner - runs, wickets AND innings. Asking the engine
+    // rather than re-listing them here: an innings victory has a winner, and
+    // hard-coding the list once dropped it (empty summary + scored as a tie).
+    const decisive = eng().isDecisiveResult(d.resultType);
     const so = d.superOver && d.superOver.played && d.superOver.winnerTeamId ? d.superOver : null;
     return {
       resultType: d.resultType,
@@ -1124,7 +1127,7 @@
     const m = matches.find(x => x.id === modal.matchId);
     if (!m) return closeModal();
     const d = modal.draft;
-    const decisive = d.resultType === "runs" || d.resultType === "wickets";
+    const decisive = eng().isDecisiveResult(d.resultType);
     if (decisive && !d.winnerTeamId) return toast("Pick the winning team", "bad");
     // A ticked Super Over with no winner would silently score as a plain tie.
     if (d.resultType === "tie" && d.superOver && d.superOver.played && !d.superOver.winnerTeamId)

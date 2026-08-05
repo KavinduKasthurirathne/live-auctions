@@ -88,6 +88,15 @@
   // different result from a "tie" (scores finish level) and scores differently.
   const RESULT_TYPES = ["runs", "wickets", "tie", "abandoned", "no-result"];
   const TEST_RESULT_TYPES = ["runs", "wickets", "innings", "draw", "tie", "abandoned"];
+  /* Result types that NAME A WINNER. "innings" belongs here just as much as runs or
+     wickets - an innings victory has a winner. Keep this as the single source of
+     truth: callers that ask "is there a winner to record?" must use it rather than
+     re-listing the types, or a new type silently loses its winner. */
+  const DECISIVE_TYPES = ["runs", "wickets", "innings"];
+  const isDecisiveResult = t => DECISIVE_TYPES.indexOf(t) >= 0;
+  // A result that ENDS the match (nothing further will be played).
+  const FINAL_TYPES = ["runs", "wickets", "innings", "draw", "tie", "abandoned", "no-result"];
+  const isFinalResult = t => FINAL_TYPES.indexOf(t) >= 0;
 
   /* ---------------------------- utils ------------------------------ */
   const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
@@ -264,7 +273,14 @@
     });
   }
   // { side, runsNeeded } for the team batting last, or null when not applicable.
+  // A target only exists while the match is STILL LIVE. A finished match has no
+  // target - most importantly an innings victory, which ends the match with the
+  // 4th innings never played even though only 3 innings are on the card.
   function targetOf(match, nameOf) {
+    if (!match) return null;
+    if (match.status === "completed") return null;
+    const rd = match.resultData || {};
+    if (isFinalResult(rd.resultType)) return null;   // the result already stands
     const rows = inningsProgress(match, nameOf);
     if (rows.length !== 3) return null;              // only meaningful before the 4th innings
     const last = rows[rows.length - 1];
@@ -624,6 +640,7 @@
 
   root.HCCLFixtures = {
     CONFIG, STATUSES, STATUS_LABEL, FORMATS, RESULT_TYPES, TEST_RESULT_TYPES,
+    isDecisiveResult, isFinalResult,
     STAGES, DEFAULT_STAGE, stageOf, stageMeta, countsForStandings, isKnockout,
     isTestMatch, inningsOf, bonusFor, battingBonusFor, bowlingBonusFor,
     inningsProgress, targetOf, testStandings,
