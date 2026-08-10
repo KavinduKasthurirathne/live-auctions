@@ -43,9 +43,101 @@ service cloud.firestore {
 
     // Shared fantasy data (Phase C): fantasy/league/{teams|players|contestants|days}/{id}.
     // Must be signed in to read (no anonymous viewing); only editors write.
+    // NOTE: the contestants' own fantasy teams are NOT under here - they live at
+    // fantasyEntries/** below, precisely because this recursive rule cannot be
+    // tightened. Do not add a get()-based rule to days/{id}: a batched editor
+    // save runs to 450 documents and would blow the 20-access-call cap.
     match /fantasy/{document=**} {
       allow read: if signedIn();
       allow write: if canEdit();
+    }
+
+    // Fantasy contestant entries: fantasyEntries/{tid}/days/{dayId}/entries/{entryId}.
+    // One document per contestant per match. entryId == the submitter's uid for a
+    // self-submitted team, or "g_…" for a guest entry a moderator adds on behalf
+    // of someone with no account. `tid` is the tournament id - "hccl-s6" is the
+    // legacy tournament, whose match days live at the top-level fantasy/ root.
+    //
+    // These sit OUTSIDE fantasy/ and tournaments/ on purpose. Both of those roots
+    // are guarded by recursive {document=**} rules granting read to any signed-in
+    // user and write to any editor, and because rules are OR-ed, nothing nested
+    // under them can ever be made STRICTER. This feature needs two things those
+    // rules would silently defeat: rivals' picks stay hidden until the deadline,
+    // and the deadline binds moderators too.
+    //
+    // The lock is the whole point. Once lockAt has passed - or once the points are
+    // published - NOBODY may create, edit or delete an entry, admins included. To
+    // reopen, an editor pushes lockAt forward, which is visible to every
+    // contestant because their countdown changes, and unpublishes the points
+    // first if they were already out.
+    //
+    // NOT enforced here: the match's optional "max players from one team" cap.
+    // Checking it would mean reading every picked player's document to learn its
+    // team, far past the access-call budget. Squad size, distinctness, C/VC
+    // validity and the deadline ARE enforced; the per-team cap is UI-only.
+    match /fantasyEntries/{tid}/days/{dayId}/entries/{entryId} {
+      // && and || short-circuit, so only the branch whose root actually exists is
+      // ever fetched - a get() on a missing document would fail the whole rule.
+      // Repeated get()s of one path are cached, so this is a single access call.
+      function legacyDay()  { return get(/databases/$(database)/documents/fantasy/league/days/$(dayId)).data; }
+      function tourneyDay() { return get(/databases/$(database)/documents/tournaments/$(tid)/fantasy/league/days/$(dayId)).data; }
+      function isLegacy()   { return tid == 'hccl-s6'; }
+
+      function openFor(day) {
+        return day.lockAt is number
+            && request.time.toMillis() < day.lockAt
+            && day.hasResults != true;
+      }
+      function matchOpen() {
+        return (isLegacy() && openFor(legacyDay())) || (!isLegacy() && openFor(tourneyDay()));
+      }
+
+      // Exactly teamSize DISTINCT players. toSet() is what stops someone listing
+      // the same player six times to multiply the captain bonus.
+      function squadOk(d, day) {
+        return day.teamSize is int && day.teamSize > 0 && day.teamSize <= 15
+            && d.playerIds is list
+            && d.playerIds.size() == day.teamSize
+            && d.playerIds.toSet().size() == day.teamSize
+            && (d.captainId in d.playerIds)
+            && (d.viceCaptainId in d.playerIds)
+            && d.captainId != d.viceCaptainId;
+      }
+      function squadMatches() {
+        return (isLegacy() && squadOk(request.resource.data, legacyDay()))
+            || (!isLegacy() && squadOk(request.resource.data, tourneyDay()));
+      }
+      // A closed allowlist. Points are always DERIVED from the match's own
+      // performance map, never stored on the entry, so an injected score field
+      // can't forge a result.
+      function shapeOk() {
+        return request.resource.data.keys().hasOnly(
+                 ['uid','name','photo','teamName','playerIds','captainId','viceCaptainId','createdAt','updatedAt'])
+            && request.resource.data.keys().hasAll(
+                 ['uid','name','playerIds','captainId','viceCaptainId'])
+            && request.resource.data.uid is string
+            && request.resource.data.name is string
+            && request.resource.data.name.size() > 0
+            && request.resource.data.name.size() <= 120;
+      }
+
+      // Your own team is always visible to you; everyone else's opens at lock
+      // time. get and list are split deliberately - a list rule must never touch
+      // resource.data or the whole collection query fails, not just one document.
+      allow get:  if signedIn() && (entryId == request.auth.uid || canEdit() || !matchOpen());
+      allow list: if signedIn() && (canEdit() || !matchOpen());
+
+      // A moderator's guest entry must use a "g_" id: without that, they could
+      // key an entry to a real member's uid and squat their slot.
+      allow create, update: if signedIn() && matchOpen() && shapeOk() && squadMatches()
+                            && (
+                                 (entryId == request.auth.uid
+                                  && request.resource.data.uid == request.auth.uid)
+                                 || (canEdit()
+                                     && entryId.matches('^g_[a-z0-9]+$')
+                                     && request.resource.data.uid == '')
+                               );
+      allow delete: if signedIn() && matchOpen() && (entryId == request.auth.uid || canEdit());
     }
 
     // Shared auction data (Phase D): auction/league/{teams|players}/{id} + state docs.

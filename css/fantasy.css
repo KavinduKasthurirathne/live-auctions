@@ -82,6 +82,151 @@
 .fan-table td.strong { color: var(--yellow); font-weight: 800; font-size: 15px; }
 .fan-table tr:first-child td { font-weight: 700; }
 
+/* ===================== SELF-SERVE FANTASY ===================== */
+/* Match list -> team builder -> everyone's teams. All of it lives inside the
+   #view-fantasy panel; nothing is position:fixed, because .app-header has a
+   backdrop-filter and would become the containing block for it. */
+
+.fan-list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.fan-list-head .hint { margin: 0; flex: 1 1 240px; }
+
+.fan-matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr)); gap: 16px; align-items: start; }
+.fan-match-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.fan-match-card:hover { border-color: #4a4a52; transform: translateY(-2px); box-shadow: var(--shadow); }
+.fan-match-card.is-open { border-color: rgba(34, 197, 94, 0.45); }
+.fan-match-card.is-published { border-color: rgba(245, 179, 1, 0.4); }
+.fan-match-card.is-legacy { opacity: 0.85; }
+
+.fan-mc-teams { display: flex; align-items: center; gap: 10px; }
+.fan-mc-team { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 15px; }
+.fan-mc-team b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-mc-team:last-child { justify-content: flex-end; text-align: right; }
+.fan-mc-vs { flex: none; font-size: 11px; font-weight: 800; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+.fan-mc-meta { font-size: 12.5px; color: var(--muted); }
+
+.fan-clock {
+  align-self: flex-start; font-size: 12px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--panel-2); color: var(--muted); white-space: nowrap;
+}
+.fan-clock[data-fan-countdown] { color: var(--green); border-color: rgba(34, 197, 94, 0.4); }
+.fan-clock.is-closing { color: var(--yellow); border-color: var(--gold); background: rgba(255, 204, 0, 0.1); }
+.fan-clock.is-locked { color: var(--muted); border-color: var(--border); background: var(--panel-2); }
+.fan-clock.is-done { color: var(--gold); border-color: rgba(245, 179, 1, 0.45); }
+
+.fan-mc-you { font-size: 13.5px; color: var(--muted); padding-top: 2px; border-top: 1px solid var(--panel-3); }
+.fan-mc-you.is-in { color: var(--green); font-weight: 700; }
+.fan-mc-you.is-scored { color: var(--text); }
+.fan-mc-you.is-scored b { color: var(--yellow); }
+.fan-mc-cta { width: 100%; justify-content: center; }
+.fan-mc-actions { display: flex; }
+
+.fan-admin-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-top: 10px; border-top: 1px dashed var(--panel-3); }
+.fan-admin-count { font-size: 12px; font-weight: 700; color: var(--muted); margin-right: auto; }
+
+/* ---- builder ---- */
+.fan-builder-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.fan-builder-title { font-family: "Russo One", sans-serif; font-size: 18px; flex: 1; min-width: 0; }
+.fan-back { flex: none; }
+.fan-builder-intro .hint { margin: 0 0 4px; }
+
+/* Your squad stays in view while you scroll the player lists. .app-header is
+   sticky at z-index 30, so this has to park BELOW it (81px at full width, 71px
+   from 900px down) rather than slide underneath. */
+.fan-picked-card { position: sticky; top: 89px; z-index: 3; }
+@media (max-width: 900px) { .fan-picked-card { top: 79px; } }
+.fan-picked-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.fan-picked-chip {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-family: inherit;
+  background: var(--panel-3); border: 1px solid var(--border); color: var(--text);
+  padding: 7px 11px; border-radius: 999px; font-size: 13px; font-weight: 600;
+}
+.fan-picked-chip:hover { border-color: var(--red); }
+.fan-picked-chip .fan-x { color: var(--muted); font-size: 11px; }
+.fan-picked-chip.is-empty { cursor: default; border-style: dashed; color: var(--muted); background: transparent; min-width: 44px; justify-content: center; }
+
+.fan-cvc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.fan-cvc-slot {
+  display: flex; flex-direction: column; gap: 3px; text-align: left; cursor: pointer; font-family: inherit;
+  background: var(--panel-2); border: 1px dashed var(--border); color: var(--text);
+  padding: 10px 12px; border-radius: 12px;
+}
+.fan-cvc-slot:hover { border-color: #4a4a52; }
+.fan-cvc-slot.is-set { border-style: solid; }
+.fan-cvc-slot.is-armed { border-color: var(--gold); background: rgba(255, 204, 0, 0.1); border-style: solid; }
+.fan-cvc-k { font-size: 10.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.fan-cvc-slot.is-armed .fan-cvc-k { color: var(--yellow); }
+.fan-cvc-v { font-size: 14px; font-weight: 700; }
+.fan-cvc-slot:not(.is-set) .fan-cvc-v { color: var(--muted); font-weight: 500; }
+
+.fan-squad-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; margin: 16px 0; align-items: start; }
+.fan-squad-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.fan-squad-head { display: flex; align-items: center; gap: 9px; padding: 2px 4px 10px; border-bottom: 1px solid var(--panel-3); margin-bottom: 8px; }
+.fan-squad-head b { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-squad-count { flex: none; font-size: 12px; font-weight: 800; color: var(--muted); }
+.fan-plist { display: flex; flex-direction: column; gap: 6px; }
+
+.fan-ptile {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+  font-family: inherit; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 11px; padding: 8px 10px;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.fan-ptile:hover:not(:disabled) { border-color: #4a4a52; }
+.fan-ptile.on { border-color: var(--gold); background: rgba(255, 204, 0, 0.12); }
+.fan-ptile.is-full { opacity: 0.35; cursor: not-allowed; }
+.fan-ptile-av {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--panel-3); border: 1px solid var(--border); font-size: 12px; font-weight: 800; color: var(--muted);
+}
+.fan-ptile.on .fan-ptile-av { background: var(--gold); color: #1a1300; border-color: transparent; }
+.fan-ptile-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fan-ptile-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-ptile-stat { font-size: 11px; color: var(--muted); }
+.fan-ptile-badge { flex: none; font-size: 10px; font-weight: 800; min-width: 22px; text-align: right; color: var(--yellow); }
+.fan-ptile.is-c .fan-ptile-badge, .fan-ptile.is-vc .fan-ptile-badge {
+  min-width: 0; padding: 2px 6px; border-radius: 5px; color: #fff; background: var(--red);
+}
+.fan-ptile.is-vc .fan-ptile-badge { background: var(--gold); color: #1a1300; }
+
+.fan-savebar {
+  position: sticky; bottom: 0; z-index: 4;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: rgba(22, 22, 24, 0.94); backdrop-filter: blur(8px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; margin-bottom: 8px;
+}
+.fan-savebar-count { font-size: 13px; font-weight: 800; color: var(--muted); flex: none; }
+.fan-savebar-msg { flex: 1; min-width: 120px; font-size: 13px; }
+.fan-savebar-msg.is-bad { color: var(--yellow); }
+.fan-savebar-msg.is-ok { color: var(--green); }
+
+/* ---- everyone's teams ---- */
+.fan-hidden-note .hint { margin: 0; }
+.fan-teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; align-items: start; }
+.fan-team-card.is-me { border-color: var(--gold); }
+.fan-tc-head { display: flex; align-items: center; gap: 10px; }
+.fan-tc-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-av {
+  flex: none; width: 32px; height: 32px; border-radius: 50%; background-size: cover; background-position: center;
+  display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #1a1300;
+}
+.fan-pchip.is-gone { opacity: 0.55; }
+.fan-pchip.is-gone .fen-pname { font-style: italic; }
+
+/* ---- editor forms ---- */
+.fan-form-warn {
+  background: rgba(255, 204, 0, 0.1); border: 1px solid var(--gold); border-radius: 12px;
+  padding: 11px 13px; font-size: 13px; line-height: 1.5;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.fan-publish-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--panel-3); }
+.fan-publish-state { flex: 1; min-width: 160px; font-size: 13px; color: var(--muted); }
+
 /* One-row swipe bar on small screens (same treatment as .subtabs /
    .season-tabs at the end of styles.css). */
 @media (max-width: 760px) {
@@ -93,4 +238,20 @@
   }
   .fan-subnav::-webkit-scrollbar { display: none; }
   .fan-tab { flex: none; white-space: nowrap; }
+
+  /* The picked squad becomes a one-row scroller so the player lists stay in
+     view while you build, and the save bar clears the home indicator. */
+  .fan-picked-strip {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+    padding-bottom: 2px;
+  }
+  .fan-picked-strip::-webkit-scrollbar { display: none; }
+  .fan-picked-chip { flex: none; }
+  .fan-savebar { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  /* Full-width and ABOVE the count/button row: what to do next should be read
+     before the button, not after it. */
+  .fan-savebar-msg { order: -1; flex-basis: 100%; }
+  .fan-builder-title { font-size: 15px; }
 }

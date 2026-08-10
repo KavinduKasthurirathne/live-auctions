@@ -75,7 +75,7 @@ one of three roles:
 |------|--------|
 | **Admin** | Everything: run the auction, edit fantasy, **and manage members/roles**. |
 | **Moderator** | Create / update / delete auction **and** fantasy data. No role management. |
-| **Viewer** | Read-only. Sees the auction, squads, fantasy and leaderboards - no edit controls, no setup pages. |
+| **Viewer** | Read-only for auction, squads and leaderboards - no edit controls, no setup pages. **Can still enter the fantasy game**: pick and edit their own team until a match closes. |
 
 > The role hierarchy is **admin ▸ moderator ▸ viewer**.
 
@@ -164,21 +164,37 @@ one of three roles:
 ## 🏏 The Fantasy League
 
 A self-contained fantasy game that lives in the **🏏 Fantasy** tab. It has its own data and
-storage and does **not** touch the auction.
+storage and does **not** touch the auction. **Every signed-in member picks their own team** -
+admins, moderators and viewers alike.
 
 ### Concepts
 
 - **Teams** and **Players** (each player belongs to a team).
-- **Contestants** - the people playing fantasy (your friends/participants).
-- **Match Days** - each day picks which teams are playing, records every player's
-  performance, and holds each contestant's **entry** (their picked squad).
+- **Matches** - one fixture: two teams, a squad size, an optional per-team cap and a
+  **closing time**. Stored in the `days` collection (the name predates the feature).
+- **Entries** - one member's fantasy team for one match, stored as its own document at
+  `fantasyEntries/{tid}/days/{dayId}/entries/{entryId}`.
+- **Contestants** - *legacy only*. Older match days recorded participants by name; new
+  matches use each member's own account.
 
-### Match Day (📅) - build entries & enter results
+### 🏏 Matches - how a round works
 
-- Create a day (date + optional label) and choose which **teams** play that day.
-- Each **contestant's entry** picks players from that day's pool and designates a
-  **Captain (C)** and **Vice-Captain (VC)**.
-- Enter each player's **runs** and **wickets**; points compute live.
+1. **An editor creates the match** (＋ Create match): Team A vs Team B, players per fantasy
+   team, an optional *max from one team*, and the time entries close.
+2. **Everyone picks a team** before that deadline: tap players from either squad, tap the
+   Captain / Vice-captain slots to assign the multipliers, submit. The team can be edited
+   as often as you like until the deadline.
+3. **Entries close.** After `lockAt` nobody may submit, edit or delete a team - **moderators
+   and admins included**. That is enforced by the security rules, not by the UI. To reopen,
+   an editor pushes the closing time forward, which reopens the match for everyone equally.
+4. **An editor enters the scores** (📝 Scores) - each player's runs and wickets - then
+   presses **Publish points**. *Save scores* alone changes nothing anyone else can see;
+   publishing is what puts the match on the leaderboard.
+
+Until the deadline you can only see **your own** team; everyone else's appears the moment
+entries close, so nobody can copy a squad at the last minute. Editors always see everything,
+and can add a **guest team** for a participant who has no account (subject to the same
+deadline).
 
 ### Scoring
 
@@ -189,12 +205,51 @@ vice-captain   = player points × 1.5
 entry points   = sum of the entry's player points (with C/VC multipliers)
 ```
 
-- **Day Standings** rank that day's entries by points (🥇🥈🥉).
+- **Match Standings** rank that match's teams by points (🥇🥈🥉).
 - **Leaderboards (🏆)**:
-  - **Contestants** - every contestant ranked by **total** points across all days that
-    have results.
-  - **Player of the Season (⭐)** - top players ranked by total fantasy points.
+  - **Contestants** - everyone ranked by **total** points across every published match.
+  - **Player of the Season (⭐)** - top players by total fantasy points (raw performance;
+    C/VC multipliers belong to an entry, not to a player).
   - Totals are shown in **yellow**; ranking is by total.
+
+Publishing writes a denormalised `standings` array onto the match document, so the season
+leaderboard is built from the `days` collection alone - it needs no extra listeners and no
+access to entries that are still hidden. Matches from before this feature keep their inline
+`entries[]` and keep counting, unchanged.
+
+> ⚠️ **Adding a field to a match document?** `syncDiff()` writes a *whole-document replace*
+> built from what `normDay()` knows about, so any field `normDay` doesn't list is deleted
+> from Firestore the next time an editor touches that match. Add it to `normDay()` in
+> `js/fantasy.js` first.
+
+### Publishing the rules (required)
+
+This feature does not work until `firestore.rules` is published - viewers get
+`permission-denied` when they submit. Before publishing, run these in
+**Firebase console → Firestore → Rules → Playground**:
+
+| Auth | Op | State / payload | Expect |
+|---|---|---|---|
+| viewer `U` | create `fantasyEntries/hccl-s6/days/D/entries/U` | valid, lock in future | ✅ |
+| viewer `U` | create `…/entries/V` | valid | ❌ |
+| viewer `U` | update `…/entries/U` | wrong number of `playerIds` | ❌ |
+| viewer `U` | update `…/entries/U` | one player listed twice | ❌ |
+| viewer `U` | update `…/entries/U` | C == VC, or C not in `playerIds` | ❌ |
+| viewer `U` | update `…/entries/U` | extra field, e.g. `points: 999` | ❌ |
+| viewer `U` | update `…/entries/U` | `uid` set to someone else | ❌ |
+| viewer `U` | update `…/entries/U` | lock in the past | ❌ |
+| viewer `U` | update `…/entries/U` | match has `hasResults: true` | ❌ |
+| **moderator** | create `…/entries/g_abc` | **lock in the past** | **❌** |
+| moderator | create `…/entries/g_abc` | lock in future, `uid: ""` | ✅ |
+| moderator | create `…/entries/V` | `uid: ""` (uid-squat) | ❌ |
+| viewer | `list` entries | match still open | ❌ |
+| viewer | `list` entries | match closed | ✅ |
+| viewer `U` | `get …/entries/U` | match still open | ✅ |
+| signed-out | `get …/entries/U` | — | ❌ |
+
+Repeat the first few against `fantasyEntries/<other-tid>/…` to exercise the non-legacy
+branch, then spot-check as a viewer that `auction/league/players/X`, `matches/X`, `mvp/X`,
+`tournaments/T/stats/sheet` and `ranking/league` still read.
 
 ### 📷 Share as image
 
@@ -264,7 +319,8 @@ When Firebase is configured and you're signed in, the app switches from local st
 **Firestore** as the source of truth:
 
 ```
-fantasy/league/{teams, players, contestants, days}/{id}     ← fantasy data
+fantasy/league/{teams, players, contestants, days}/{id}     ← fantasy league + matches
+fantasyEntries/{tid}/days/{dayId}/entries/{entryId}         ← each member's own team
 auction/league/{teams, players}/{id}                        ← auction text data
 auction/league/state/{settings, live}                       ← settings + live auction state
 auction/league/playerPhotos/{playerId}   { data: <base64> } ← one image per doc
@@ -273,6 +329,13 @@ auction/league/teamLogos/{teamId}        { data: <base64> } ← one image per do
 
 - `onSnapshot` listeners mirror server state into the app **in real time**; local edits are
   pushed back as a **minimal diff** (only changed/added/removed docs, in small batches).
+- **Fantasy entries deliberately sit outside `fantasy/` and `tournaments/`.** Both of those
+  roots are guarded by recursive `{document=**}` rules that grant read to any signed-in user
+  and write to any editor; because Firestore ORs its rules, nothing nested under them can be
+  made *stricter*. Entries need exactly that - hidden from rivals until the deadline, and
+  frozen for moderators after it - so they get a root of their own. They are also written
+  one document at a time, never batched, which keeps the parent-match `get()` in their rule
+  inside the access-call budget.
 - The auction is **presenter-driven** (last-write-wins): whoever is running it drives the
   state for everyone - it is deliberately *not* crowd-bidding.
 - **Images live in their own one-image-per-document collections** (`playerPhotos`,
@@ -379,7 +442,8 @@ the HTML/JS are relative to it).
 | `firebase-config.js` | Public Firebase web config + admin email list |
 | `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` `/home` `/mvp` read/write gating) |
 | `js/app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, Firestore sync |
-| `js/fantasy.js` | Self-contained fantasy league module + Firestore sync (Phase C) |
+| `js/fantasy-engine.js` | Fantasy scoring, lock state, squad validation, standings (pure, Node-testable) |
+| `js/fantasy.js` | Fantasy league view + Firestore sync (Phase C) + self-serve entries |
 | `js/home.js` | Home page: hero + past-seasons carousel + Firestore read/seed of `home/seasons` |
 | `js/ranking.js` | Player Ranking boards UI + Firestore read/seed of `ranking/league` |
 | `js/ranking-engine.js` | Rating math (batting/bowling/all-rounder) from the stats CSV |

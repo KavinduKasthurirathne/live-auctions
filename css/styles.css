@@ -607,8 +607,10 @@ body:not(.can-edit) .tab[data-tab="setup"],    /* auction Setup tab */
 body:not(.can-edit) #view-setup,               /* the ENTIRE Setup section (even if reached) */
 body:not(.can-edit) [data-goto="setup"],       /* "Open Setup" shortcut buttons */
 body:not(.can-edit) [data-auction],            /* "Auction now" buttons */
-body:not(.can-edit) .fan-tab[data-fan-sub="matchday"],  /* fantasy Match Day */
-body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {   /* fantasy Manage */
+/* Fantasy Manage only. The Matches tab is deliberately NOT gated: every member
+   picks their own fantasy team there, viewers included. What a viewer may
+   actually write is enforced by firestore.rules, not by this stylesheet. */
+body:not(.can-edit) .fan-tab[data-fan-sub="manage"] {
   display: none !important;
 }
 

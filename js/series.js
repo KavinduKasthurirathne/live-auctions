@@ -451,6 +451,10 @@
       ["tournaments", tid, "matches"],
       ["tournaments", tid, "mvp"],
       ["tournaments", tid, "fantasy", "league", "teams"],
+      // Fantasy matches: without this, a tournament whose only content is a
+      // fantasy fixture would delete cleanly and strand the contestant entries
+      // hanging off it at fantasyEntries/{tid}/days/{dayId}/entries.
+      ["tournaments", tid, "fantasy", "league", "days"],
     ];
     for (const segs of roots) {
       const snap = await a.getDocs(a.collection(d, ...segs));
