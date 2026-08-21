@@ -240,6 +240,7 @@
       }
       viewingId = id;
       try { localStorage.setItem(VIEW_KEY, id); } catch (e) {}
+      if (window.HCCL) window.HCCL.track("select_content", { content_type: "tournament", item_id: id });
       render(); renderBanner();
       fire();
       const m = metaOf(id);
@@ -257,6 +258,7 @@
         : (metaOf(activeId) ? activeId : LEGACY_ID);
       if (!metaOf(id)) return;
       UI.detail = id; UI.form = null; UI.hubTab = hubKey || "overview";
+      if (window.HCCL) window.HCCL.track("select_content", { content_type: "hub_tab", item_id: hubKey || "overview" });
       render();
     },
   };

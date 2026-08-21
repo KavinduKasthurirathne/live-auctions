@@ -1679,6 +1679,9 @@ function wireEvents() {
     closeNav();
     switchTab(tab.dataset.tab);
     if (tab.dataset.tab === "auctions") switchSubTab("auction"); // land on Auction Room by default
+    // SPA page_view on real user navigation only (the initial landing is covered
+    // by Analytics' automatic first page_view - firing here too would duplicate it).
+    if (window.HCCL) window.HCCL.trackPageView(tab.dataset.tab);
   });
 
   /* ---------------- mobile off-canvas nav drawer ----------------
@@ -1786,7 +1789,7 @@ function wireEvents() {
   // any [data-goto] button (empty state, overlay)
   document.addEventListener("click", e => {
     const g = e.target.closest("[data-goto]");
-    if (g) { hideOverlay(); switchTab(g.dataset.goto); }
+    if (g) { hideOverlay(); switchTab(g.dataset.goto); if (window.HCCL) window.HCCL.trackPageView(g.dataset.goto); }
   });
 
   // auctioneer controls

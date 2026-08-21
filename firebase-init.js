@@ -15,6 +15,15 @@ import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp,
   collection, getDocs, writeBatch, query, orderBy, limit,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAnalytics, logEvent, setUserId, isSupported,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+
+// GA4 debug: ?analytics_debug=1 (or localStorage hccl_analytics_debug=1) mirrors
+// every tracked event to the console AND stamps debug_mode so events surface in
+// the Firebase Analytics DebugView in real time.
+const ANALYTICS_DEBUG = /[?&]analytics_debug=1/.test(location.search)
+  || (() => { try { return localStorage.getItem("hccl_analytics_debug") === "1"; } catch (e) { return false; } })();
 
 const listeners = new Set();
 function emit() { listeners.forEach(cb => { try { cb(window.HCCL); } catch (e) { console.error(e); } }); }
@@ -33,6 +42,10 @@ window.HCCL = {
   canEdit() { return this.role === "admin" || this.role === "moderator"; },
   isAdmin() { return this.role === "admin"; },
   onChange(cb) { listeners.add(cb); if (this.ready) cb(this); return () => listeners.delete(cb); },
+  // GA4 tracking - real implementations wired up once Analytics initializes
+  // (see below). No-ops until then, and in offline/unconfigured mode, so any
+  // classic script may call them unconditionally.
+  track() {}, trackPageView() {}, setAnalyticsUser() {},
   signIn() {}, signOut() {},
   listMembers() { return Promise.resolve([]); },     // admin: read all users/{uid}
   setMemberRole() { return Promise.resolve(); },     // admin: change a user's role
@@ -216,6 +229,36 @@ try {
   } else {
     const app = initializeApp(cfg);
     const auth = getAuth(app);
+
+    // ---- Firebase Analytics (GA4) -------------------------------------------
+    // Reuse the one `app` instance and the measurementId already in the config.
+    // Guarded by isSupported() so unsupported environments (some in-app
+    // webviews, cookie-less contexts) are a clean skip rather than a throw.
+    // getAnalytics() loads gtag itself and emits the standard automatic events
+    // (first_visit, session_start, user_engagement, the initial page_view).
+    let analytics = null;
+    window.HCCL.track = function (name, params) {
+      if (!name) return;
+      const p = ANALYTICS_DEBUG ? Object.assign({ debug_mode: true }, params) : (params || {});
+      if (ANALYTICS_DEBUG) console.log("[GA4]", name, p);
+      if (analytics) { try { logEvent(analytics, name, p); } catch (e) { console.warn("[GA4] event failed", e); } }
+    };
+    window.HCCL.trackPageView = function (page) {
+      const name = String(page || "");
+      window.HCCL.track("page_view", { page_title: name, page_path: "/" + name, page_location: location.origin + "/" + name });
+    };
+    window.HCCL.setAnalyticsUser = function () {
+      if (analytics && window.HCCL.user && window.HCCL.user.uid) {
+        try { setUserId(analytics, window.HCCL.user.uid); } catch (e) {}
+      }
+    };
+    isSupported().then(function (ok) {
+      if (!ok) { if (ANALYTICS_DEBUG) console.warn("[GA4] unsupported environment"); return; }
+      analytics = getAnalytics(app);
+      window.HCCL.setAnalyticsUser(); // apply UID if the session is already signed in
+    }).catch(function (e) { console.warn("[GA4] init failed", e); });
+    // -------------------------------------------------------------------------
+
     // Auto-detect long-polling: falls back from the streaming WebChannel to
     // plain XHR long-polling on restrictive networks/proxies. (Does NOT defeat
     // a deliberate ad-block rule on firestore.googleapis.com - that needs the
@@ -254,15 +297,25 @@ try {
     // full-page redirect, which popup blockers can't stop.
     const POPUP_FALLBACK = new Set(["auth/popup-blocked", "auth/popup-closed-by-user", "auth/cancelled-popup-request", "auth/operation-not-supported-in-this-environment"]);
     window.HCCL.signIn = () =>
-      signInWithPopup(auth, provider).catch(e => {
+      signInWithPopup(auth, provider).then(r => {
+        // Fires only on a deliberate popup sign-in; a redirect sign-in completes
+        // in getRedirectResult below, and a silent session restore never gets here.
+        if (r) window.HCCL.track("login", { method: "google" });
+        return r;
+      }).catch(e => {
         if (e && POPUP_FALLBACK.has(e.code)) return signInWithRedirect(auth, provider);
         console.error(e); alert("Sign-in failed: " + (e && e.message || e));
       });
-    window.HCCL.signOut = () => signOut(auth).catch(e => console.error(e));
+    window.HCCL.signOut = () => {
+      window.HCCL.track("logout");
+      return signOut(auth).catch(e => console.error(e));
+    };
 
     setPersistence(auth, browserLocalPersistence).catch(() => {});
     // Complete a redirect-based sign-in if we're returning from one.
-    getRedirectResult(auth).catch(e => { console.error(e); alert("Sign-in failed: " + (e && e.message || e)); });
+    getRedirectResult(auth).then(r => {
+      if (r && r.user) window.HCCL.track("login", { method: "google" });
+    }).catch(e => { console.error(e); alert("Sign-in failed: " + (e && e.message || e)); });
     renderAuthBox(); renderAuthGate(); // "Connecting…" wall until the first auth event
 
     onAuthStateChanged(auth, async (user) => {
@@ -301,6 +354,7 @@ try {
         window.HCCL.user = null;
         window.HCCL.role = "none";
       }
+      window.HCCL.setAnalyticsUser(); // attach the non-PII Firebase UID to GA4 (no-op if signed out)
       window.HCCL.ready = true;
       applyRoleAttr();
       renderAuthBox(); renderAuthGate();
