@@ -1,0 +1,298 @@
+/* ============================================================
+   HC LIVE - the "Live Now" tab (js/live.js)
+   Broadcast-style scoreboard for hand-cricket matches, plus the
+   scorer's tap pad. Uses the site theme tokens from styles.css.
+   ============================================================ */
+
+/* Everything an admin/moderator gets and a viewer must not. Same mechanism the
+   rest of the app uses: firebase-init.js puts .can-edit on <body>. */
+body:not(.can-edit) .lv-admin { display: none !important; }
+
+:root {
+  --lv-live: #ff2d55;
+  --lv-turf: #123a24;
+  --lv-turf-2: #0d2b1a;
+}
+
+/* ===================== LOBBY ===================== */
+.lv-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+
+.lv-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.lv-card:hover { transform: translateY(-2px); border-color: #4a4a52; }
+.lv-card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.lv-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lv-card-title { font-size: 12px; color: var(--muted); letter-spacing: 0.6px; text-transform: uppercase; }
+
+.lv-chip {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+  padding: 4px 9px; border-radius: 999px;
+  background: var(--panel-3); border: 1px solid var(--border); color: var(--muted);
+  white-space: nowrap;
+}
+.lv-chip.is-live { background: rgba(255, 45, 85, 0.14); border-color: var(--lv-live); color: #ff738f; }
+.lv-chip.is-done { background: rgba(34, 197, 94, 0.12); border-color: rgba(34, 197, 94, 0.5); color: #6ee7a0; }
+.lv-chip.is-soon { background: rgba(255, 204, 0, 0.10); border-color: rgba(255, 204, 0, 0.45); color: var(--yellow); }
+
+/* The pulsing dot that says "this is happening right now". */
+.lv-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--lv-live); margin-right: 5px; vertical-align: middle;
+  animation: lv-pulse 1.4s ease-in-out infinite;
+}
+@keyframes lv-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+@media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
+
+.lv-card-team { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.lv-card-team .lv-tname { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-card-team .lv-tscore { font-family: "Russo One", sans-serif; font-size: 16px; white-space: nowrap; }
+.lv-card-team .lv-tov { color: var(--muted); font-size: 12px; font-family: inherit; margin-left: 5px; }
+.lv-card-team.is-batting .lv-tname { color: var(--yellow); }
+.lv-card-team.is-winner .lv-tname { color: var(--green); }
+
+.lv-card-note { font-size: 13px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 10px; }
+.lv-card-note.is-result { color: var(--green); font-weight: 600; }
+
+/* ===================== MATCH: top bar ===================== */
+.lv-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.lv-top-title { font-family: "Russo One", sans-serif; font-size: clamp(16px, 3.4vw, 20px); letter-spacing: 0.6px; }
+.lv-top-sub { color: var(--muted); font-size: 12px; }
+.lv-top-spacer { flex: 1; }
+
+/* ===================== MATCH: scoreboard ===================== */
+.lv-board {
+  background: linear-gradient(135deg, rgba(225, 6, 0, 0.10), transparent 45%), var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: clamp(14px, 3vw, 22px);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.lv-board-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+
+.lv-score-row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.lv-score-team { font-size: clamp(15px, 3vw, 19px); font-weight: 700; letter-spacing: 0.4px; }
+.lv-score-big {
+  font-family: "Russo One", sans-serif;
+  font-size: clamp(34px, 9vw, 56px);
+  line-height: 1;
+  background: linear-gradient(90deg, #fff, var(--yellow));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.lv-score-ov { font-size: clamp(14px, 3vw, 18px); color: var(--muted); font-family: "Russo One", sans-serif; padding-bottom: 5px; }
+
+/* CRR / target / RRR strip */
+.lv-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.lv-meta-box {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 8px 13px; min-width: 92px;
+}
+.lv-meta-box .k { display: block; font-size: 10px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+.lv-meta-box .v { display: block; font-family: "Russo One", sans-serif; font-size: 17px; margin-top: 3px; }
+.lv-meta-box.is-chase { border-color: rgba(255, 204, 0, 0.45); }
+.lv-meta-box.is-chase .v { color: var(--yellow); }
+
+.lv-need { margin-top: 14px; font-size: clamp(13px, 2.6vw, 15px); color: var(--text); font-weight: 600; }
+.lv-need em { color: var(--yellow); font-style: normal; }
+
+.lv-result {
+  margin-top: 14px; padding: 11px 14px;
+  background: rgba(34, 197, 94, 0.10); border: 1px solid rgba(34, 197, 94, 0.45);
+  border-radius: 12px; color: #6ee7a0; font-weight: 700;
+  font-size: clamp(14px, 3vw, 17px);
+}
+.lv-result.is-tie { background: rgba(255, 204, 0, 0.10); border-color: rgba(255, 204, 0, 0.45); color: var(--yellow); }
+
+/* first-innings line, shown under the chase */
+.lv-firstline { margin-top: 10px; font-size: 13px; color: var(--muted); }
+
+/* ===================== MATCH: stage (ground + at-the-crease) ===================== */
+/* align-items:start keeps each panel at its own height - otherwise the short
+   'at the crease' panel is stretched to match the ground and shows a large
+   empty box underneath it. */
+.lv-stage {
+  display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 16px; margin-bottom: 16px; align-items: start;
+}
+@media (max-width: 820px) { .lv-stage { grid-template-columns: 1fr; } }
+
+.lv-panel {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
+}
+.lv-panel h3 {
+  font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 12px; font-weight: 700;
+}
+
+.lv-ground-wrap { position: relative; }
+.lv-ground { display: block; width: 100%; height: auto; border-radius: 14px; overflow: hidden; }
+/* The value of the ball just bowled, flashed over the ground. */
+.lv-lastball {
+  position: absolute; top: 10px; right: 10px;
+  min-width: 46px; height: 46px; padding: 0 10px;
+  display: grid; place-items: center;
+  border-radius: 14px;
+  font-family: "Russo One", sans-serif; font-size: 22px;
+  background: var(--panel-3); border: 1px solid var(--border); color: var(--text);
+  box-shadow: var(--shadow);
+}
+.lv-lastball.v4 { background: linear-gradient(135deg, var(--yellow), var(--gold)); color: #1a1300; border-color: transparent; }
+.lv-lastball.v6 { background: linear-gradient(135deg, var(--red), #ff2a00); color: #fff; border-color: transparent; }
+.lv-lastball.vW { background: var(--lv-live); color: #fff; border-color: transparent; }
+
+.lv-wheel-key { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 11px; color: var(--muted); }
+.lv-wheel-key span { display: inline-flex; align-items: center; gap: 5px; }
+.lv-wheel-key i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+
+/* at the crease */
+.lv-crease { display: grid; gap: 10px; }
+.lv-crease-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 11px 13px;
+}
+.lv-crease-row .lv-who { flex: 1; min-width: 0; }
+.lv-crease-row .lv-role { display: block; font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+.lv-crease-row .lv-name { display: block; font-weight: 700; font-size: 15px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-crease-row .lv-figs { font-family: "Russo One", sans-serif; font-size: 17px; white-space: nowrap; }
+.lv-crease-row .lv-sub { display: block; font-size: 11px; color: var(--muted); text-align: right; margin-top: 3px; font-family: "Inter", sans-serif; }
+.lv-crease-row.is-striker { border-color: rgba(255, 204, 0, 0.45); }
+.lv-crease-row.is-striker .lv-name { color: var(--yellow); }
+.lv-crease-empty { color: var(--muted); font-size: 13px; padding: 14px 2px; }
+
+/* ===================== THIS OVER ===================== */
+.lv-over-strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lv-ball {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 14px;
+  background: var(--panel-3); border: 1px solid var(--border); color: var(--text);
+  flex: none;
+}
+.lv-ball.b0 { color: var(--muted); }
+.lv-ball.b4 { background: linear-gradient(135deg, var(--yellow), var(--gold)); color: #1a1300; border-color: transparent; }
+.lv-ball.b6 { background: linear-gradient(135deg, var(--red), #ff2a00); color: #fff; border-color: transparent; }
+.lv-ball.bW { background: var(--lv-live); color: #fff; border-color: transparent; }
+.lv-ball.is-pending { opacity: 0.28; border-style: dashed; }
+.lv-over-tot { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+/* ===================== SCORECARDS ===================== */
+.lv-sc-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.lv-sc-tab {
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; font-family: inherit;
+}
+.lv-sc-tab.active { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+
+.lv-table-wrap { overflow-x: auto; }
+.lv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 420px; }
+.lv-table th {
+  text-align: right; font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); padding: 0 8px 9px; font-weight: 700;
+}
+.lv-table th:first-child, .lv-table td:first-child { text-align: left; }
+.lv-table td { padding: 9px 8px; border-top: 1px solid var(--border); text-align: right; }
+.lv-table td:first-child { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-table .lv-r { font-family: "Russo One", sans-serif; }
+.lv-table tr.is-striker td { background: rgba(255, 204, 0, 0.06); }
+.lv-table tr.is-striker td:first-child { color: var(--yellow); font-weight: 700; }
+.lv-out { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.lv-empty { color: var(--muted); font-size: 13px; padding: 10px 2px; }
+.lv-fow { margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+.lv-fow b { color: var(--text); font-weight: 600; }
+
+/* commentary */
+.lv-comm { display: grid; gap: 8px; max-height: 420px; overflow-y: auto; }
+.lv-comm-row { display: flex; gap: 11px; align-items: flex-start; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.lv-comm-row:last-child { border-bottom: 0; }
+.lv-comm-ov { font-family: "Russo One", sans-serif; font-size: 12px; color: var(--muted); min-width: 34px; padding-top: 4px; }
+.lv-comm-txt { flex: 1; font-size: 13px; line-height: 1.5; }
+.lv-comm-txt b { color: var(--text); }
+
+/* ===================== SCORER PANEL ===================== */
+.lv-scorer {
+  margin-top: 18px;
+  background: linear-gradient(180deg, rgba(255, 204, 0, 0.05), transparent 40%), var(--panel);
+  border: 1px solid rgba(255, 204, 0, 0.30);
+  border-radius: var(--radius);
+  padding: clamp(14px, 3vw, 20px);
+}
+.lv-scorer-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.lv-scorer-head h3 {
+  font-family: "Russo One", sans-serif; font-size: 15px; letter-spacing: 1px;
+  color: var(--yellow);
+}
+.lv-scorer-ask { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.lv-scorer-ask em { color: var(--yellow); font-style: normal; }
+
+/* the 0-6 + W tap pad */
+.lv-pad { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 700px) { .lv-pad { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.lv-digit {
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: "Russo One", sans-serif;
+  font-size: clamp(20px, 5vw, 28px);
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.15s ease;
+  display: grid; place-items: center;
+}
+.lv-digit:hover:not(:disabled) { border-color: var(--gold); }
+.lv-digit:active:not(:disabled) { transform: scale(0.94); }
+.lv-digit:disabled { opacity: 0.4; cursor: not-allowed; }
+.lv-digit.d4 { background: linear-gradient(135deg, var(--yellow), var(--gold)); color: #1a1300; border-color: transparent; }
+.lv-digit.d6 { background: linear-gradient(135deg, var(--red), var(--red-dark)); color: #fff; border-color: transparent; }
+.lv-digit.dW { background: var(--lv-live); color: #fff; border-color: transparent; font-size: clamp(17px, 4vw, 22px); }
+
+/* picking a batsman / bowler */
+.lv-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.lv-pick {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 600; text-align: left;
+}
+.lv-pick:hover:not(:disabled) { border-color: var(--gold); }
+.lv-pick:disabled { opacity: 0.45; cursor: not-allowed; }
+.lv-pick .lv-pick-figs { font-size: 11px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+
+.lv-scorer-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.lv-hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+
+/* ===================== SETUP FORM ===================== */
+.lv-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; align-items: start; }
+.lv-form .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.lv-form .card h3 { font-size: 15px; margin-bottom: 14px; font-family: "Russo One", sans-serif; letter-spacing: 0.6px; }
+.lv-form label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.lv-form label > input, .lv-form label > select, .lv-form label > textarea { width: 100%; margin-top: 6px; display: block; }
+.lv-form textarea {
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 12px; border-radius: 10px; font-size: 14px; font-family: inherit;
+  outline: none; min-height: 190px; resize: vertical; line-height: 1.6;
+}
+.lv-form textarea:focus { border-color: var(--gold); }
+.lv-count { font-size: 11px; color: var(--muted); margin-top: -6px; }
+.lv-count.is-bad { color: var(--red); }
+.lv-form-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.lv-errs { color: var(--red); font-size: 13px; margin-top: 12px; line-height: 1.7; }
+
+/* ===================== MOBILE ===================== */
+@media (max-width: 560px) {
+  .lv-list { grid-template-columns: 1fr; }
+  .lv-meta-box { flex: 1 1 calc(50% - 5px); min-width: 0; }
+  .lv-ball { width: 30px; height: 30px; font-size: 13px; }
+  .lv-table { font-size: 12.5px; min-width: 380px; }
+}

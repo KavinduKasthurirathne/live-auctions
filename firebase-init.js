@@ -13,7 +13,7 @@ import {
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp,
-  collection, getDocs, writeBatch, query, orderBy, limit,
+  collection, getDocs, writeBatch, query, orderBy, limit, arrayUnion, arrayRemove,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAnalytics, logEvent, setUserId, isSupported,
@@ -284,7 +284,10 @@ try {
 
     window.HCCL.configured = true;
     window.HCCL.db = db;
-    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp, collection, getDocs, writeBatch, query, orderBy, limit };
+    // arrayUnion/arrayRemove let a client APPEND to an array field atomically
+    // (js/live.js appends one event per ball), so two scorers tapping at the
+    // same moment both land instead of one overwriting the other.
+    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp, collection, getDocs, writeBatch, query, orderBy, limit, arrayUnion, arrayRemove };
     window.HCCL.listMembers = async () => {
       const snap = await getDocs(collection(db, "users"));
       return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
