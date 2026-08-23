@@ -299,7 +299,7 @@
       const need = `<em>${ch.need} run${ch.need === 1 ? "" : "s"}</em> off <em>${ch.ballsLeft} ball${ch.ballsLeft === 1 ? "" : "s"}</em>`;
       line = `<div class="lv-need">${esc(eng().teamName(m, inn.batSide))} need ${need} with ${ch.wicketsLeft} wicket${ch.wicketsLeft === 1 ? "" : "s"} in hand</div>`;
     } else if (st.phase === "notStarted") {
-      line = `<div class="lv-need">${esc(eng().teamName(m, st.battingFirst))} to bat first — waiting for the first ball</div>`;
+      line = `<div class="lv-need">${esc(eng().teamName(m, st.battingFirst))} to bat first waiting for the first ball</div>`;
     }
 
     // Once the chase is on, keep the first innings visible underneath it.
@@ -408,7 +408,7 @@
       if (best) bits.push(`🎯 ${esc(nameOf(st, inn.bowlSide, best.id))} ${best.wickets}–${best.runs}`);
       return `<div class="lv-crease-row">
           <span class="lv-who">
-            <span class="lv-role">${esc(eng().teamName(st.match, inn.batSide))} — ${inn.runs}/${inn.wickets} (${eng().ballsToOvers(inn.balls)} ov)</span>
+            <span class="lv-role">${esc(eng().teamName(st.match, inn.batSide))} ${inn.runs}/${inn.wickets} (${eng().ballsToOvers(inn.balls)} ov)</span>
             <span class="lv-name" style="font-size:13.5px;font-weight:500">${bits.join(" &nbsp;·&nbsp; ")}</span>
           </span>
         </div>`;
@@ -534,7 +534,7 @@
       const bowler = esc(nameOf(st, inn.bowlSide, t.bowlerId));
       const bat = esc(nameOf(st, inn.batSide, t.batId));
       let txt;
-      if (t.v === "W") txt = `<b>OUT!</b> ${bat} b ${bowler} — ${t.runs}/${t.wickets}`;
+      if (t.v === "W") txt = `<b>OUT!</b> ${bat} b ${bowler} ${t.runs}/${t.wickets}`;
       else if (t.v === 0) txt = `${bowler} to ${bat}, <b>no run</b>`;
       else if (t.v === 6) txt = `${bowler} to ${bat}, <b>SIX!</b>`;
       else if (t.v === 4) txt = `${bowler} to ${bat}, <b>FOUR</b>`;
@@ -582,7 +582,7 @@
     let ask = "";
 
     if (st.phase === "complete") {
-      ask = `Match complete — <em>${esc(st.result.summary)}</em>`;
+      ask = `Match complete <em>${esc(st.result.summary)}</em>`;
       body = `<p class="lv-hint">Undo the last ball if it was entered by mistake; the result recalculates itself.</p>`;
     } else if (st.need === "bat") {
       const av = eng().availableBatsmen(st);
@@ -607,13 +607,13 @@
       }).join("")}</div>`;
     } else {
       const inn = st.live;
-      ask = `<em>${esc(nameOf(st, inn.bowlSide, inn.bowlerId))}</em> to <em>${esc(nameOf(st, inn.batSide, inn.strikerId))}</em> — tap what he scored`;
+      ask = `<em>${esc(nameOf(st, inn.bowlSide, inn.bowlerId))}</em> to <em>${esc(nameOf(st, inn.batSide, inn.strikerId))}</em> tap what he scored`;
       body = `<div class="lv-pad">
           ${eng().DIGITS.map(d =>
             `<button class="lv-digit d${d}" data-lv-run="${d}"${dis} aria-label="${d} run${d === 1 ? "" : "s"}">${d}</button>`).join("")}
           <button class="lv-digit dW" data-lv-wkt${dis} aria-label="Bowled">W</button>
         </div>
-        <p class="lv-hint">Strike never rotates — the same batsman keeps facing until he's bowled. Every wicket is credited to ${esc(nameOf(st, inn.bowlSide, inn.bowlerId))}.</p>`;
+        <p class="lv-hint">Strike never rotates the same batsman keeps facing until he's bowled. Every wicket is credited to ${esc(nameOf(st, inn.bowlSide, inn.bowlerId))}.</p>`;
     }
 
     const hasEvents = (m.events || []).length > 0;
@@ -665,7 +665,7 @@
         <button class="btn btn-dark btn-mini" data-lv-cancel>← Cancel</button>
         <div class="lv-top-title">${d.__isNew ? "New live match" : "Edit match"}</div>
       </div>
-      ${started ? `<p class="lv-hint" style="margin-bottom:14px">This match is already under way. Renaming a player is safe — his balls follow him. Removing a player who has already batted will leave his name blank on the scorecard.</p>` : ""}
+      ${started ? `<p class="lv-hint" style="margin-bottom:14px">This match is already under way. Renaming a player is safe his balls follow him. Removing a player who has already batted will leave his name blank on the scorecard.</p>` : ""}
       <div class="lv-form">
         <div class="card">
           <h3>Match</h3>
@@ -695,7 +695,7 @@
             <input type="text" id="lvName${side}" placeholder="e.g. ${side === "A" ? "Royal Strikers" : "Night Riders"}"
                    value="${esc(d.teams[side].name)}" />
           </label>
-          <label>Playing XI — one name per line
+          <label>Playing XI one name per line
             <textarea id="lvSquad${side}" data-lv-squad="${side}"
               placeholder="Kasun Perera&#10;Nimal Silva&#10;Sunil Fernando">${esc(lines(side))}</textarea>
           </label>
@@ -760,7 +760,7 @@
     await act(async () => {
       await putMatch(d);
       screen = "match"; openId = d.id; draft = null; formMounted = false; scPick = null;
-      toast(isNew ? "Match created — start scoring" : "Match updated", "good");
+      toast(isNew ? "Match created start scoring" : "Match updated", "good");
     });
   }
 

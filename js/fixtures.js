@@ -702,7 +702,7 @@
     if (!innings.length) return "";
     return innings.map(inn => {
       const battingTeam = inn.team || teamName(inn.side === "home" ? m.homeTeamId : m.awayTeamId);
-      const label = `${battingTeam} — ${inn.order === 2 ? "2nd" : "1st"} innings`;
+      const label = `${battingTeam} ${inn.order === 2 ? "2nd" : "1st"} innings`;
       return testBattingCard(sc.players, inn.seq, label, inn) + testBowlingCard(sc.players, inn.seq, battingTeam);
     }).join("");
   }
@@ -933,7 +933,7 @@
     // time before the innings started.
     const isTest = !!d.isTest;
     const testInningsBlock = !isTest ? "" : (d.innings || []).map((inn, i) => {
-      const label = `${teamName(inn.side === "home" ? m.homeTeamId : m.awayTeamId)} — ${inn.order === 2 ? "2nd" : "1st"} innings`;
+      const label = `${teamName(inn.side === "home" ? m.homeTeamId : m.awayTeamId)} ${inn.order === 2 ? "2nd" : "1st"} innings`;
       return `<fieldset class="fx-scorebox fx-inn-box">
         <legend>${esc(label)}</legend>
         <label class="fx-check">
@@ -983,7 +983,7 @@
     // wrong: show it, say where it came from, and warn loudly when it's missing.
     const quotaNote = d.oversPerSide
       ? `<span class="hint">A side bowled out early is charged the full ${esc(String(d.oversPerSide))} overs in the NRR, per official rules.</span>`
-      : `<span class="hint fx-hint-so">⚠️ Couldn't read the over quota from this report — enter it, or net run rate falls back to the overs actually faced.</span>`;
+      : `<span class="hint fx-hint-so">⚠️ Couldn't read the over quota from this report enter it, or net run rate falls back to the overs actually faced.</span>`;
     const quotaRow = `<label>Overs per side <span class="fx-opt">(used for net run rate)</span>
         <input type="number" min="0" step="1" id="fxOversQuota" placeholder="e.g. 6" value="${esc(String(d.oversPerSide || ""))}" />
         ${quotaNote}
@@ -992,7 +992,7 @@
     const body = `${banner}
       <div class="fx-form">
         ${isTest
-        ? `<p class="hint fx-test-note">🏏 <b>Test match</b> — enter each innings below. Points: win ${eng().CONFIG.test.points.win} · draw ${eng().CONFIG.test.points.draw} · tie ${eng().CONFIG.test.points.tie} · loss ${eng().CONFIG.test.points.loss}, plus per-innings bonuses.</p>
+        ? `<p class="hint fx-test-note">🏏 <b>Test match</b> enter each innings below. Points: win ${eng().CONFIG.test.points.win} · draw ${eng().CONFIG.test.points.draw} · tie ${eng().CONFIG.test.points.tie} · loss ${eng().CONFIG.test.points.loss}, plus per-innings bonuses.</p>
            ${testInningsBlock}`
         : `${scoreRow("home", teamName(m.homeTeamId) + " (home)")}
            ${scoreRow("away", teamName(m.awayTeamId) + " (away)")}

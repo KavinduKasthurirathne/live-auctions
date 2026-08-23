@@ -854,7 +854,7 @@
   }
 
   /* ============================================================
-     TOURNAMENT PAGE (Cricbuzz-style) — list ⇄ detail in #view-series.
+     TOURNAMENT PAGE (Cricbuzz-style) list ⇄ detail in #view-series.
      #view-series holds two PERSISTENT children (index.html): #seriesList and
      #tournamentDetail (a head + inner tab bar #tournamentTabs + #tournamentPanels).
      Inline panels (overview/squads/players/stats) are filled here; the hosted

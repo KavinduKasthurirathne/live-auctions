@@ -96,17 +96,17 @@ A scorer taps a digit for every ball; everyone else watches their own phone upda
 real time.
 
 **This tab is deliberately standalone.** It shares no data with the auction, tournaments,
-fixtures, fantasy or rankings — its own Firestore collection, its own teams, its own
+fixtures, fantasy or rankings its own Firestore collection, its own teams, its own
 players. Nothing you do here affects anything else in the app, and nothing elsewhere
 affects it.
 
 ### The rules it encodes
 
-- Only the digits **0 1 2 3 4 5 6**, plus **W** (bowled — the only way out). No extras,
+- Only the digits **0 1 2 3 4 5 6**, plus **W** (bowled the only way out). No extras,
   so every ball is legal and an over is *always* six balls.
 - **Strike never rotates.** Odd runs don't swap, the end of an over doesn't swap. One
   batsman is at the crease until he's bowled, so there is no non-striker and no
-  partnership — the batting card shows the current batsman starred plus everyone who
+  partnership the batting card shows the current batsman starred plus everyone who
   has already batted.
 - **Every wicket goes to the bowler of that over.**
 - The scorer picks the incoming batsman after each wicket, and a bowler at the start of
@@ -118,13 +118,13 @@ affects it.
 
 **＋ New Match** asks for team names, a **playing XI per side typed one name per line**,
 overs, wickets per innings, and who bats first. Title and venue are optional. Renaming a
-player later is safe — the squad is re-parsed by name, so an existing player keeps his id
+player later is safe the squad is re-parsed by name, so an existing player keeps his id
 and every ball he has faced follows him.
 
 ### Scoring
 
 The scoring panel sits underneath the scoreboard and only ever asks for one thing at a
-time — the opening batsman, then the bowler, then the tap pad. After a wicket it asks who
+time the opening batsman, then the bowler, then the tap pad. After a wicket it asks who
 is in; at the end of an over it asks who bowls the next one. **↩ Undo last** is always
 available and is always exact.
 
@@ -133,18 +133,18 @@ available and is always exact.
 | | Viewer | Moderator / Admin |
 |---|---|---|
 | Scoreboard, ground & wagon wheel, over track, full scorecards, commentary | ✅ | ✅ |
-| Create / edit / delete a match, the scoring panel, Undo, End innings | — | ✅ |
+| Create / edit / delete a match, the scoring panel, Undo, End innings | | ✅ |
 
 The scoring panel is CSS-gated on `body.can-edit` (the same mechanism the rest of the app
 uses) *and* every write is refused by `firestore.rules` unless the caller is a moderator
-or an admin — so a viewer cannot score by poking at the DOM.
+or an admin so a viewer cannot score by poking at the DOM.
 
 ### Why the score is never stored
 
-`liveMatches/{id}` holds the match **settings** and an ordered **event list** — one small
-event per ball — and never a score. Every client folds those events through the same pure
+`liveMatches/{id}` holds the match **settings** and an ordered **event list** one small
+event per ball and never a score. Every client folds those events through the same pure
 function (`js/live-engine.js`) to derive everything on screen. That is what makes Undo
-exact (drop the last event and recompute — nothing to unwind by hand, so the score can
+exact (drop the last event and recompute nothing to unwind by hand, so the score can
 never drift out of step with the cards), keeps each write tiny, and guarantees two devices
 can never disagree. Appends use Firestore's `arrayUnion`, so two scorers tapping at the
 same instant both land instead of one silently overwriting the other.
@@ -311,7 +311,7 @@ This feature does not work until `firestore.rules` is published - viewers get
 | viewer | `list` entries | match still open | ❌ |
 | viewer | `list` entries | match closed | ✅ |
 | viewer `U` | `get …/entries/U` | match still open | ✅ |
-| signed-out | `get …/entries/U` | — | ❌ |
+| signed-out | `get …/entries/U` | | ❌ |
 
 Repeat the first few against `fantasyEntries/<other-tid>/…` to exercise the non-legacy
 branch, then spot-check as a viewer that `auction/league/players/X`, `matches/X`, `mvp/X`,
