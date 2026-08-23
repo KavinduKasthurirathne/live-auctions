@@ -1314,13 +1314,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .news-title { font-family: "Russo One", sans-serif; font-weight: 700; font-size: clamp(17px, 3vw, 21px); letter-spacing: 1px; }
 .news-alerts.on { color: var(--yellow); border-color: rgba(255, 204, 0, 0.4); }
 
-/* Unread-news badge on the Home nav pill + a dot on the mobile hamburger. */
-.nav-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 17px; height: 17px; padding: 0 4px; margin-left: 6px;
-  border-radius: 999px; background: var(--red); color: #fff;
-  font-size: 10px; font-weight: 800; line-height: 1; vertical-align: middle;
-}
+/* Unread news shows as a dot on the mobile hamburger only. The Home nav pill
+   used to carry a red count badge too; it was removed as visual noise, so
+   news.js's updateBadge() simply finds no #newsBadge and skips it. */
 body.has-news-unread .nav-toggle::after {
   content: ""; position: absolute; top: 8px; right: 8px;
   width: 8px; height: 8px; border-radius: 50%; background: var(--red);
