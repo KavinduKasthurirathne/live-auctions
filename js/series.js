@@ -368,8 +368,14 @@
         if (!meta.honors) delete meta.honors;
         await a.setDoc(a.doc(d, "tournaments", seed.id), meta);
       }
+      // Only bump the seed version - NEVER override an admin's chosen default.
+      // Preserve the stored activeId (cfg.activeId) and merge so we don't drop
+      // other fields. Resetting activeId here was the "reverts to S06 on refresh"
+      // bug: this runs before the snapshot handler reads activeId from cfg, so
+      // `activeId` is still the initial LEGACY_ID at this point.
       await a.setDoc(a.doc(d, "tournaments", "_config"),
-        { activeId: activeId || LEGACY_ID, seasonSeedVersion: SEASON_SEED_VERSION });
+        { activeId: (cfg && cfg.activeId) || activeId || LEGACY_ID, seasonSeedVersion: SEASON_SEED_VERSION },
+        { merge: true });
     } catch (e) { console.warn("tournament seed failed:", e); seasonSeedTried = false; }
   }
 
@@ -580,7 +586,11 @@
     if (busy || !metaOf(id)) return;
     if (!editorOn() || !cloudOn()) return;
     try {
-      await fsa().setDoc(fsa().doc(db(), "tournaments", "_config"), { activeId: id });
+      // MERGE, don't replace: a plain setDoc would drop seasonSeedVersion, and a
+      // _config without it makes maybeSeedSeasons re-run on the next load and
+      // reset activeId back to the legacy season - the "reverts to S06 on
+      // refresh" bug. Merge keeps the version so the seeder stays quiet.
+      await fsa().setDoc(fsa().doc(db(), "tournaments", "_config"), { activeId: id }, { merge: true });
       toast(`${metaOf(id).name} is now the default tournament`, "good");
     } catch (e) { console.error(e); toast("Couldn't set the default tournament", "bad"); }
   }
