@@ -321,6 +321,32 @@ try {
     }).catch(e => { console.error(e); alert("Sign-in failed: " + (e && e.message || e)); });
     renderAuthBox(); renderAuthGate(); // "Connecting…" wall until the first auth event
 
+    // ---- lastAccessedAt: most-recent meaningful visit -----------------------
+    // Distinct from Firebase Auth's lastSignInTime: this records every time the
+    // app is actually OPENED, including silent session restores (onAuthStateChanged
+    // fires on those too - no re-login needed). Throttled per-uid via localStorage
+    // so page reloads, multiple tabs and tab-refocus don't spam Firestore. 30 min
+    // mirrors GA4's session window - a natural "new visit" boundary. Merge-safe
+    // (updateDoc touches only this one field) and fire-and-forget (a failed write,
+    // e.g. rules not yet published, never blocks or crashes the app).
+    const ACCESS_THROTTLE_MS = 30 * 60 * 1000;
+    function touchLastAccessed() {
+      const u = window.HCCL.user;
+      if (!u || !u.uid) return;
+      const key = "hccl_last_access_" + u.uid;
+      let last = 0;
+      try { last = Number(localStorage.getItem(key)) || 0; } catch (e) {}
+      if (Date.now() - last < ACCESS_THROTTLE_MS) return; // wrote recently - skip
+      // Stamp BEFORE the write so a denied/failed write can't retry-storm on reload.
+      try { localStorage.setItem(key, String(Date.now())); } catch (e) {}
+      updateDoc(doc(db, "users", u.uid), { lastAccessedAt: serverTimestamp() })
+        .catch(e => console.warn("lastAccessedAt update skipped:", (e && e.code) || e));
+    }
+    // Coming back to a long-open tab counts as a fresh access (still throttled).
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") touchLastAccessed();
+    });
+
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         const owner = (window.HCCL_ADMIN_EMAILS || []).includes(user.email);
@@ -353,6 +379,9 @@ try {
         if (owner) role = "admin";
         window.HCCL.user = { uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL };
         window.HCCL.role = role;
+        // Record this visit. The doc exists by now (just created above, or already
+        // present); throttled + fire-and-forget so it never delays or breaks sign-in.
+        touchLastAccessed();
       } else {
         window.HCCL.user = null;
         window.HCCL.role = "none";

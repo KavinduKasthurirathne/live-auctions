@@ -37,8 +37,14 @@ service cloud.firestore {
       // (the owner email may bootstrap itself as 'admin').
       allow create: if signedIn() && request.auth.uid == uid
                     && (isOwner() || request.resource.data.role == 'viewer');
-      // Only admins can change/remove roles.
-      allow update, delete: if isAdmin();
+      // Admins can change/remove roles. A user may ALSO update their OWN doc,
+      // but ONLY the lastAccessedAt field (last-visit tracking) - affectedKeys
+      // hasOnly() blocks self-promotion or any other field edit. Deletes stay
+      // admin-only.
+      allow update: if isAdmin()
+                    || (signedIn() && request.auth.uid == uid
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAccessedAt']));
+      allow delete: if isAdmin();
     }
 
     // Shared fantasy data (Phase C): fantasy/league/{teams|players|contestants|days}/{id}.
