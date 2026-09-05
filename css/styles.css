@@ -601,6 +601,7 @@ html.nav-locked { overflow: hidden; }
 /* Viewers (and signed-out users, when Firebase is configured) get a read-only
    app: no control buttons, no setup/management pages. firebase-init.js toggles
    .can-edit on <body> for admin/moderator (and for fully-offline mode). */
+body:not(.can-edit) .rtm-actions,              /* RTM decision buttons (panel itself stays) */
 body:not(.can-edit) .auctioneer-bar,           /* SOLD / Unsold / Undo / Reset */
 body:not(.can-edit) #teamsBidGrid,             /* per-team bid buttons */
 body:not(.can-edit) .tab[data-tab="setup"],    /* auction Setup tab */
@@ -1572,4 +1573,57 @@ body:not(.can-edit) .news-composer { display: none; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ===================== RIGHT TO MATCH (RTM) =====================
+   The handshake panel on the auction board. Rendered from state.auction.rtm so
+   every device shows the same thing; viewers get it read-only (the .rtm-actions
+   row is hidden for them by the role-gating block above). */
+.rtm-panel {
+  border: 1px solid var(--gold);
+  background: linear-gradient(180deg, rgba(245,179,1,0.10), rgba(245,179,1,0.03));
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
+  animation: rtmIn .22s ease;
+}
+@keyframes rtmIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.rtm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.rtm-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.6px; color: var(--gold);
+  border: 1px solid rgba(245,179,1,0.5); border-radius: 999px; padding: 3px 10px;
+}
+.rtm-clock {
+  font-family: "Russo One", sans-serif; font-size: 20px; color: var(--yellow);
+  min-width: 62px; text-align: right; font-variant-numeric: tabular-nums;
+}
+.rtm-clock.over { color: var(--red); animation: rtmPulse 1s infinite; }
+@keyframes rtmPulse { 50% { opacity: .45; } }
+.rtm-body { display: flex; align-items: center; gap: 14px; }
+.rtm-body .team-logo { flex: none; width: 52px; height: 52px; }
+.rtm-text { min-width: 0; }
+.rtm-title { font-size: 16px; font-weight: 800; margin-bottom: 3px; }
+.rtm-sub { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.rtm-meta { font-size: 11.5px; color: var(--muted); margin-top: 6px; letter-spacing: .3px; }
+.rtm-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+.rtm-actions .btn { flex: 1 1 auto; min-width: 120px; }
+.rtm-actions .rtm-cancel { flex: 0 0 auto; min-width: 0; font-size: 12px; opacity: .75; }
+.rtm-raise-input {
+  flex: 1 1 120px; min-width: 110px; padding: 10px 12px; border-radius: 10px;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font-size: 14px;
+}
+/* "Last season: <team>" chip on the player card, and the RTM squad tag. */
+.rtm-former {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--gold);
+  border: 1px solid rgba(245,179,1,0.4); border-radius: 999px; padding: 3px 10px;
+}
+.rt-rtm { --rt: #f5b301; }            /* RTM chip accent (see the retention tags) */
+/* Per-team "RTM card still in hand" dot on the bid buttons / purse cards. */
+.rtm-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--gold); margin-left: 6px; vertical-align: middle;
+  box-shadow: 0 0 0 2px rgba(245,179,1,0.18);
+}
+@media (max-width: 560px) {
+  .rtm-body { flex-direction: column; align-items: flex-start; }
+  .rtm-actions .btn { flex: 1 1 100%; }
 }

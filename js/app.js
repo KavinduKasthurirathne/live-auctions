@@ -21,10 +21,17 @@ function defaultState() {
       defaultPurse: 100,
       squadSize: 5,      // players per team; a team may override via team.maxPlayers
       bidIncrement: 1,
+      // Right to Match: a team may reclaim a player who was on its roster last
+      // season by matching the winning bid. rtmCards is per team (IPL: 1).
+      rtmEnabled: true,
+      rtmCards: 1,
+      prevTournamentId: "", // which tournament counts as "last season"
     },
     teams: [],   // { id, name, logo, purse, maxPlayers }
-    players: [], // { id, name, role, basePrice, photo, status, soldTo, soldPrice }
-    auction: { currentPlayerId: null, currentBid: 0, currentBidderId: null, soldStage: 0, bidLog: [], lastResult: null },
+    players: [], // { id, name, role, basePrice, photo, status, soldTo, soldPrice, formerTeamId, rtmBy }
+    // rtm: null, or the live Right-to-Match handshake (see the RTM section below).
+    // It rides state.auction, so the existing `live` doc broadcasts it to every device.
+    auction: { currentPlayerId: null, currentBid: 0, currentBidderId: null, soldStage: 0, bidLog: [], lastResult: null, rtm: null },
     lastAction: null, // { type, playerId }for Undo
   };
 }
@@ -42,6 +49,10 @@ function normalize(s) {
     if (p.role === undefined) p.role = "";
     if (p.photo === undefined) p.photo = "";
     if (p.retained === undefined) p.retained = false;
+    // RTM: which team held him last season ("" / null = unset, "none" = explicitly
+    // nobody), and which team spent an RTM card to sign him.
+    if (p.formerTeamId === undefined) p.formerTeamId = null;
+    if (p.rtmBy === undefined) p.rtmBy = null;
   });
   s.auction = { ...d.auction, ...(s.auction || {}) };
   if (!Array.isArray(s.auction.bidLog)) s.auction.bidLog = [];
@@ -539,6 +550,73 @@ function squadInfo(s, teamId) {
   return { squadCount, maxPlayers, slotsLeft, purse, spent, remaining, minBase, reserve, safeBid };
 }
 
+/* ============================================================
+   RIGHT TO MATCH (RTM)  -  IPL 2025 rules
+   A player's LAST-SEASON franchise may reclaim him when he's about to be sold
+   to someone else: the winning bidder gets ONE final raise, then the former
+   team either matches that price or passes.
+
+   Everything here is DERIVED (no stored counters) - the same discipline as
+   teamSpent/squadInfo. In particular the RTM card count is computed from the
+   players a team actually signed via RTM, so Undo hands the card straight back
+   and a counter can never drift out of step with the squad.
+   ============================================================ */
+
+// Is RTM in play at all? Off for fixed-squad tournaments (no auction) and when
+// the league switched it off.
+function rtmOn(s) {
+  s = s || state;
+  if (!s.settings || s.settings.rtmEnabled === false) return false;
+  if (window.HCCLSeries && typeof window.HCCLSeries.hasAuction === "function"
+      && !window.HCCLSeries.hasAuction()) return false;
+  return true;
+}
+const rtmCardsPerTeam = s => Math.max(0, Number((s || state).settings.rtmCards ?? 1) || 0);
+// Cards SPENT = players this team currently holds that it signed with an RTM.
+function rtmUsed(s, teamId) {
+  s = s || state;
+  return s.players.filter(p => p.status === "sold" && p.soldTo === teamId && p.rtmBy === teamId).length;
+}
+function rtmLeft(s, teamId) {
+  s = s || state;
+  return Math.max(0, rtmCardsPerTeam(s) - rtmUsed(s, teamId));
+}
+
+/* The team that held this player last season, or "" when there isn't one.
+   "none" is an explicit "nobody" set by an admin; a stale id (team deleted
+   since) resolves to "". */
+function formerTeamIdOf(s, player) {
+  s = s || state;
+  const raw = player && player.formerTeamId;
+  if (!raw || raw === "none") return "";
+  return s.teams.some(t => t.id === raw) ? raw : "";
+}
+
+/* Can the former team invoke RTM on this sale? Reuses the SAME squad-cap and
+   Safe-Bid guards as a normal bid, so an RTM can never break a squad or budget.
+   Returns { ok, formerTeamId, reason }. */
+function rtmEligible(s, player, winnerTeamId, price) {
+  s = s || state;
+  if (!rtmOn(s)) return { ok: false, reason: "off" };
+  if (!player || player.retained) return { ok: false, reason: "no-player" };
+  const formerTeamId = formerTeamIdOf(s, player);
+  if (!formerTeamId) return { ok: false, reason: "no-former-team" };
+  if (formerTeamId === winnerTeamId) return { ok: false, formerTeamId, reason: "already-theirs" };
+  if (rtmLeft(s, formerTeamId) <= 0) return { ok: false, formerTeamId, reason: "no-card" };
+  const info = squadInfo(s, formerTeamId);
+  if (info.slotsLeft <= 0) return { ok: false, formerTeamId, reason: "squad-full" };
+  if (info.safeBid < price) return { ok: false, formerTeamId, reason: "cant-afford" };
+  return { ok: true, formerTeamId, reason: "" };
+}
+
+/* Highest price the winning bidder may raise to during the RTM raise step -
+   their own Safe Bid, so a raise can't break THEIR squad completion either. */
+function rtmMaxRaise(s, winnerTeamId) {
+  s = s || state;
+  const info = squadInfo(s, winnerTeamId);
+  return Math.max(0, info.safeBid);
+}
+
 /* turn an image File into a resized data URL so it fits in localStorage */
 function fileToDataURL(file, maxSize = 400, format = "jpeg") {
   return new Promise((resolve, reject) => {
@@ -660,9 +738,9 @@ function renderAll() {
    auction owns - in both cloud and localStorage mode. */
 window.HCCLAuction = {
   teams:    () => state.teams.map(t => ({ id: t.id, name: t.name, logo: t.logo || "" })),
-  squad:    id => teamPlayers(id).map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
+  squad:    id => teamPlayers(id).map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained, rtm: !!p.rtmBy, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
   team:     id => { const t = getTeam(id); return t ? { id: t.id, name: t.name, logo: t.logo || "" } : null; },
-  players:  () => state.players.map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained, status: p.status, soldTo: p.soldTo || null, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
+  players:  () => state.players.map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained, rtm: !!p.rtmBy, status: p.status, soldTo: p.soldTo || null, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
   money,
   settings: () => ({ ...state.settings }),
 };
@@ -736,6 +814,19 @@ function renderAuction() {
   setPhoto($("#playerPhoto"), player.photo, initials(player.name));
   $("#playerName").textContent = player.name;
   $("#playerRole").textContent = player.role || "";
+  // Last-season franchise (drives Right to Match) - shown on the block so the
+  // room knows an RTM is possible before bidding closes.
+  const roleBox = $("#playerRole");
+  const prevChip = roleBox ? roleBox.parentElement.querySelector(".rtm-former") : null;
+  if (prevChip) prevChip.remove();
+  const ftId = rtmOn(state) ? formerTeamIdOf(state, player) : "";
+  if (ftId && roleBox) {
+    const ft = getTeam(ftId);
+    const chip = document.createElement("div");
+    chip.className = "rtm-former";
+    chip.textContent = `RTM  last season: ${ft ? ft.name : ""}`;
+    roleBox.insertAdjacentElement("afterend", chip);
+  }
   $("#playerBase").textContent = money(player.basePrice);
   const queue = state.players.filter(p => !p.retained);
   $("#playerCounter").textContent = `Player ${queue.indexOf(player) + 1} / ${queue.length}`;
@@ -748,6 +839,7 @@ function renderAuction() {
   $("#currentLeader").style.color = leader ? "var(--yellow)" : "var(--muted)";
 
   renderTeamButtons();
+  renderRtmPanel();
   renderSoldButton();
   renderBidLog();
 
@@ -806,7 +898,8 @@ function renderTeamButtons() {
     btn.innerHTML = `
       ${logoHTML("tb-logo", t.logo, t.name)}
       <span class="tb-meta">
-        <span class="tb-name">${esc(t.name)}</span>
+        <span class="tb-name">${esc(t.name)}${rtmOn(state) && rtmLeft(state, t.id) > 0
+          ? `<i class="rtm-dot" title="Right to Match card still in hand"></i>` : ""}</span>
         <span class="tb-purse">${leading ? "★ Leading" : money(info.remaining) + " left"}</span>
       </span>
       ${i < 9 ? `<span class="tb-key">${i + 1}</span>` : ""}`;
@@ -848,9 +941,94 @@ function renderSquadTracker() {
 }
 
 
+/* ---------------- RTM panel ----------------
+   Rendered from state.auction.rtm, so it looks identical on every device.
+   Action buttons are wrapped in .rtm-actions, which the existing
+   `body:not(.can-edit)` rule hides - viewers get the prompt + clock, no controls. */
+let rtmTick = null;
+function stopRtmClock() { if (rtmTick) { clearInterval(rtmTick); rtmTick = null; } }
+
+function rtmClockHtml(endsAt) {
+  const left = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+  const over = left <= 0;
+  return `<span class="rtm-clock${over ? " over" : ""}" data-rtm-clock="${endsAt}">${
+    over ? "TIME UP" : left + "s"}</span>`;
+}
+
+function renderRtmPanel() {
+  const box = $("#rtmPanel");
+  if (!box) return;
+  stopRtmClock();
+  const r = state.auction.rtm;
+  if (!r) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+
+  const ft = getTeam(r.formerTeamId), win = getTeam(r.winnerTeamId);
+  const player = getPlayer(r.playerId);
+  const ftName = ft ? ft.name : "Former team";
+  const winName = win ? win.name : "the bidder";
+  const info = ft ? squadInfo(state, ft.id) : null;
+  const badge = logoHTML("team-logo", ft ? ft.logo : "", ftName);
+
+  let head = "", body = "", actions = "";
+  if (r.phase === "prompt") {
+    head = `${ftName} may match ${money(r.bidPrice)}`;
+    body = `<b>${esc(player ? player.name : "")}</b> played for <b>${esc(ftName)}</b> last season.`;
+    actions = `<button class="btn btn-yellow" data-rtm="use">Use RTM</button>
+               <button class="btn btn-dark" data-rtm="pass">Pass</button>`;
+  } else if (r.phase === "raise") {
+    const max = rtmMaxRaise(state, r.winnerTeamId);
+    head = `${winName} may raise once`;
+    body = `<b>${esc(ftName)}</b> used their RTM card. <b>${esc(winName)}</b> can raise above
+            <b>${money(r.bidPrice)}</b> (up to ${money(max)}) or stand pat.`;
+    actions = `<input type="number" class="rtm-raise-input" id="rtmRaiseAmt" min="${r.bidPrice + 1}"
+                 max="${max}" step="any" placeholder="${r.bidPrice + (Number(state.settings.bidIncrement) || 1)}" />
+               <button class="btn btn-yellow" data-rtm="raise">Raise</button>
+               <button class="btn btn-dark" data-rtm="noraise">No raise</button>`;
+  } else { // match
+    const raised = r.finalPrice > r.bidPrice;
+    head = `${ftName} to match ${money(r.finalPrice)}`;
+    body = raised
+      ? `<b>${esc(winName)}</b> raised to <b>${money(r.finalPrice)}</b>. Match it, or he goes to them at that price.`
+      : `No raise. <b>${esc(ftName)}</b> can sign him at <b>${money(r.finalPrice)}</b>.`;
+    const afford = info && info.safeBid >= r.finalPrice && info.slotsLeft > 0;
+    actions = `<button class="btn btn-yellow" data-rtm="match" ${afford ? "" : "disabled"}
+                 title="${afford ? "" : "Beyond their Safe Bid or squad is full"}">Match ${money(r.finalPrice)}</button>
+               <button class="btn btn-dark" data-rtm="decline">Decline</button>`;
+  }
+
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="rtm-head">
+      <span class="rtm-tag">RIGHT TO MATCH</span>
+      ${rtmClockHtml(r.endsAt)}
+    </div>
+    <div class="rtm-body">
+      ${badge}
+      <div class="rtm-text">
+        <div class="rtm-title">${esc(head)}</div>
+        <div class="rtm-sub">${body}</div>
+        ${info ? `<div class="rtm-meta">${esc(ftName)}: ${money(info.remaining)} left  ${info.slotsLeft} slot${info.slotsLeft === 1 ? "" : "s"}  RTM ${rtmLeft(state, r.formerTeamId)}/${rtmCardsPerTeam(state)}</div>` : ""}
+      </div>
+    </div>
+    <div class="rtm-actions">${actions}
+      <button class="btn btn-dark rtm-cancel" data-rtm="cancel" title="Abandon RTM and sell to the leading bidder">Cancel RTM</button>
+    </div>`;
+
+  // Advisory clock only - it never commits anything.
+  rtmTick = setInterval(() => {
+    const el = $("[data-rtm-clock]");
+    if (!el) { stopRtmClock(); return; }
+    const ends = Number(el.getAttribute("data-rtm-clock")) || 0;
+    const left = Math.max(0, Math.ceil((ends - Date.now()) / 1000));
+    el.textContent = left <= 0 ? "TIME UP" : left + "s";
+    el.classList.toggle("over", left <= 0);
+  }, 250);
+}
+
 function renderSoldButton() {
   const btn = $("#btnSold");
   const a = state.auction;
+  if (a.rtm) { btn.textContent = "RTM in progress"; btn.className = "btn btn-sold"; btn.disabled = true; return; }
   const labels = { 0: "SOLD", 1: "GOING ONCE!", 2: "GOING TWICE!", 3: "GOING THRICESELL!" };
   btn.className = "btn btn-sold" + (a.soldStage ? ` stage-${a.soldStage}` : "");
   btn.textContent = labels[a.soldStage];
@@ -909,26 +1087,143 @@ function placeBid(teamId) {
 }
 
 function advanceSold() {  const a = state.auction;
+  if (a.rtm) return;                    // an RTM handshake owns the board right now
   if (a.currentBidderId == null) { toast("No bids yetuse Unsold instead", "bad"); return; }
   if (a.soldStage < 3) { a.soldStage++; save(); renderSoldButton(); }
-  else { finalizeSold(); }
+  // The final tap doesn't sell outright any more: if the player's last-season
+  // team can match, pause here and let them decide (maybeStartRtm returns true).
+  else if (!maybeStartRtm()) { finalizeSold(); }
 }
 
-function finalizeSold() {
+/* Sell the player on the block. Defaults to the winning bidder at the standing
+   bid; the RTM paths pass an explicit team/price (and viaRtm to spend the card). */
+function finalizeSold(opts) {
   const player = currentPlayer();
   const a = state.auction;
-  const team = getTeam(a.currentBidderId);
+  const o = opts || {};
+  const teamId = o.teamId != null ? o.teamId : a.currentBidderId;
+  const team = getTeam(teamId);
   if (!player || !team) return;
-  const price = a.currentBid;
+  const price = o.price != null ? o.price : a.currentBid;
   player.status = "sold";
   player.soldTo = team.id;
   player.soldPrice = price;
   player.soldBids = (a.bidLog || []).length; // bid count, for the Insights "Biggest Bid War"
+  // Spending the card is recorded ON THE PLAYER - that's what makes rtmLeft()
+  // derived, and what makes Undo give the card back for free.
+  player.rtmBy = o.viaRtm ? team.id : null;
   state.lastAction = { type: "sold", playerId: player.id };
-  a.lastResult = { type: "sold", playerId: player.id, playerName: player.name, teamId: team.id, teamName: team.name, price };
+  a.rtm = null;
+  a.lastResult = { type: "sold", playerId: player.id, playerName: player.name,
+                   teamId: team.id, teamName: team.name, price, viaRtm: !!o.viaRtm };
   resetBidState();
   save();
   renderAll();
+}
+
+/* ---------------- RTM handshake (auctioneer-driven, synced to everyone) ----------------
+   Phases: prompt -> (raise) -> match. Every step writes state.auction.rtm and
+   save()s, so the live doc broadcasts the exact same board to all devices.
+   The countdown is ADVISORY: endsAt only drives the on-screen clock - nothing
+   ever auto-commits, the auctioneer always taps. */
+const RTM_WINDOW_MS = 15000;
+
+// Called on the final SOLD tap. Returns true when it opened an RTM prompt
+// (so the caller must NOT sell), false to sell normally.
+function maybeStartRtm() {
+  const a = state.auction;
+  const player = currentPlayer();
+  const price = a.currentBid;
+  const el = rtmEligible(state, player, a.currentBidderId, price);
+  if (!el.ok) return false;
+  a.rtm = {
+    phase: "prompt",
+    playerId: player.id,
+    formerTeamId: el.formerTeamId,
+    winnerTeamId: a.currentBidderId,
+    bidPrice: price,
+    finalPrice: price,
+    endsAt: Date.now() + RTM_WINDOW_MS,
+  };
+  save();
+  renderAll();
+  const ft = getTeam(el.formerTeamId);
+  toast(`Right to Match  ${ft ? ft.name : "former team"} may match ${money(price)}`, "good");
+  return true;
+}
+
+// Guard shared by every RTM action: editors only, and only in the given phase.
+function rtmAct(phase) {
+  if (!auCanEdit()) { toast("Only admins/moderators can run the auction", "bad"); return null; }
+  const r = state.auction.rtm;
+  if (!r || (phase && r.phase !== phase)) return null;
+  return r;
+}
+
+/* prompt: the former team spends its card -> the winner gets one raise. */
+function rtmUse() {
+  const r = rtmAct("prompt"); if (!r) return;
+  r.phase = "raise";
+  r.endsAt = Date.now() + RTM_WINDOW_MS;
+  save(); renderAll();
+  const w = getTeam(r.winnerTeamId);
+  toast(`RTM used  ${w ? w.name : "the bidder"} may raise once`, "good");
+}
+
+/* prompt: they let him go -> normal sale to the winning bidder. */
+function rtmPass() {
+  const r = rtmAct("prompt"); if (!r) return;
+  finalizeSold({ teamId: r.winnerTeamId, price: r.bidPrice });
+}
+
+/* raise: the winner raises to `amount` (validated against THEIR safe bid). */
+function rtmRaise(amount) {
+  const r = rtmAct("raise"); if (!r) return;
+  const n = Number(amount);
+  if (!isFinite(n) || n <= r.bidPrice) { toast(`Raise must be above ${money(r.bidPrice)}`, "bad"); return; }
+  const max = rtmMaxRaise(state, r.winnerTeamId);
+  if (n > max) { toast(`${money(n)} exceeds their Safe Bid (${money(max)})`, "bad"); return; }
+  r.finalPrice = n;
+  r.phase = "match";
+  r.endsAt = Date.now() + RTM_WINDOW_MS;
+  save(); renderAll();
+  const ft = getTeam(r.formerTeamId);
+  toast(`Raised to ${money(n)}  ${ft ? ft.name : "former team"} to match?`, "good");
+}
+
+/* raise: no raise -> the former team decides at the original bid. */
+function rtmNoRaise() {
+  const r = rtmAct("raise"); if (!r) return;
+  r.finalPrice = r.bidPrice;
+  r.phase = "match";
+  r.endsAt = Date.now() + RTM_WINDOW_MS;
+  save(); renderAll();
+}
+
+/* match: former team matches -> they sign him and the RTM card is spent. */
+function rtmMatch() {
+  const r = rtmAct("match"); if (!r) return;
+  const player = currentPlayer();
+  const el = rtmEligible(state, player, r.winnerTeamId, r.finalPrice);
+  // Re-check at commit time: the raise may have pushed it past what they can afford.
+  if (!el.ok || el.formerTeamId !== r.formerTeamId) {
+    toast(el.reason === "cant-afford" ? "They can no longer afford that price" : "RTM is no longer available", "bad");
+    return;
+  }
+  finalizeSold({ teamId: r.formerTeamId, price: r.finalPrice, viaRtm: true });
+}
+
+/* match: they decline -> the winner signs him AT THE RAISED PRICE (IPL rule). */
+function rtmDecline() {
+  const r = rtmAct("match"); if (!r) return;
+  finalizeSold({ teamId: r.winnerTeamId, price: r.finalPrice });
+}
+
+/* Auctioneer escape hatch: abandon the handshake and hand the player to the
+   winning bidder at the original bid. */
+function rtmCancel() {
+  const r = rtmAct(null); if (!r) return;
+  finalizeSold({ teamId: r.winnerTeamId, price: r.bidPrice });
 }
 
 function markUnsold() {  const player = currentPlayer();
@@ -938,6 +1233,7 @@ function markUnsold() {  const player = currentPlayer();
   player.soldPrice = null;
   state.lastAction = { type: "unsold", playerId: player.id };
   state.auction.lastResult = { type: "unsold", playerId: player.id, playerName: player.name };
+  state.auction.rtm = null;
   resetBidState();
   save();
   renderAll();
@@ -945,6 +1241,7 @@ function markUnsold() {  const player = currentPlayer();
 
 function nextPlayer() {  const a = state.auction;
   a.lastResult = null;
+  a.rtm = null;
   const next = state.players.find(p => p.status === "available");
   a.currentPlayerId = next ? next.id : null;
   resetBidState();
@@ -952,7 +1249,8 @@ function nextPlayer() {  const a = state.auction;
   renderAll();
 }
 
-function resetBid() {  resetBidState();
+function resetBid() {  state.auction.rtm = null;
+  resetBidState();
   save();
   renderAuction();
   toast("Bids cleared for this player");
@@ -965,10 +1263,12 @@ function undoLast() {  const la = state.lastAction;
     player.status = "available";
     player.soldTo = null;
     player.soldPrice = null;
+    player.rtmBy = null;   // spending is derived from this - clearing it returns the RTM card
     state.auction.currentPlayerId = player.id; // bring them back to the block
   }
   state.lastAction = null;
   state.auction.lastResult = null;
+  state.auction.rtm = null;
   resetBidState();
   save();
   renderAll();
@@ -982,6 +1282,7 @@ function auctionNow(playerId) {
   if (p.status !== "available") { toast("Already solduse Undo first", "bad"); return; }
   state.auction.currentPlayerId = playerId;
   state.auction.lastResult = null;
+  state.auction.rtm = null;
   resetBidState();
   save();
   goAuctions();
@@ -1143,6 +1444,7 @@ function renderPlayers() {
       </div>
       <div class="pcard-foot">
         <span class="badge ${badgeClass}">${esc(badgeText)}</span>
+        ${p.rtmBy ? `<span class="ret-tag rt-rtm" title="Signed with a Right to Match card">RTM</span>` : ""}
         ${foot}
       </div>`;
     grid.appendChild(card);
@@ -1196,6 +1498,7 @@ function renderSquads() {
           <span class="mini-photo" style="${p.photo ? `background-image:url('${p.photo}')` : ""}">${p.photo ? "" : esc(initials(p.name))}</span>
           <span class="sr-name">${esc(p.name)}</span>
           ${p.retained ? `<span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : ""}
+          ${p.rtmBy ? `<span class="ret-tag rt-rtm" title="Signed with a Right to Match card">RTM</span>` : ""}
           <span class="sr-price">${p.soldPrice ? money(p.soldPrice) : ""}</span>
         </div>`).join("")
       : `<div class="squad-empty">No players bought yet.</div>`;
@@ -1225,12 +1528,36 @@ function fillSettingsInputs() {
   $("#setPurse").value = state.settings.defaultPurse;
   $("#setSquadSize").value = squadCapOf(state, null);
   $("#setIncrement").value = state.settings.bidIncrement;
+  const en = $("#setRtmEnabled"); if (en) en.checked = state.settings.rtmEnabled !== false;
+  const rc = $("#setRtmCards"); if (rc) rc.value = rtmCardsPerTeam(state);
+  fillPrevTournamentSelect();
+}
+
+/* "Last season" picker - every OTHER tournament in the registry, newest first.
+   Rebuilt only when the registry actually changes (the list arrives after this
+   form is first drawn), and it keeps an in-progress pick the admin hasn't
+   saved yet rather than resetting it on every render. */
+function fillPrevTournamentSelect() {
+  const sel = $("#setPrevTournament");
+  if (!sel) return;
+  const S = window.HCCLSeries;
+  const list = (S && S.list) ? S.list().filter(t => t.id !== (S.viewingId && S.viewingId())) : [];
+  const sig = list.map(t => t.id).join(",");
+  if (sel.dataset.sig === sig && sel.options.length) return;   // already built for this list
+  const want = sel.value || state.settings.prevTournamentId || "";
+  sel.dataset.sig = sig;
+  sel.innerHTML = `<option value="">- none -</option>` +
+    list.slice().reverse().map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
+  sel.value = want;
+  if (sel.value !== want) sel.value = ""; // the stored one vanished from the registry
 }
 
 function renderSetup() {
   // A fixed-squad (non-auction) tournament hides purse/base-price and adds
   // players straight into a team, so the Setup lists read differently.
   const noAuction = noAuctionMode();
+  fillPrevTournamentSelect();   // the tournament registry lands after app init
+  if (!$("#pFormerTeam").options.length) fillFormerTeamSelect(null);
 
   // team list
   const tl = $("#teamMiniList");
@@ -1319,6 +1646,9 @@ async function saveSettings() {
   s.defaultPurse = parseFloat($("#setPurse").value) || 0;
   s.squadSize = Math.max(1, parseInt($("#setSquadSize").value) || DEFAULT_SQUAD_SIZE);
   s.bidIncrement = parseFloat($("#setIncrement").value) || 1;
+  const en = $("#setRtmEnabled"); if (en) s.rtmEnabled = !!en.checked;
+  const rc = $("#setRtmCards"); if (rc && rc.value !== "") s.rtmCards = Math.max(0, parseInt(rc.value) || 0);
+  const pt = $("#setPrevTournament"); if (pt) s.prevTournamentId = pt.value || "";
   const f = $("#setLogoFile").files[0];
   if (f) { try { s.leagueLogo = await fileToDataURL(f, 220, "png"); } catch (e) { toast("Couldn't read logo image", "bad"); } }
   $("#setLogoFile").value = "";
@@ -1404,6 +1734,8 @@ async function savePlayer() {
     toast("Enter a valid base price", "bad"); return;
   }
   const role = $("#pRole").value.trim();
+  const formerSel = $("#pFormerTeam");
+  const formerTeamId = formerSel ? (formerSel.value || null) : undefined; // "" -> null (unset)
   const f = $("#pPhotoFile").files[0];
   let photo = null;
   if (f) { try { photo = await fileToDataURL(f, 460, "jpeg"); } catch (e) { toast("Couldn't read photo", "bad"); } }
@@ -1421,6 +1753,7 @@ async function savePlayer() {
         p.basePrice = base;
       }
       if (photo) p.photo = photo;
+      if (formerTeamId !== undefined) p.formerTeamId = formerTeamId;
       if (stats) p.stats = stats; else delete p.stats;
     }
   } else if (noAuction) {
@@ -1429,7 +1762,8 @@ async function savePlayer() {
     if (stats) np.stats = stats;
     state.players.push(np);
   } else {
-    const np = { id: uid(), name, role, basePrice: base, photo: photo || "", status: "available", soldTo: null, soldPrice: null };
+    const np = { id: uid(), name, role, basePrice: base, photo: photo || "", status: "available", soldTo: null, soldPrice: null,
+                 formerTeamId: formerTeamId || null, rtmBy: null };
     if (stats) np.stats = stats;
     state.players.push(np);
   }
@@ -1445,6 +1779,7 @@ function editPlayer(id) {
   $("#pRole").value = p.role || "";
   $("#pBase").value = p.basePrice;
   if ($("#pTeam")) $("#pTeam").value = p.soldTo || "";
+  fillFormerTeamSelect(p.formerTeamId);
   fillStatsForm(p.stats);
   $("#playerFormTitle").textContent = "Edit Player";
   $("#btnSavePlayer").textContent = "Save Changes";
@@ -1455,10 +1790,69 @@ function editPlayer(id) {
 function clearPlayerForm() {
   $("#playerEditId").value = ""; $("#pName").value = ""; $("#pRole").value = ""; $("#pBase").value = ""; $("#pPhotoFile").value = "";
   if ($("#pTeam")) $("#pTeam").value = "";
+  fillFormerTeamSelect(null);
   fillStatsForm(null);
   $("#playerFormTitle").textContent = "Add Player";
   $("#btnSavePlayer").textContent = "Add Player";
   $("#btnCancelPlayer").classList.add("hidden");
+}
+
+/* "Last season's team" picker on the player form. "" = unset, "none" = the admin
+   said he had no franchise last season (so the linker won't touch him). */
+function fillFormerTeamSelect(value) {
+  const sel = $("#pFormerTeam");
+  if (!sel) return;
+  sel.innerHTML = `<option value="">- not set -</option><option value="none">- none (new player) -</option>` +
+    state.teams.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
+  sel.value = value || "";
+  if (sel.value !== (value || "")) sel.value = ""; // stale team id
+}
+
+/* Read last season's squads and stamp formerTeamId on every player whose name
+   matches. Names are matched case/space-insensitively; last season's TEAM name
+   is matched to a team in THIS auction the same way. Players already set by
+   hand (including "none") are left alone, and unmatched names are reported so
+   the admin can fix them in the dropdown. */
+async function linkFormerTeams() {
+  if (!auCanEdit()) { toast("Only admins/moderators can do that", "bad"); return; }
+  const out = $("#rtmLinkResult");
+  const tid = ($("#setPrevTournament") || {}).value || "";
+  if (!tid) { toast("Pick which tournament was last season first", "bad"); return; }
+  const S = window.HCCLSeries;
+  if (!S || typeof S.squadsOf !== "function") { toast("Tournament data unavailable", "bad"); return; }
+  if (out) out.textContent = "Reading last season's squads…";
+  let squads = [];
+  try { squads = await S.squadsOf(tid); } catch (e) { console.error(e); }
+  if (!squads || !squads.length) {
+    if (out) out.textContent = "No squads found in that tournament.";
+    toast("No squads found in that tournament", "bad");
+    return;
+  }
+  const key = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const teamByKey = new Map(state.teams.map(t => [key(t.name), t.id]));
+  const playerToTeamId = new Map();      // last-season player name -> THIS auction's team id
+  const missingTeams = new Set();
+  squads.forEach(g => {
+    const id = teamByKey.get(key(g.team));
+    if (!id) { missingTeams.add(g.team); return; }
+    (g.players || []).forEach(n => playerToTeamId.set(key(n), id));
+  });
+
+  let set = 0, skipped = 0;
+  const unmatched = [];
+  state.players.forEach(p => {
+    if (p.formerTeamId) { skipped++; return; }     // already set (or explicitly "none")
+    const id = playerToTeamId.get(key(p.name));
+    if (id) { p.formerTeamId = id; set++; } else unmatched.push(p.name);
+  });
+  save(); renderAll();
+
+  const bits = [`Linked ${set} player${set === 1 ? "" : "s"}.`];
+  if (skipped) bits.push(`${skipped} already set.`);
+  if (unmatched.length) bits.push(`No match for: ${unmatched.slice(0, 8).join(", ")}${unmatched.length > 8 ? ` +${unmatched.length - 8} more` : ""}.`);
+  if (missingTeams.size) bits.push(`Team name not in this auction: ${[...missingTeams].slice(0, 5).join(", ")}.`);
+  if (out) out.textContent = bits.join(" ");
+  toast(`Linked ${set} former team${set === 1 ? "" : "s"}`, set ? "good" : "bad");
 }
 
 /* Optional player season stats (Phase E) - backwards compatible (omitted when blank). */
@@ -1792,6 +2186,21 @@ function wireEvents() {
     if (g) { hideOverlay(); switchTab(g.dataset.goto); if (window.HCCL) window.HCCL.trackPageView(g.dataset.goto); }
   });
 
+  // RTM handshake buttons (delegated - the panel is re-rendered constantly).
+  const rtmBox = $("#rtmPanel");
+  if (rtmBox) rtmBox.addEventListener("click", e => {
+    const b = e.target.closest("[data-rtm]");
+    if (!b) return;
+    const act = b.getAttribute("data-rtm");
+    if (act === "use") rtmUse();
+    else if (act === "pass") rtmPass();
+    else if (act === "raise") rtmRaise(($("#rtmRaiseAmt") || {}).value);
+    else if (act === "noraise") rtmNoRaise();
+    else if (act === "match") rtmMatch();
+    else if (act === "decline") rtmDecline();
+    else if (act === "cancel") rtmCancel();
+  });
+
   // auctioneer controls
   $("#btnSold").onclick = advanceSold;
   $("#btnUnsold").onclick = markUnsold;
@@ -1800,6 +2209,7 @@ function wireEvents() {
 
   // settings
   $("#btnSaveSettings").onclick = saveSettings;
+  const lk = $("#btnLinkFormerTeams"); if (lk) lk.onclick = linkFormerTeams;
 
   // team form
   $("#btnSaveTeam").onclick = saveTeam;
@@ -1916,6 +2326,9 @@ function auMaybeStartSync() {
 function syncAuctionMode() {
   const has = !window.HCCLSeries || window.HCCLSeries.hasAuction();
   document.body.classList.toggle("no-auction", !has);
+  // The tournament registry lands after app init - refresh the RTM "last season"
+  // picker here, the one hook that fires in BOTH offline and cloud modes.
+  fillPrevTournamentSelect();
   // Don't strand the user on a now-hidden Auctions tab.
   if (!has) { const av = $("#view-auctions"); if (av && av.classList.contains("active")) switchTab("series"); }
 }

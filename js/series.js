@@ -209,6 +209,47 @@
     // Same-tournament identity, so Home can fold duplicate registry entries
     // into a single Hall of Champions card.
     identityKey: m => identityKey(m),
+    /* Squads of ANY tournament: [{ team, players:[name] }]. Used by the auction's
+       Right-to-Match linker (app.js linkFormerTeams) to learn who played for whom
+       last season. A stats-sheet tournament resolves through the bundled/imported
+       CSV; one with live auction data is read once with getDocs. */
+    async squadsOf(tid) {
+      const m = metaOf(tid);
+      if (!m) return [];
+      const A = window.HCCLSeasonArchive;
+      // 1. Live auction data for that tournament (teams + sold players).
+      if (!isArchiveOnly(m) && cloudOn()) {
+        try {
+          const a = fsa(), d = db();
+          const pre = m.legacy ? [] : ["tournaments", m.id];
+          const [teamSnap, playerSnap] = await Promise.all([
+            a.getDocs(a.collection(d, ...pre, "auction", "league", "teams")),
+            a.getDocs(a.collection(d, ...pre, "auction", "league", "players")),
+          ]);
+          const names = new Map();
+          teamSnap.forEach(t => names.set(t.id, (t.data() || {}).name || ""));
+          const byTeam = new Map();
+          playerSnap.forEach(pd => {
+            const p = pd.data() || {};
+            if (p.status !== "sold" || !p.soldTo) return;
+            const tn = names.get(p.soldTo);
+            if (!tn) return;
+            if (!byTeam.has(tn)) byTeam.set(tn, []);
+            byTeam.get(tn).push(p.name || "");
+          });
+          if (byTeam.size) return [...byTeam].map(([team, players]) => ({ team, players }));
+        } catch (e) { console.warn("squadsOf: auction read failed", e); }
+      }
+      // 2. Fall back to the stats sheet (its Team column), same source the
+      //    tournament page's Squads panel uses.
+      if (A) {
+        const rows = tournamentRows(m);
+        if (rows && rows.length) {
+          return A.squadsFromRows(rows).map(g => ({ team: g.team, players: g.players.map(x => x.name) }));
+        }
+      }
+      return [];
+    },
     // Does the given (default: viewed) tournament run a player auction? Drives
     // whether app.js shows the Auctions tab + purse / base-price fields.
     hasAuction(id) {
@@ -954,6 +995,7 @@
           <span class="mini-photo" style="${p.photo ? `background-image:url('${p.photo}')` : ""}">${p.photo ? "" : esc(initials(p.name))}</span>
           <span class="sr-name">${esc(p.name)}</span>
           ${p.retained ? `<span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : (p.role ? `<span class="sr-role">${esc(p.role)}</span>` : "")}
+          ${p.rtm ? `<span class="ret-tag rt-rtm" title="Signed with a Right to Match card">RTM</span>` : ""}
           ${showPrice ? `<span class="sr-price">${p.soldPrice ? mfmt(p.soldPrice) : ""}</span>` : ""}
         </div>`).join("") : `<div class="squad-empty">No players yet.</div>`;
       return `<div class="squad-card">

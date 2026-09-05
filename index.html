@@ -146,6 +146,11 @@
 
           <div class="teams-bid-grid" id="teamsBidGrid"></div>
 
+          <!-- Right to Match handshake. Built by app.js from state.auction.rtm,
+               so every device (including viewers) shows the same live prompt and
+               countdown; only editors get the action buttons inside it. -->
+          <div class="rtm-panel hidden" id="rtmPanel"></div>
+
           <div class="auctioneer-bar">
             <button class="btn btn-sold" id="btnSold">SOLD</button>
             <button class="btn btn-dark" id="btnUnsold">Unsold</button>
@@ -225,6 +230,25 @@
           <label class="auction-only">Bid increment
             <input type="number" id="setIncrement" min="0" step="any" placeholder="1" />
           </label>
+          <details class="stats-fieldset auction-only" id="rtmSetup">
+            <summary>Right to Match (RTM)</summary>
+            <p class="hint">A team can reclaim a player who was on its roster last season by
+              matching the winning bid. The winning bidder gets one final raise first.</p>
+            <label class="ser-check">
+              <input type="checkbox" id="setRtmEnabled" />
+              <span>Enable Right to Match for this auction</span>
+            </label>
+            <label>RTM cards per team
+              <input type="number" id="setRtmCards" min="0" max="5" step="1" placeholder="1" />
+            </label>
+            <label>Last season (where former teams come from)
+              <select id="setPrevTournament"></select>
+            </label>
+            <div class="form-row">
+              <button class="btn btn-dark" id="btnLinkFormerTeams">🔗 Link last season's squads</button>
+            </div>
+            <p class="hint" id="rtmLinkResult"></p>
+          </details>
           <label>League logo
             <input type="file" id="setLogoFile" accept="image/*" />
           </label>
@@ -269,6 +293,9 @@
           </label>
           <label class="auction-only">Base price
             <input type="number" id="pBase" min="0" step="any" placeholder="1" />
+          </label>
+          <label class="auction-only">Last season's team (Right to Match)
+            <select id="pFormerTeam"></select>
           </label>
           <label>Player photo
             <input type="file" id="pPhotoFile" accept="image/*" />
