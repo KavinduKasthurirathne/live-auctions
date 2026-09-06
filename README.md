@@ -21,7 +21,6 @@ Two ways to run, automatically chosen:
 
 - [Highlights](#highlights)
 - [Sign-in & roles](#sign-in--roles)
-- [Live Now (hand-cricket live scoring)](#-live-now)
 - [The Auction](#-the-auction)
 - [The Fantasy League](#-the-fantasy-league)
 - [Player Ranking](#-player-ranking)
@@ -52,7 +51,8 @@ Two ways to run, automatically chosen:
   parses the scorecard in-browser to rank players match-by-match and across the season.
 - ☁️ **Real-time sync** via Firestore - auction and fantasy state mirror instantly to
   every signed-in device.
-- 🔐 **Google sign-in with Admin / Moderator / Viewer roles** and a members screen.
+- 🔐 **Google sign-in with Admin / Moderator / Viewer roles**, plus a **📈 Members &
+  Engagement** board (admin/moderator only) for sign-ins, last access and time on site.
 - 🖼️ **Player photos & team logos in the cloud**, stored so every viewer sees them.
 - 📷 **Share leaderboards as branded PNG images** (one-tap download).
 - 💾 **Export / import JSON backups** any time, and a graceful offline fallback.
@@ -82,75 +82,12 @@ one of three roles:
 
 - The **owner email** (configured in `firestore.rules` and `firebase-config.js`) is always
   treated as an admin, even before any profile exists - it bootstraps the system.
-- New users default to **Viewer**. An admin promotes them from the **👤 Members** screen
-  (open it from the header chip after signing in).
-- The UI gates itself by role: viewers never see edit buttons, the Setup tab, or keyboard
-  auction shortcuts.
-
----
-
-## 🔴 Live Now
-
-Ball-by-ball live scoring for **hand cricket**, in the style of a broadcast scorecard.
-A scorer taps a digit for every ball; everyone else watches their own phone update in
-real time.
-
-**This tab is deliberately standalone.** It shares no data with the auction, tournaments,
-fixtures, fantasy or rankings its own Firestore collection, its own teams, its own
-players. Nothing you do here affects anything else in the app, and nothing elsewhere
-affects it.
-
-### The rules it encodes
-
-- Only the digits **0 1 2 3 4 5 6**, plus **W** (bowled the only way out). No extras,
-  so every ball is legal and an over is *always* six balls.
-- **Strike never rotates.** Odd runs don't swap, the end of an over doesn't swap. One
-  batsman is at the crease until he's bowled, so there is no non-striker and no
-  partnership the batting card shows the current batsman starred plus everyone who
-  has already batted.
-- **Every wicket goes to the bowler of that over.**
-- The scorer picks the incoming batsman after each wicket, and a bowler at the start of
-  every over.
-- An innings closes on: overs exhausted, the wickets limit reached, no batsman left, the
-  target passed, or the scorer ending it early.
-
-### Setting a match up (editors only)
-
-**＋ New Match** asks for team names, a **playing XI per side typed one name per line**,
-overs, wickets per innings, and who bats first. Title and venue are optional. Renaming a
-player later is safe the squad is re-parsed by name, so an existing player keeps his id
-and every ball he has faced follows him.
-
-### Scoring
-
-The scoring panel sits underneath the scoreboard and only ever asks for one thing at a
-time the opening batsman, then the bowler, then the tap pad. After a wicket it asks who
-is in; at the end of an over it asks who bowls the next one. **↩ Undo last** is always
-available and is always exact.
-
-### Who sees what
-
-| | Viewer | Moderator / Admin |
-|---|---|---|
-| Scoreboard, ground & wagon wheel, over track, full scorecards, commentary | ✅ | ✅ |
-| Create / edit / delete a match, the scoring panel, Undo, End innings | | ✅ |
-
-The scoring panel is CSS-gated on `body.can-edit` (the same mechanism the rest of the app
-uses) *and* every write is refused by `firestore.rules` unless the caller is a moderator
-or an admin so a viewer cannot score by poking at the DOM.
-
-### Why the score is never stored
-
-`liveMatches/{id}` holds the match **settings** and an ordered **event list** one small
-event per ball and never a score. Every client folds those events through the same pure
-function (`js/live-engine.js`) to derive everything on screen. That is what makes Undo
-exact (drop the last event and recompute nothing to unwind by hand, so the score can
-never drift out of step with the cards), keeps each write tiny, and guarantees two devices
-can never disagree. Appends use Firestore's `arrayUnion`, so two scorers tapping at the
-same instant both land instead of one silently overwriting the other.
-
-Signed out or with Firebase unconfigured, the tab falls back to `localStorage`
-(`hccl_live_v1`) and works exactly the same on that one device.
+- New users default to **Viewer**. An admin promotes them from the **📈 Members** tab,
+  which also shows engagement: who has signed in, their first login and last access, and
+  how long each person spends on the site. Admins and moderators both see it; admins alone
+  get the role dropdowns.
+- The UI gates itself by role: viewers never see edit buttons, the Setup or Members tabs,
+  or keyboard auction shortcuts.
 
 ---
 
@@ -506,7 +443,7 @@ the HTML/JS are relative to it).
 | `vercel.json` | Static host config / optional auth rewrites |
 | `firebase-init.js` | Google auth, roles, members, split landing page, `window.HCCL` API |
 | `firebase-config.js` | Public Firebase web config + admin email list |
-| `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` `/home` `/mvp` `/liveMatches` read/write gating) |
+| `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` `/home` `/mvp` read/write gating) |
 | `js/app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, Firestore sync |
 | `js/fantasy-engine.js` | Fantasy scoring, lock state, squad validation, standings (pure, Node-testable) |
 | `js/fantasy.js` | Fantasy league view + Firestore sync (Phase C) + self-serve entries |
@@ -516,11 +453,8 @@ the HTML/JS are relative to it).
 | `js/ranking-data.js` | Bundled stats CSV + `HCCL_STATS_VERSION` (ranking source/fallback) |
 | `js/mvp.js` | MVP boards UI + STUMPS PDF upload (pdf.js) + realtime `mvp/{matchId}` sync |
 | `js/mvp-engine.js` | Hybrid MVP model: PDF-scorecard parser + scoring + season aggregation |
-| `js/live-engine.js` | Hand-cricket scoring rules for Live Now (pure, Node-testable) |
-| `js/live.js` | Live Now tab: lobby, scoreboard, wagon wheel, scorecards, scoring panel + `liveMatches` sync |
 | `css/styles.css` | Theme + auction UI + Squad Tracker / insights / role gating |
 | `css/fantasy.css` | Fantasy tab styling |
-| `css/live.css` | Live Now styling (scoreboard, ground, tap pad, role gating) |
 | `assets/brand-logo.jpeg` | League logo for the sign-in wall and default favicon |
 | `docs/HCCL Player Stats/` | Raw stats exports (source for regenerating `js/ranking-data.js`) |
 | `docs/HCCL Batting Rankings Explanation.pdf` | Reference doc for the batting rating math |

@@ -13,7 +13,7 @@ import {
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp,
-  collection, getDocs, writeBatch, query, orderBy, limit, arrayUnion, arrayRemove, increment,
+  collection, getDocs, writeBatch, query, orderBy, limit, increment,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAnalytics, logEvent, setUserId, isSupported,
@@ -74,97 +74,18 @@ function renderAuthBox() {
           <span class="auth-name">${esc(H.user.displayName || H.user.email || "")}</span>
           <span class="auth-role role-${esc(H.role)}">${esc(H.role)}</span>
         </div>
-        ${H.isAdmin() ? `<button class="auth-btn ghost" id="authMembers">👤 Members</button>` : ""}
         <button class="auth-btn ghost" id="authSignOut">Sign out</button>
       </div>`;
-    const mb = document.getElementById("authMembers"); if (mb) mb.onclick = openMembers;
+    // Role management moved to the 📈 Members tab (js/members.js), which admins
+    // and moderators share - no header popup any more.
     const b = document.getElementById("authSignOut"); if (b) b.onclick = () => H.signOut();
   }
 }
 
-/* ---------- admin: Members & Roles screen ---------- */
-const ROLES = ["admin", "moderator", "viewer"]; // hierarchy order
-let membersBackdrop = null;
-
-function buildMembersModal() {
-  membersBackdrop = document.createElement("div");
-  membersBackdrop.className = "members-backdrop hidden";
-  membersBackdrop.innerHTML = `
-    <div class="members-modal" role="dialog" aria-modal="true">
-      <div class="members-head">
-        <h3>Members &amp; Roles</h3>
-        <button class="auth-btn ghost" id="membersClose">Close</button>
-      </div>
-      <div class="members-list" id="membersList"></div>
-    </div>`;
-  document.body.appendChild(membersBackdrop);
-
-  membersBackdrop.addEventListener("click", (e) => {
-    if (e.target === membersBackdrop || e.target.id === "membersClose") membersBackdrop.classList.add("hidden");
-  });
-  membersBackdrop.addEventListener("change", async (e) => {
-    const sel = e.target.closest(".member-role-select");
-    if (!sel) return;
-    const uid = sel.getAttribute("data-uid");
-    const role = sel.value;
-    const prev = sel.getAttribute("data-prev") || "viewer";
-    sel.disabled = true;
-    try {
-      await window.HCCL.setMemberRole(uid, role);
-      sel.setAttribute("data-prev", role);
-      notify(`Role updated to ${role}`, "good");
-      if (window.HCCL.user && window.HCCL.user.uid === uid) {
-        // Changed my own role - reflect it immediately.
-        window.HCCL.role = role; applyRoleAttr(); renderAuthBox();
-      }
-    } catch (err) {
-      console.error(err);
-      sel.value = prev; // revert the dropdown
-      notify("Couldn't update role (need admin + published rules)", "bad");
-    } finally {
-      sel.disabled = false;
-    }
-  });
-}
-
-function memberRowHtml(m) {
-  const isSelf = window.HCCL.user && window.HCCL.user.uid === m.uid;
-  const initial = esc((m.displayName || m.email || "?").slice(0, 1).toUpperCase());
-  const avatar = m.photoURL
-    ? `<img src="${esc(m.photoURL)}" alt="" referrerpolicy="no-referrer"/>`
-    : `<div class="member-avatar">${initial}</div>`;
-  return `<div class="member-row">
-      ${avatar}
-      <div class="member-meta">
-        <span class="member-name">${esc(m.displayName || "(no name)")}${isSelf ? " · you" : ""}</span>
-        <span class="member-email">${esc(m.email || "")}</span>
-      </div>
-      <select class="member-role-select" data-uid="${esc(m.uid)}" data-prev="${esc(m.role || "viewer")}">
-        ${ROLES.map(r => `<option value="${r}" ${m.role === r ? "selected" : ""}>${r}</option>`).join("")}
-      </select>
-    </div>`;
-}
-
-async function refreshMembers() {
-  const list = document.getElementById("membersList");
-  if (!list) return;
-  list.innerHTML = `<p class="members-hint">Loading…</p>`;
-  try {
-    const members = await window.HCCL.listMembers();
-    members.sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role) || (a.email || "").localeCompare(b.email || ""));
-    list.innerHTML = members.map(memberRowHtml).join("") || `<p class="members-hint">No members yet.</p>`;
-  } catch (e) {
-    console.error(e);
-    list.innerHTML = `<p class="members-hint">Couldn't load members. If the console shows <b>ERR_BLOCKED_BY_CLIENT</b> or "client is offline", an ad-blocker / privacy shield is blocking Firestore - allow this site, then retry.</p>`;
-  }
-}
-
-async function openMembers() {
-  if (!window.HCCL.isAdmin()) return;
-  if (!membersBackdrop) buildMembersModal();
-  membersBackdrop.classList.remove("hidden");
-  refreshMembers();
-}
+/* Role hierarchy - shared by setMemberRole() below and the 📈 Members tab.
+   (The old header Members popup lived here; role management now lives in
+   js/members.js, which admins and moderators both open from the nav.) */
+const ROLES = ["admin", "moderator", "viewer"];
 
 /* ---------- sign-in wall: nobody sees the app until authenticated ---------- */
 let authGateEl = null;
@@ -285,10 +206,7 @@ try {
 
     window.HCCL.configured = true;
     window.HCCL.db = db;
-    // arrayUnion/arrayRemove let a client APPEND to an array field atomically
-    // (js/live.js appends one event per ball), so two scorers tapping at the
-    // same moment both land instead of one overwriting the other.
-    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp, collection, getDocs, writeBatch, query, orderBy, limit, arrayUnion, arrayRemove };
+    window.HCCL.fs = { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp, collection, getDocs, writeBatch, query, orderBy, limit };
     window.HCCL.listMembers = async () => {
       const snap = await getDocs(collection(db, "users"));
       return snap.docs.map(d => ({ uid: d.id, ...d.data() }));

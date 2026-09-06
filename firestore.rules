@@ -204,17 +204,6 @@ service cloud.firestore {
       allow write: if canEdit();
     }
 
-    // Live Now: liveMatches/{id} = one hand-cricket match being scored ball by
-    // ball. The doc holds the SETTINGS (teams, squads, overs, wickets) plus an
-    // ordered `events` array - never a score, which is always derived from the
-    // events client-side (js/live-engine.js). Scorers are moderators/admins;
-    // everyone signed in watches. Deliberately its own root: this tab shares no
-    // data with the auction, tournaments, fixtures or fantasy.
-    match /liveMatches/{document=**} {
-      allow read: if signedIn();
-      allow write: if canEdit();
-    }
-
     // Series & tournaments: tournaments/{tid} = meta (name, logo, duration,
     // status) + tournaments/_config = { activeId }. Each NON-legacy
     // tournament's data lives under tournaments/{tid}/{auction|fantasy|

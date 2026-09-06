@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/fantasy.css" />
   <link rel="stylesheet" href="css/fixtures.css" />
-  <link rel="stylesheet" href="css/live.css" />
 </head>
 <body>
 
@@ -35,7 +34,6 @@
         <button class="nav-close" id="navClose" aria-label="Close menu">✕</button>
       </div>
       <button class="tab active" data-tab="home">🏠 Home</button>
-      <button class="tab" data-tab="live">🔴 Live Now</button>
       <button class="tab" data-tab="series">🏆 Tournaments</button>
       <button class="tab" data-tab="auctions">🔨 Auctions</button>
       <button class="tab" data-tab="rankings">📊 Rankings</button>
@@ -57,16 +55,6 @@
 
     <!-- ===================== HOME (built by home.js) ===================== -->
     <section class="view active" id="view-home"></section>
-
-    <!-- ============ LIVE NOW (built by live.js) ============
-         Ball-by-ball hand-cricket scoring. Deliberately standalone: its own
-         Firestore collection (liveMatches/{id}), its own teams and players -
-         it shares nothing with the auction, tournaments or fantasy. Admins and
-         moderators get the scoring panel underneath the scoreboard; viewers
-         get the scoreboard alone (CSS-gated on body.can-edit). -->
-    <section class="view" id="view-live">
-      <div id="liveRoot"></div>
-    </section>
 
     <!-- ============ TOURNAMENTS (built by series.js) ============
          Two persistent children so a list/detail re-render never wipes the
@@ -473,10 +461,6 @@
        extraction (mvp.js), so both must load first. -->
   <script src="js/fixtures-engine.js"></script>
   <script src="js/fixtures.js"></script>
-  <!-- Live Now: pure hand-cricket scoring engine -> the tab that renders it.
-       Standalone - reads none of the modules above. -->
-  <script src="js/live-engine.js"></script>
-  <script src="js/live.js"></script>
   <!-- Auth + roles (Google sign-in); exposes window.HCCL -->
   <script type="module" src="firebase-init.js"></script>
 </body>

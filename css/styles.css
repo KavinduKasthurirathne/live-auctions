@@ -495,7 +495,6 @@ html.nav-locked { overflow: hidden; }
   /* iOS Safari zooms the page when it focuses a field under 16px -
      keep form fields at 16px on touch-size screens so it never zooms. */
   input, select, textarea { font-size: 16px; }
-  .member-role-select { font-size: 16px; }
 }
 @media (max-width: 560px) {
   .btn { padding: 11px 14px; font-size: 14px; }
@@ -527,20 +526,6 @@ html.nav-locked { overflow: hidden; }
 .auth-role.role-viewer, .auth-role.role-none { color: var(--muted); }
 
 /* Members & Roles modal (admin) */
-.members-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-.members-backdrop.hidden { display: none; }
-.members-modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 480px; max-height: 85vh; max-height: min(85vh, calc(100dvh - 32px)); overflow: auto; padding: 18px; box-shadow: var(--shadow); }
-.members-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.members-head h3 { margin: 0; font-size: 17px; }
-.members-list { display: flex; flex-direction: column; gap: 8px; }
-.member-row { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; }
-.member-row img, .member-avatar { width: 36px; height: 36px; border-radius: 50%; flex: none; object-fit: cover; }
-.member-avatar { background: var(--panel-3); display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--muted); }
-.member-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
-.member-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.member-email { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.member-role-select { width: auto; flex: none; padding: 6px 8px; font-size: 13px; }
-.members-hint { color: var(--muted); font-size: 12px; margin-top: 12px; }
 
 /* ===================== SIGN-IN WALL / LANDING ===================== */
 .app-locked { overflow: hidden; }
