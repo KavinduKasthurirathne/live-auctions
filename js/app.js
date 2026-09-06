@@ -694,8 +694,9 @@ function switchTab(name) {
   const alias = TAB_ALIASES[name];
   if (alias) { switchTab(alias.tab); if (alias.sub) switchSubTab(alias.sub); return; }
   // Viewers never get the Setup surface - not via the tab, not via any
-  // [data-goto="setup"] shortcut, not via a direct switchTab call.
-  if (name === "setup" && !auCanEdit()) name = "home";
+  // [data-goto="setup"] shortcut, not via a direct switchTab call. Same for the
+  // Members & engagement board (admin/moderator only).
+  if ((name === "setup" || name === "members") && !auCanEdit()) name = "home";
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
   // Open the new view at the top - otherwise it keeps the old view's scroll
@@ -734,6 +735,12 @@ function renderAll() {
   renderSquads();
   renderSetup();
   renderInsights();
+  // Members board: clear it whenever the role can't see it (a demotion must not
+  // leave stale member data in the DOM), and refresh it while it's open.
+  if (window.HCCLMembers) {
+    const mv = $("#view-members");
+    if (!auCanEdit() || (mv && mv.classList.contains("active"))) window.HCCLMembers.render();
+  }
   // Sibling modules (fixtures.js) read teams/squads through window.HCCLAuction;
   // this tells them the underlying data just changed (cloud snapshot, edit, …).
   document.dispatchEvent(new CustomEvent("hccl:data"));
@@ -905,11 +912,13 @@ function renderTeamButtons() {
       ${logoHTML("tb-logo", t.logo, t.name)}
       <span class="tb-meta">
         <span class="tb-name">${esc(t.name)}</span>
-        <span class="tb-purse">${leading ? "★ Leading" : money(info.remaining) + " left"}</span>
+        <span class="tb-purse">
+          <span class="tb-purse-txt">${leading ? "★ Leading" : money(info.remaining) + " left"}</span>
+          ${rtmOn(state) && rtmLeft(state, t.id) > 0
+            ? `<i class="rtm-badge" title="Right to Match card still in hand">RTM</i>` : ""}
+        </span>
       </span>
-      ${i < 9 ? `<span class="tb-key">${i + 1}</span>` : ""}
-      ${rtmOn(state) && rtmLeft(state, t.id) > 0
-        ? `<i class="rtm-badge" title="Right to Match card still in hand">RTM</i>` : ""}`;
+      ${i < 9 ? `<span class="tb-key">${i + 1}</span>` : ""}`;
     btn.onclick = () => placeBid(t.id);
     grid.appendChild(btn);
   });
@@ -1806,6 +1815,9 @@ function clearPlayerForm() {
   if ($("#pTeam")) $("#pTeam").value = "";
   fillFormerTeamSelect(null);
   fillStatsForm(null);
+  careerPreviewFound = null;
+  const cpBox = $("#playerStatsPreview");
+  if (cpBox) { cpBox.classList.add("hidden"); cpBox.innerHTML = ""; }
   $("#playerFormTitle").textContent = "Add Player";
   $("#btnSavePlayer").textContent = "Add Player";
   $("#btnCancelPlayer").classList.add("hidden");
@@ -1867,6 +1879,102 @@ async function linkFormerTeams() {
   if (missingTeams.size) bits.push(`Team name not in this auction: ${[...missingTeams].slice(0, 5).join(", ")}.`);
   if (out) out.textContent = bits.join(" ");
   toast(`Linked ${set} former team${set === 1 ? "" : "s"}`, set ? "good" : "bad");
+}
+
+/* ---------------- career-stats preview (Setup > Add Player) ----------------
+   Type a name; if any past tournament sheet mentions them we show their career
+   line and offer to fill the stat boxes. Nothing is written until Apply is
+   tapped - the admin's own typing is never overwritten. */
+let careerPreviewTimer = null;
+let careerPreviewFound = null;   // the stats currently on offer
+let careerExtraSheets = null;    // cloud-imported tournament CSVs, fetched once
+
+// Cloud-imported sheets live at tournaments/{tid}/stats/sheet, which the archive
+// can't see on its own. Pull them once so imported tournaments count too.
+async function loadCareerExtraSheets() {
+  if (careerExtraSheets) return careerExtraSheets;
+  careerExtraSheets = [];
+  const S = window.HCCLSeries, H = window.HCCL;
+  if (!S || !S.list || !H || !H.configured || !H.user || !H.db || !H.fs || !H.fs.getDoc) return careerExtraSheets;
+  try {
+    const fs = H.fs;
+    const list = S.list();
+    const got = await Promise.all(list.map(t =>
+      fs.getDoc(fs.doc(H.db, "tournaments", t.id, "stats", "sheet"))
+        .then(d => (d.exists() ? { name: t.name, csv: (d.data() || {}).csv || "" } : null))
+        .catch(() => null)));
+    careerExtraSheets = got.filter(x => x && x.csv);
+  } catch (e) { /* bundled sheets alone still give a useful career line */ }
+  return careerExtraSheets;
+}
+
+function careerStatRow(k, v) {
+  return `<div class="cp-item"><span class="cp-k">${esc(k)}</span><span class="cp-v">${esc(String(v))}</span></div>`;
+}
+
+async function renderCareerPreview() {
+  const box = $("#playerStatsPreview");
+  if (!box) return;
+  const A = window.HCCLSeasonArchive;
+  const name = ($("#pName") ? $("#pName").value : "").trim();
+  careerPreviewFound = null;
+  if (!A || !A.careerStatsFor || name.length < 3 || !auCanEdit()) {
+    box.classList.add("hidden"); box.innerHTML = ""; return;
+  }
+  const extra = await loadCareerExtraSheets();
+  const c = A.careerStatsFor(name, extra);
+  if (!c) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+
+  // Previous price = what he actually sold for in the tournament marked as
+  // "last season" (the same setting RTM uses).
+  let prevPrice = null;
+  const prevId = state.settings.prevTournamentId;
+  if (prevId && window.HCCLSeries && window.HCCLSeries.lastAuctionPrices) {
+    try {
+      const prices = await window.HCCLSeries.lastAuctionPrices(prevId);
+      const k = name.toLowerCase().replace(/\s+/g, " ");
+      if (prices && prices[k] != null) prevPrice = prices[k];
+    } catch (e) {}
+  }
+  careerPreviewFound = { ...c, previousPrice: prevPrice };
+
+  const n = c.tournaments.length;
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="cp-head">
+      <span class="cp-title">📊 Career stats found</span>
+      <span class="cp-src" title="${esc(c.tournaments.join(", "))}">${n} tournament${n === 1 ? "" : "s"}</span>
+    </div>
+    <div class="cp-grid">
+      ${careerStatRow("Matches", c.matches)}
+      ${careerStatRow("Runs", c.runs)}
+      ${careerStatRow("Wickets", c.wickets)}
+      ${careerStatRow("Bat SR", c.strikeRate)}
+      ${careerStatRow("Bat Avg", c.average)}
+      ${careerStatRow("Economy", c.economy)}
+      ${prevPrice != null ? careerStatRow("Prev Price", money(prevPrice)) : ""}
+    </div>
+    <div class="cp-actions">
+      <button type="button" class="btn btn-yellow btn-mini" data-career-apply>Apply to form</button>
+      <button type="button" class="btn btn-dark btn-mini" data-career-dismiss>Dismiss</button>
+    </div>`;
+}
+
+// Fill the stat inputs from the offered career line (the only write path).
+function applyCareerStats() {
+  const c = careerPreviewFound;
+  if (!c) return;
+  const set = (id, v) => { const el = $("#" + id); if (el && v != null && v !== "") el.value = v; };
+  set("pStatMatches", c.matches);
+  set("pStatRuns", c.runs);
+  set("pStatWickets", c.wickets);
+  set("pStatSR", c.strikeRate);
+  set("pStatAvg", c.average);
+  set("pStatEcon", c.economy);
+  if (c.previousPrice != null) set("pStatPrev", c.previousPrice);
+  const det = $("#playerStatsPreview") ? document.querySelector(".stats-fieldset") : null;
+  if (det && det.tagName === "DETAILS") det.open = true;   // show what just landed
+  toast("Career stats applied", "good");
 }
 
 /* Optional player season stats (Phase E) - backwards compatible (omitted when blank). */
@@ -2222,6 +2330,20 @@ function wireEvents() {
   $("#btnUnsold").onclick = markUnsold;
   $("#btnUndo").onclick = undoLast;
   $("#btnReset").onclick = resetBid;
+
+  // Career-stats preview: debounce the name box, then Apply/Dismiss.
+  const pn = $("#pName");
+  if (pn) pn.addEventListener("input", () => {
+    clearTimeout(careerPreviewTimer);
+    careerPreviewTimer = setTimeout(() => { renderCareerPreview(); }, 400);
+  });
+  const cp = $("#playerStatsPreview");
+  if (cp) cp.addEventListener("click", e => {
+    if (e.target.closest("[data-career-apply]")) { applyCareerStats(); return; }
+    if (e.target.closest("[data-career-dismiss]")) {
+      careerPreviewFound = null; cp.classList.add("hidden"); cp.innerHTML = "";
+    }
+  });
 
   // settings
   $("#btnSaveSettings").onclick = saveSettings;

@@ -41,6 +41,7 @@
       <button class="tab" data-tab="rankings">📊 Rankings</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
       <button class="tab" data-tab="setup">⚙️ Setup</button>
+      <button class="tab" data-tab="members">📈 Members</button>
     </nav>
     <div class="auth-box" id="authBox"></div>
     <!-- Mobile only: opens the drawer. While it's open the drawer's own ✕ sits
@@ -285,6 +286,10 @@
           <label>Player name
             <input type="text" id="pName" placeholder="e.g. Kasun Perera" />
           </label>
+          <!-- Career stats found in past tournament sheets. Built by app.js from
+               HCCLSeasonArchive.careerStatsFor(); nothing is written into the form
+               until "Apply" is tapped, so typed values are never clobbered. -->
+          <div class="career-preview hidden" id="playerStatsPreview"></div>
           <label class="no-auction-only">Team
             <select id="pTeam"></select>
           </label>
@@ -393,6 +398,12 @@
          #tournamentPanels above); the Fantasy nav pill is a shortcut that opens
          the viewed tournament there. -->
 
+    <!-- ===== MEMBERS & ENGAGEMENT (js/members.js) - admin/moderator only =====
+         Hidden from viewers by the body:not(.can-edit) rules in styles.css and
+         by switchTab()'s guard; firestore.rules (users list/get => canEdit) is
+         the real backstop. -->
+    <section class="view" id="view-members"></section>
+
     <!-- ============ RANKINGS: Player Ranking (global, ranking.js) ============
          MVP moved into the tournament page (#view-mvp under #tournamentPanels).
          Rankings is now the single global Player-Ranking view. -->
@@ -441,6 +452,8 @@
   <script src="js/home.js"></script>
   <!-- HC News feed (renders into the #homeNews shell home.js builds) -->
   <script src="js/news.js"></script>
+  <!-- Members & engagement dashboard (admin/moderator only) -->
+  <script src="js/members.js"></script>
   <!-- DOM-to-PNG for the leaderboard share cards (exposes window.htmlToImage) -->
   <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js"></script>
   <!-- Charts for the 📊 Insights tab (exposes window.Chart). Degrades gracefully if blocked. -->

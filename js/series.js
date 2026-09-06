@@ -117,6 +117,7 @@
   let activeId = LEGACY_ID;
   let viewingId = null;
   let busy = false;           // a create/copy/delete is running
+  let lastPriceCache = null;  // tid -> { playerNameKey: soldPrice } (see lastAuctionPrices)
   const listeners = [];
   // form: null | { mode:"create" } | { mode:"edit", id }
   // detail: null | tournament id whose hub page is open (list ⇄ detail)
@@ -209,6 +210,29 @@
     // Same-tournament identity, so Home can fold duplicate registry entries
     // into a single Hall of Champions card.
     identityKey: m => identityKey(m),
+    /* name(lowercased) -> the price he sold for in that tournament's auction.
+       Feeds the "Previous price" box on the Setup player form. Cached: one
+       getDocs per tournament, per session. */
+    async lastAuctionPrices(tid) {
+      lastPriceCache = lastPriceCache || {};
+      if (lastPriceCache[tid]) return lastPriceCache[tid];
+      const out = {};
+      const m = metaOf(tid);
+      if (m && !isArchiveOnly(m) && cloudOn()) {
+        try {
+          const a = fsa(), d = db();
+          const pre = m.legacy ? [] : ["tournaments", m.id];
+          const snap = await a.getDocs(a.collection(d, ...pre, "auction", "league", "players"));
+          snap.forEach(pd => {
+            const p = pd.data() || {};
+            if (p.status !== "sold" || p.soldPrice == null) return;
+            out[String(p.name || "").trim().toLowerCase().replace(/\s+/g, " ")] = p.soldPrice;
+          });
+        } catch (e) { console.warn("lastAuctionPrices failed", e); }
+      }
+      lastPriceCache[tid] = out;
+      return out;
+    },
     /* Squads of ANY tournament: [{ team, players:[name] }]. Used by the auction's
        Right-to-Match linker (app.js linkFormerTeams) to learn who played for whom
        last season. A stats-sheet tournament resolves through the bundled/imported

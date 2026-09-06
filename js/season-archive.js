@@ -389,6 +389,10 @@
     no: 0, name: 1, team: 2, matches: 3, pom: 4, runs: 6, batAvg: 7, batSR: 8,
     s30: 9, s50: 10, hs: 12, sixes: 13, fours: 14, wickets: 22, maiden: 24,
     bowlAvg: 25, bowlSR: 26, econ: 27, bestBowl: 30,
+    // RAW columns - the career aggregate sums these and re-derives avg/SR/econ.
+    // You cannot average the per-sheet batAvg/batSR/econ columns and get the
+    // right answer; you need the underlying balls/innings/outs/runs conceded.
+    batInn: 5, ballsFaced: 15, notOuts: 16, bowlInn: 21, runsConceded: 23, ballsBowled: 31,
   };
   // Header spot-checks used to validate an imported Season Stats CSV against
   // the same fixed 36-column layout the COL map above assumes.
@@ -1010,6 +1014,74 @@
         byTeam.get(key).players.push(p);
       });
       return groups;
+    },
+    /* ---------- career stats across every sheet ----------
+       Used by the auction Setup form to pre-fill a player's card. Sums the RAW
+       columns from every sheet the player appears in, then RE-DERIVES average /
+       strike rate / economy. Averaging the per-sheet batAvg/batSR/econ columns
+       would be wrong - a 5-run season and a 500-run season would count equally.
+
+       `extraSheets` lets the caller fold in CSVs the archive can't see by itself
+       (cloud-imported tournament sheets); results are cached per sheet set. */
+    careerIndex(extraSheets) {
+      const sheets = [];
+      // bundled per-season sheets (+ any live override) …
+      getSeasons().forEach(s => { const r = seasonRows(s.no); if (r && r.length) sheets.push({ name: `HCCL Season ${pad2(s.no)}`, rows: r }); });
+      // … the bundled per-tournament sheets …
+      (window.HCCL_TOURNAMENT_STATS || []).forEach(t => {
+        if (t && t.csv) sheets.push({ name: t.name || t.id || "Tournament", rows: api.rowsFromCsv(t.csv) });
+      });
+      // … and anything the caller supplies ({ name, csv }).
+      (extraSheets || []).forEach(x => {
+        if (x && x.csv) sheets.push({ name: x.name || "Tournament", rows: api.rowsFromCsv(x.csv) });
+      });
+
+      const key = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
+      const idx = new Map();
+      sheets.forEach(sheet => {
+        (sheet.rows || []).forEach(r => {
+          const nm = (r[COL.name] || "").trim();
+          if (!nm) return;
+          const k = key(nm);
+          let a = idx.get(k);
+          if (!a) {
+            a = { name: nm, tournaments: [], matches: 0, runs: 0, batInn: 0, ballsFaced: 0,
+                  notOuts: 0, wickets: 0, runsConceded: 0, ballsBowled: 0 };
+            idx.set(k, a);
+          }
+          if (a.tournaments.indexOf(sheet.name) === -1) a.tournaments.push(sheet.name);
+          a.matches      += num(r[COL.matches]);
+          a.runs         += num(r[COL.runs]);
+          a.batInn       += num(r[COL.batInn]);
+          a.ballsFaced   += num(r[COL.ballsFaced]);
+          a.notOuts      += num(r[COL.notOuts]);
+          a.wickets      += num(r[COL.wickets]);
+          a.runsConceded += num(r[COL.runsConceded]);
+          a.ballsBowled  += num(r[COL.ballsBowled]);
+        });
+      });
+      return idx;
+    },
+    /* One player's career line, or null when no sheet mentions them.
+       Rounded to what the player card shows. */
+    careerStatsFor(name, extraSheets) {
+      const key = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
+      const a = api.careerIndex(extraSheets).get(key(name));
+      if (!a || !a.tournaments.length) return null;
+      const round1 = v => Math.round(v * 10) / 10;
+      const outs = a.batInn - a.notOuts;              // dismissals
+      const overs = a.ballsBowled / 6;
+      return {
+        name: a.name,
+        tournaments: a.tournaments.slice(),
+        matches: a.matches,
+        runs: a.runs,
+        wickets: a.wickets,
+        // Guarded: a batter never dismissed has no average; no balls -> no SR.
+        average:    outs > 0 ? round1(a.runs / outs) : (a.runs > 0 ? round1(a.runs) : 0),
+        strikeRate: a.ballsFaced > 0 ? round1((a.runs / a.ballsFaced) * 100) : 0,
+        economy:    overs > 0 ? round1(a.runsConceded / overs) : 0,
+      };
     },
     // Fired whenever the underlying data changes (cloud honors, live CSV).
     onChange(cb) { listeners.push(cb); },

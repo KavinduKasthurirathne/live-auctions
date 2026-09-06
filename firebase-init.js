@@ -13,7 +13,7 @@ import {
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, serverTimestamp,
-  collection, getDocs, writeBatch, query, orderBy, limit, arrayUnion, arrayRemove,
+  collection, getDocs, writeBatch, query, orderBy, limit, arrayUnion, arrayRemove, increment,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAnalytics, logEvent, setUserId, isSupported,
@@ -246,6 +246,7 @@ try {
     window.HCCL.trackPageView = function (page) {
       const name = String(page || "");
       window.HCCL.track("page_view", { page_title: name, page_path: "/" + name, page_location: location.origin + "/" + name });
+      notePageVisit(name);   // engagement dashboard (Firestore, batched)
     };
     window.HCCL.setAnalyticsUser = function () {
       if (analytics && window.HCCL.user && window.HCCL.user.uid) {
@@ -342,10 +343,54 @@ try {
       updateDoc(doc(db, "users", u.uid), { lastAccessedAt: serverTimestamp() })
         .catch(e => console.warn("lastAccessedAt update skipped:", (e && e.code) || e));
     }
+    /* ---------------- engagement counters (admin/mod dashboard) ----------------
+       Time spent + pages visited, on the SAME users/{uid} doc. Everything is
+       accumulated LOCALLY and flushed at most once a minute (plus when the tab
+       is hidden/closed) with increment() - never a write per tab switch.
+       Fire-and-forget like touchLastAccessed: a denied write (rules not yet
+       published) must never block or crash the app. */
+    const ENGAGE_FLUSH_MS = 60 * 1000;
+    let engageTimeMs = 0;      // unflushed ACTIVE ms (only while the tab is visible)
+    let engagePages = {};      // unflushed per-section view counts
+    let engageVisit = false;   // this session not yet counted
+    let engageSince = document.visibilityState === "visible" ? Date.now() : 0;
+    let engageLastFlush = 0;
+
+    function engageAccrue() {   // bank the time since we last looked
+      if (engageSince) { engageTimeMs += Math.max(0, Date.now() - engageSince); }
+      engageSince = document.visibilityState === "visible" ? Date.now() : 0;
+    }
+    function notePageVisit(name) {
+      if (!name) return;
+      engagePages[name] = (engagePages[name] || 0) + 1;
+      flushEngagement();        // throttled inside
+    }
+    function flushEngagement(force) {
+      const u = window.HCCL.user;
+      if (!u || !u.uid) return;
+      engageAccrue();
+      const pages = engagePages, ms = Math.round(engageTimeMs);
+      const hasPages = Object.keys(pages).length > 0;
+      if (!force && Date.now() - engageLastFlush < ENGAGE_FLUSH_MS) return;
+      if (!ms && !hasPages && !engageVisit) return;   // nothing to say
+      engageLastFlush = Date.now();
+      engageTimeMs = 0; engagePages = {};
+      const patch = {};
+      if (ms) patch.timeMs = increment(ms);
+      Object.keys(pages).forEach(k => { patch["pages." + k] = increment(pages[k]); });
+      if (engageVisit) { patch.visits = increment(1); engageVisit = false; }
+      if (!Object.keys(patch).length) return;
+      updateDoc(doc(db, "users", u.uid), patch)
+        .catch(e => console.warn("engagement update skipped:", (e && e.code) || e));
+    }
+
     // Coming back to a long-open tab counts as a fresh access (still throttled).
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") touchLastAccessed();
+      if (document.visibilityState === "visible") { engageSince = Date.now(); touchLastAccessed(); }
+      else { flushEngagement(true); }   // leaving: bank what we have
     });
+    window.addEventListener("pagehide", () => flushEngagement(true));
+    setInterval(() => flushEngagement(), ENGAGE_FLUSH_MS);
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -382,6 +427,9 @@ try {
         // Record this visit. The doc exists by now (just created above, or already
         // present); throttled + fire-and-forget so it never delays or breaks sign-in.
         touchLastAccessed();
+        engageVisit = true;                 // count one session
+        engageSince = document.visibilityState === "visible" ? Date.now() : 0;
+        flushEngagement(true);
       } else {
         window.HCCL.user = null;
         window.HCCL.role = "none";

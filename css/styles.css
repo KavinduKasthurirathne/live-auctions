@@ -230,12 +230,12 @@ input[type="file"] { padding: 8px; font-size: 13px; }
 .cb-right { text-align: right; }
 .cb-leader { font-size: clamp(18px, 2.4vw, 26px); font-weight: 800; color: var(--yellow); }
 
-.teams-bid-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.teams-bid-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .team-bid-btn {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 12px;
+  padding: 12px 14px;
   cursor: pointer;
   text-align: left;
   color: var(--text);
@@ -252,9 +252,10 @@ input[type="file"] { padding: 8px; font-size: 13px; }
   background: linear-gradient(135deg, var(--red), var(--gold)) center/cover no-repeat;
   display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff;
 }
-.tb-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; padding-right: 10px; }
+.tb-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; padding-right: 18px; }
 .tb-name { display: block; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tb-purse { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-purse { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); min-width: 0; }
+.tb-purse-txt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tb-key { position: absolute; top: 6px; right: 8px; font-size: 10px; color: var(--muted); }
 
 /* AUCTIONEER BAR */
@@ -606,6 +607,8 @@ body:not(.can-edit) .auctioneer-bar,           /* SOLD / Unsold / Undo / Reset *
 body:not(.can-edit) #teamsBidGrid,             /* per-team bid buttons */
 body:not(.can-edit) .tab[data-tab="setup"],    /* auction Setup tab */
 body:not(.can-edit) #view-setup,               /* the ENTIRE Setup section (even if reached) */
+body:not(.can-edit) .tab[data-tab="members"],  /* Members & engagement tab */
+body:not(.can-edit) #view-members,             /* and its whole section */
 body:not(.can-edit) [data-goto="setup"],       /* "Open Setup" shortcut buttons */
 body:not(.can-edit) [data-auction],            /* "Auction now" buttons */
 /* Fantasy Manage only. The Matches tab is deliberately NOT gated: every member
@@ -1623,20 +1626,71 @@ body:not(.can-edit) .news-composer { display: none; }
   background: var(--gold); margin-left: 6px; vertical-align: middle; flex: none;
   box-shadow: 0 0 0 2px rgba(245,179,1,0.18);
 }
-/* "RTM card still in hand" on a bid button. Anchored to the BUTTON, not inside
-   .tb-name / .tb-purse - both of those ellipsis-clip, which used to swallow the
-   indicator on every team whose name was long enough to overflow. */
+/* "RTM card still in hand". Sits INLINE in the purse row as a flex item, so it
+   reserves its own space: it must never live inside an ellipsis-clipping box
+   (that swallowed it on long team names) nor overlap the purse text (which an
+   absolutely-positioned version did). */
 .rtm-badge {
-  position: absolute; right: 8px; bottom: 6px;
   font-size: 9px; font-weight: 800; letter-spacing: .8px; font-style: normal;
   color: var(--gold); border: 1px solid rgba(245,179,1,0.45);
   border-radius: 999px; padding: 1px 6px; line-height: 1.4; flex: none;
   background: rgba(245,179,1,0.10); pointer-events: none;
 }
 /* Same badge inline in lists (Teams & Purse, Squad Tracker). */
-.rtm-badge.inline { position: static; margin-left: 6px; }
+.rtm-badge.inline { margin-left: 6px; }
 .rtm-badge.spent { color: var(--muted); border-color: var(--border); background: transparent; }
 @media (max-width: 560px) {
   .rtm-body { flex-direction: column; align-items: flex-start; }
   .rtm-actions .btn { flex: 1 1 100%; }
 }
+
+/* ============ Career-stats preview (Setup > Add Player) ============
+   Shows what past tournament sheets know about the typed name. Read-only until
+   "Apply" is tapped, so it can never silently overwrite what an admin typed. */
+.career-preview {
+  border: 1px solid rgba(245,179,1,0.35);
+  background: rgba(245,179,1,0.06);
+  border-radius: 12px; padding: 12px 14px; margin: -4px 0 14px;
+}
+.cp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.cp-title { font-size: 12px; font-weight: 800; letter-spacing: .6px; color: var(--gold); }
+.cp-src { font-size: 10.5px; color: var(--muted); cursor: help; }
+.cp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 8px; }
+.cp-item { background: var(--panel-2); border-radius: 9px; padding: 7px 9px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cp-k { font-size: 9.5px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+.cp-v { font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-actions { display: flex; gap: 8px; margin-top: 11px; flex-wrap: wrap; }
+
+/* ============ MEMBERS & ENGAGEMENT (admin/moderator only) ============ */
+.mb-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.mb-tile { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.mb-tile-k { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+.mb-tile-v { font-family: "Russo One", sans-serif; font-size: 22px; color: var(--yellow); }
+
+.mb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.mb-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.mb-table th, .mb-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+.mb-table th { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.mb-table tbody tr:hover { background: var(--panel-2); }
+.mb-email { color: var(--muted); }
+.mb-who { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.mb-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.mb-sub { display: block; font-size: 10.5px; color: var(--muted); }
+.mb-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; background: var(--panel-3) center/cover no-repeat; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+.mb-avatar.fallback { background: linear-gradient(135deg, var(--red), var(--gold)); color: #fff; }
+.mb-role { font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+.mb-role.role-admin { color: var(--yellow); border-color: rgba(255,204,0,.4); }
+.mb-role.role-moderator { color: var(--green); border-color: rgba(34,197,94,.4); }
+.mb-role-select { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
+
+.mb-h3 { margin: 24px 0 12px; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+.mb-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px; }
+.mb-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+.mb-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mb-card-who { min-width: 0; flex: 1; }
+.mb-time { font-family: "Russo One", sans-serif; font-size: 17px; color: var(--yellow); flex: none; }
+.mb-bar { height: 6px; border-radius: 999px; background: var(--panel-3); overflow: hidden; }
+.mb-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--yellow)); }
+.mb-pages { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.mb-page { font-size: 11px; color: var(--muted); background: var(--panel-3); border-radius: 999px; padding: 3px 9px; }
+.mb-page b { color: var(--text); font-weight: 700; }

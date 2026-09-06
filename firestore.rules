@@ -29,21 +29,24 @@ service cloud.firestore {
 
     // User profiles + roles
     match /users/{uid} {
-      // You can read your own profile; admins can read anyone's.
-      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
-      // Only admins can enumerate the whole member list (Members screen).
-      allow list: if isAdmin();
+      // You can read your own profile; editors (admin + moderator) can read
+      // anyone's - they share the Members / engagement dashboard.
+      allow get: if signedIn() && (request.auth.uid == uid || canEdit());
+      // Editors enumerate the member list (Members screen + engagement board).
+      allow list: if canEdit();
       // A user may create only their OWN profile, and only as 'viewer'
       // (the owner email may bootstrap itself as 'admin').
       allow create: if signedIn() && request.auth.uid == uid
                     && (isOwner() || request.resource.data.role == 'viewer');
       // Admins can change/remove roles. A user may ALSO update their OWN doc,
-      // but ONLY the lastAccessedAt field (last-visit tracking) - affectedKeys
-      // hasOnly() blocks self-promotion or any other field edit. Deletes stay
+      // but ONLY the visit/engagement fields - affectedKeys hasOnly() blocks
+      // self-promotion or any other field edit. (These counters are written by
+      // the client, so treat them as indicative, not audited.) Deletes stay
       // admin-only.
       allow update: if isAdmin()
                     || (signedIn() && request.auth.uid == uid
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAccessedAt']));
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['lastAccessedAt', 'timeMs', 'visits', 'pages']));
       allow delete: if isAdmin();
     }
 
