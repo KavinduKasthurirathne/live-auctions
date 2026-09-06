@@ -217,7 +217,13 @@ function auNormPlayer(id, d) {
   const p = { id, name: d.name || "", role: d.role || "", basePrice: d.basePrice || 0,
     photo: d.photo || "", status: d.status || "available",
     soldTo: d.soldTo == null ? null : d.soldTo, soldPrice: d.soldPrice == null ? null : d.soldPrice,
-    retained: !!d.retained, order: d.order || 0 };
+    retained: !!d.retained, order: d.order || 0,
+    // Right to Match. These MUST be rebuilt here: this whitelist replaces
+    // state.players wholesale on every snapshot, so a field missing from it is
+    // wiped locally a second after it's written - which silently killed RTM
+    // (the former-team link vanished and spent cards came back).
+    formerTeamId: d.formerTeamId == null ? null : d.formerTeamId,
+    rtmBy: d.rtmBy == null ? null : d.rtmBy };
   if (d.soldBids != null) p.soldBids = d.soldBids; // optional (Phase E)
   if (d.stats) p.stats = d.stats;                  // optional season stats (Phase E)
   return p;
@@ -898,11 +904,12 @@ function renderTeamButtons() {
     btn.innerHTML = `
       ${logoHTML("tb-logo", t.logo, t.name)}
       <span class="tb-meta">
-        <span class="tb-name">${esc(t.name)}${rtmOn(state) && rtmLeft(state, t.id) > 0
-          ? `<i class="rtm-dot" title="Right to Match card still in hand"></i>` : ""}</span>
+        <span class="tb-name">${esc(t.name)}</span>
         <span class="tb-purse">${leading ? "★ Leading" : money(info.remaining) + " left"}</span>
       </span>
-      ${i < 9 ? `<span class="tb-key">${i + 1}</span>` : ""}`;
+      ${i < 9 ? `<span class="tb-key">${i + 1}</span>` : ""}
+      ${rtmOn(state) && rtmLeft(state, t.id) > 0
+        ? `<i class="rtm-badge" title="Right to Match card still in hand">RTM</i>` : ""}`;
     btn.onclick = () => placeBid(t.id);
     grid.appendChild(btn);
   });
@@ -928,7 +935,9 @@ function renderSquadTracker() {
       return `<div class="tracker-card ${health}${leading ? " leading" : ""}">
         <div class="tc-head">${logoHTML("tc-logo", t.logo, t.name)}<span class="tc-name">${esc(t.name)}</span></div>
         <div class="tc-dots" title="${info.squadCount} of ${info.maxPlayers} players">${dots}</div>
-        <div class="tc-players">${info.squadCount} / ${info.maxPlayers} Players</div>
+        <div class="tc-players">${info.squadCount} / ${info.maxPlayers} Players${
+          rtmOn(state) && rtmCardsPerTeam(state) > 0 && rtmLeft(state, t.id) > 0
+            ? `<i class="rtm-badge inline" title="Right to Match card still in hand">RTM</i>` : ""}</div>
         <div class="tc-bar"><span style="width:${fillPct}%"></span></div>
         <div class="tc-stats">
           <div><span class="tc-k">Purse</span><span class="tc-v">${money(info.remaining)}</span></div>
@@ -1468,7 +1477,12 @@ function renderPurse() {
         ${logoHTML("team-logo", t.logo, t.name)}
         <div>
           <div class="purse-name">${esc(t.name)}</div>
-          <div class="purse-count">${count} player${count !== 1 ? "s" : ""}</div>
+          <div class="purse-count">${count} player${count !== 1 ? "s" : ""}${
+            rtmOn(state) && rtmCardsPerTeam(state) > 0
+              ? (rtmLeft(state, t.id) > 0
+                  ? `<i class="rtm-badge inline" title="Right to Match cards left">RTM ${rtmLeft(state, t.id)}/${rtmCardsPerTeam(state)}</i>`
+                  : `<i class="rtm-badge inline spent" title="Right to Match card used">RTM used</i>`)
+              : ""}</div>
         </div>
       </div>
       <div class="purse-amounts">
@@ -1917,12 +1931,13 @@ async function saveRetain() {
 
   if (current) {
     current.name = name; current.role = role; current.soldTo = teamId;
+    current.rtmBy = null;   // retention isn't an RTM signing
     current.basePrice = price || 0; current.soldPrice = price;
     if (photo) current.photo = photo;
   } else {
     state.players.push({
       id: uid(), name, role, basePrice: price || 0, photo: photo || "",
-      status: "sold", retained: true, soldTo: teamId, soldPrice: price,
+      status: "sold", retained: true, soldTo: teamId, soldPrice: price, rtmBy: null,
     });
   }
   clearRetainForm();
@@ -2041,8 +2056,9 @@ function resetAuction() {
   state.players.forEach(p => {
     if (p.retained) return; // keep pre-auction retentions
     p.status = "available"; p.soldTo = null; p.soldPrice = null;
+    p.rtmBy = null;         // hand every Right-to-Match card back with the players
   });
-  state.auction = { currentPlayerId: null, currentBid: 0, currentBidderId: null, soldStage: 0, bidLog: [], lastResult: null };
+  state.auction = { currentPlayerId: null, currentBid: 0, currentBidderId: null, soldStage: 0, bidLog: [], lastResult: null, rtm: null };
   state.lastAction = null;
   save();
   renderAll();
