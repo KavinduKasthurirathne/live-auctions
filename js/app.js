@@ -557,10 +557,11 @@ function squadInfo(s, teamId) {
 }
 
 /* ============================================================
-   RIGHT TO MATCH (RTM)  -  IPL 2025 rules
+   RIGHT TO MATCH (RTM)
    A player's LAST-SEASON franchise may reclaim him when he's about to be sold
-   to someone else: the winning bidder gets ONE final raise, then the former
-   team either matches that price or passes.
+   to someone else, by matching the STANDING BID: if bidding closed at 15 Cr,
+   the card buys him at exactly 15 Cr. There is no price-raise step - one
+   decision, Use RTM or Pass.
 
    Everything here is DERIVED (no stored counters) - the same discipline as
    teamSpent/squadInfo. In particular the RTM card count is computed from the
@@ -615,13 +616,6 @@ function rtmEligible(s, player, winnerTeamId, price) {
   return { ok: true, formerTeamId, reason: "" };
 }
 
-/* Highest price the winning bidder may raise to during the RTM raise step -
-   their own Safe Bid, so a raise can't break THEIR squad completion either. */
-function rtmMaxRaise(s, winnerTeamId) {
-  s = s || state;
-  const info = squadInfo(s, winnerTeamId);
-  return Math.max(0, info.safeBid);
-}
 
 /* turn an image File into a resized data URL so it fits in localStorage */
 function fileToDataURL(file, maxSize = 400, format = "jpeg") {
@@ -987,32 +981,15 @@ function renderRtmPanel() {
   const info = ft ? squadInfo(state, ft.id) : null;
   const badge = logoHTML("team-logo", ft ? ft.logo : "", ftName);
 
-  let head = "", body = "", actions = "";
-  if (r.phase === "prompt") {
-    head = `${ftName} may match ${money(r.bidPrice)}`;
-    body = `<b>${esc(player ? player.name : "")}</b> played for <b>${esc(ftName)}</b> last season.`;
-    actions = `<button class="btn btn-yellow" data-rtm="use">Use RTM</button>
-               <button class="btn btn-dark" data-rtm="pass">Pass</button>`;
-  } else if (r.phase === "raise") {
-    const max = rtmMaxRaise(state, r.winnerTeamId);
-    head = `${winName} may raise once`;
-    body = `<b>${esc(ftName)}</b> used their RTM card. <b>${esc(winName)}</b> can raise above
-            <b>${money(r.bidPrice)}</b> (up to ${money(max)}) or stand pat.`;
-    actions = `<input type="number" class="rtm-raise-input" id="rtmRaiseAmt" min="${r.bidPrice + 1}"
-                 max="${max}" step="any" placeholder="${r.bidPrice + (Number(state.settings.bidIncrement) || 1)}" />
-               <button class="btn btn-yellow" data-rtm="raise">Raise</button>
-               <button class="btn btn-dark" data-rtm="noraise">No raise</button>`;
-  } else { // match
-    const raised = r.finalPrice > r.bidPrice;
-    head = `${ftName} to match ${money(r.finalPrice)}`;
-    body = raised
-      ? `<b>${esc(winName)}</b> raised to <b>${money(r.finalPrice)}</b>. Match it, or he goes to them at that price.`
-      : `No raise. <b>${esc(ftName)}</b> can sign him at <b>${money(r.finalPrice)}</b>.`;
-    const afford = info && info.safeBid >= r.finalPrice && info.slotsLeft > 0;
-    actions = `<button class="btn btn-yellow" data-rtm="match" ${afford ? "" : "disabled"}
-                 title="${afford ? "" : "Beyond their Safe Bid or squad is full"}">Match ${money(r.finalPrice)}</button>
-               <button class="btn btn-dark" data-rtm="decline">Decline</button>`;
-  }
+  // One decision, at the standing bid - no raise step.
+  const afford = info && info.safeBid >= r.bidPrice && info.slotsLeft > 0;
+  const head = `${ftName} may match ${money(r.bidPrice)}`;
+  const body = `<b>${esc(player ? player.name : "")}</b> played for <b>${esc(ftName)}</b> last season.
+    Using the card signs him at <b>${money(r.bidPrice)}</b> - the same price
+    <b>${esc(winName)}</b> bid. Passing sells him to <b>${esc(winName)}</b>.`;
+  const actions = `<button class="btn btn-yellow" data-rtm="use" ${afford ? "" : "disabled"}
+                     title="${afford ? "" : "Beyond their Safe Bid or squad is full"}">Use RTM  ${money(r.bidPrice)}</button>
+                   <button class="btn btn-dark" data-rtm="pass">Pass</button>`;
 
   box.classList.remove("hidden");
   box.innerHTML = `
@@ -1140,10 +1117,12 @@ function finalizeSold(opts) {
 }
 
 /* ---------------- RTM handshake (auctioneer-driven, synced to everyone) ----------------
-   Phases: prompt -> (raise) -> match. Every step writes state.auction.rtm and
-   save()s, so the live doc broadcasts the exact same board to all devices.
-   The countdown is ADVISORY: endsAt only drives the on-screen clock - nothing
-   ever auto-commits, the auctioneer always taps. */
+   ONE decision: the former team either matches the standing bid or passes.
+   There is no price raise - if bidding closed at 15 Cr, the card buys him at
+   exactly 15 Cr. Each step writes state.auction.rtm and save()s, so the live
+   doc broadcasts the same board to every device. The countdown is ADVISORY:
+   endsAt only drives the on-screen clock - nothing auto-commits, the
+   auctioneer always taps. */
 const RTM_WINDOW_MS = 15000;
 
 // Called on the final SOLD tap. Returns true when it opened an RTM prompt
@@ -1159,8 +1138,7 @@ function maybeStartRtm() {
     playerId: player.id,
     formerTeamId: el.formerTeamId,
     winnerTeamId: a.currentBidderId,
-    bidPrice: price,
-    finalPrice: price,
+    bidPrice: price,          // the price the card buys him at - never changes
     endsAt: Date.now() + RTM_WINDOW_MS,
   };
   save();
@@ -1170,77 +1148,38 @@ function maybeStartRtm() {
   return true;
 }
 
-// Guard shared by every RTM action: editors only, and only in the given phase.
-function rtmAct(phase) {
+// Guard shared by every RTM action: editors only, and only while a prompt is up.
+function rtmAct() {
   if (!auCanEdit()) { toast("Only admins/moderators can run the auction", "bad"); return null; }
-  const r = state.auction.rtm;
-  if (!r || (phase && r.phase !== phase)) return null;
-  return r;
+  return state.auction.rtm || null;
 }
 
-/* prompt: the former team spends its card -> the winner gets one raise. */
+/* Use the card: the former team signs him at the STANDING BID, card spent. */
 function rtmUse() {
-  const r = rtmAct("prompt"); if (!r) return;
-  r.phase = "raise";
-  r.endsAt = Date.now() + RTM_WINDOW_MS;
-  save(); renderAll();
-  const w = getTeam(r.winnerTeamId);
-  toast(`RTM used  ${w ? w.name : "the bidder"} may raise once`, "good");
+  const r = rtmAct(); if (!r) return;
+  const player = currentPlayer();
+  // Re-check at commit time - another device may have changed the squad/purse.
+  const el = rtmEligible(state, player, r.winnerTeamId, r.bidPrice);
+  if (!el.ok || el.formerTeamId !== r.formerTeamId) {
+    toast(el.reason === "cant-afford" ? "They can no longer afford that price"
+        : el.reason === "squad-full" ? "Their squad is full"
+        : "RTM is no longer available", "bad");
+    return;
+  }
+  finalizeSold({ teamId: r.formerTeamId, price: r.bidPrice, viaRtm: true });
 }
 
-/* prompt: they let him go -> normal sale to the winning bidder. */
+/* Pass: they let him go - normal sale to the winning bidder at the same price. */
 function rtmPass() {
-  const r = rtmAct("prompt"); if (!r) return;
+  const r = rtmAct(); if (!r) return;
   finalizeSold({ teamId: r.winnerTeamId, price: r.bidPrice });
 }
 
-/* raise: the winner raises to `amount` (validated against THEIR safe bid). */
-function rtmRaise(amount) {
-  const r = rtmAct("raise"); if (!r) return;
-  const n = Number(amount);
-  if (!isFinite(n) || n <= r.bidPrice) { toast(`Raise must be above ${money(r.bidPrice)}`, "bad"); return; }
-  const max = rtmMaxRaise(state, r.winnerTeamId);
-  if (n > max) { toast(`${money(n)} exceeds their Safe Bid (${money(max)})`, "bad"); return; }
-  r.finalPrice = n;
-  r.phase = "match";
-  r.endsAt = Date.now() + RTM_WINDOW_MS;
-  save(); renderAll();
-  const ft = getTeam(r.formerTeamId);
-  toast(`Raised to ${money(n)}  ${ft ? ft.name : "former team"} to match?`, "good");
-}
-
-/* raise: no raise -> the former team decides at the original bid. */
-function rtmNoRaise() {
-  const r = rtmAct("raise"); if (!r) return;
-  r.finalPrice = r.bidPrice;
-  r.phase = "match";
-  r.endsAt = Date.now() + RTM_WINDOW_MS;
-  save(); renderAll();
-}
-
-/* match: former team matches -> they sign him and the RTM card is spent. */
-function rtmMatch() {
-  const r = rtmAct("match"); if (!r) return;
-  const player = currentPlayer();
-  const el = rtmEligible(state, player, r.winnerTeamId, r.finalPrice);
-  // Re-check at commit time: the raise may have pushed it past what they can afford.
-  if (!el.ok || el.formerTeamId !== r.formerTeamId) {
-    toast(el.reason === "cant-afford" ? "They can no longer afford that price" : "RTM is no longer available", "bad");
-    return;
-  }
-  finalizeSold({ teamId: r.formerTeamId, price: r.finalPrice, viaRtm: true });
-}
-
-/* match: they decline -> the winner signs him AT THE RAISED PRICE (IPL rule). */
-function rtmDecline() {
-  const r = rtmAct("match"); if (!r) return;
-  finalizeSold({ teamId: r.winnerTeamId, price: r.finalPrice });
-}
-
 /* Auctioneer escape hatch: abandon the handshake and hand the player to the
-   winning bidder at the original bid. */
+   winning bidder at the standing bid (same outcome as Pass, kept as a
+   distinct, clearly-labelled control). */
 function rtmCancel() {
-  const r = rtmAct(null); if (!r) return;
+  const r = rtmAct(); if (!r) return;
   finalizeSold({ teamId: r.winnerTeamId, price: r.bidPrice });
 }
 
@@ -2318,10 +2257,6 @@ function wireEvents() {
     const act = b.getAttribute("data-rtm");
     if (act === "use") rtmUse();
     else if (act === "pass") rtmPass();
-    else if (act === "raise") rtmRaise(($("#rtmRaiseAmt") || {}).value);
-    else if (act === "noraise") rtmNoRaise();
-    else if (act === "match") rtmMatch();
-    else if (act === "decline") rtmDecline();
     else if (act === "cancel") rtmCancel();
   });
 

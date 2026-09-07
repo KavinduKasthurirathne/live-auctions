@@ -1594,10 +1594,6 @@ body:not(.can-edit) .news-composer { display: none; }
 .rtm-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
 .rtm-actions .btn { flex: 1 1 auto; min-width: 120px; }
 .rtm-actions .rtm-cancel { flex: 0 0 auto; min-width: 0; font-size: 12px; opacity: .75; }
-.rtm-raise-input {
-  flex: 1 1 120px; min-width: 110px; padding: 10px 12px; border-radius: 10px;
-  background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font-size: 14px;
-}
 /* "Last season: <team>" chip on the player card, and the RTM squad tag. */
 .rtm-former {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
