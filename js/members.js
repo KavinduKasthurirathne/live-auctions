@@ -44,7 +44,7 @@
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function dateLabel(ts) {
     const d = dateOf(ts);
-    if (!d) return "—";
+    if (!d) return "-";
     return `${String(d.getDate()).padStart(2, "0")} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   }
   function agoLabel(ts) {
@@ -58,10 +58,10 @@
     if (s < 30 * 86400) return p(Math.floor(s / 86400), "day");
     return dateLabel(ts);
   }
-  // 0 -> "—", else "3h 12m" / "12m" / "45s"
+  // 0 -> "-", else "3h 12m" / "12m" / "45s"
   function durLabel(ms) {
     const n = Number(ms) || 0;
-    if (n < 1000) return "—";
+    if (n < 1000) return "-";
     const sec = Math.round(n / 1000);
     const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
     if (h) return `${h}h ${m}m`;

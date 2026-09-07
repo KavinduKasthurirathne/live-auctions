@@ -1002,8 +1002,8 @@
       <div class="card hub-facts">
         <div class="hub-fact"><span class="hub-fact-k">Status</span><span class="hub-fact-v">${STATUS_LABEL[m.status] || esc(m.status)}</span></div>
         ${m.duration ? `<div class="hub-fact"><span class="hub-fact-k">Duration</span><span class="hub-fact-v">${esc(m.duration)}</span></div>` : ""}
-        <div class="hub-fact"><span class="hub-fact-k">Teams</span><span class="hub-fact-v">${c.teams || "—"}</span></div>
-        <div class="hub-fact"><span class="hub-fact-k">Players</span><span class="hub-fact-v">${c.players || "—"}</span></div>
+        <div class="hub-fact"><span class="hub-fact-k">Teams</span><span class="hub-fact-v">${c.teams || "-"}</span></div>
+        <div class="hub-fact"><span class="hub-fact-k">Players</span><span class="hub-fact-v">${c.players || "-"}</span></div>
       </div>`;
     return `${honors || ""}${facts}`;
   }
@@ -1059,8 +1059,8 @@
     return `<div class="hub-table-wrap"><table class="hub-ptable">
       <thead><tr><th>Player</th><th>Team</th><th class="num">M</th><th class="num">Runs</th><th class="num">Wkts</th></tr></thead>
       <tbody>${rows.map(p => `<tr>
-        <td>${esc(p.name)}</td><td>${esc(p.team || "—")}</td>
-        <td class="num">${esc(p.matches || "—")}</td><td class="num">${esc(p.runs || "—")}</td><td class="num">${esc(p.wickets || "—")}</td>
+        <td>${esc(p.name)}</td><td>${esc(p.team || "-")}</td>
+        <td class="num">${esc(p.matches || "-")}</td><td class="num">${esc(p.runs || "-")}</td><td class="num">${esc(p.wickets || "-")}</td>
       </tr>`).join("")}</tbody></table></div>`;
   }
   function playersHtml(m) {
@@ -1073,8 +1073,8 @@
         <thead><tr><th>Player</th><th>Role</th><th>Team</th>${showPrice ? `<th class="num">Price</th>` : ""}</tr></thead>
         <tbody>${ps.map(p => { const t = p.soldTo ? A.team(p.soldTo) : null; return `<tr>
           <td>${esc(p.name)}${p.retained ? ` <span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : ""}</td>
-          <td>${esc(p.role || "—")}</td><td>${t ? esc(t.name) : (p.status === "available" ? "Available" : "—")}</td>
-          ${showPrice ? `<td class="num">${p.soldPrice ? mfmt(p.soldPrice) : "—"}</td>` : ""}
+          <td>${esc(p.role || "-")}</td><td>${t ? esc(t.name) : (p.status === "available" ? "Available" : "-")}</td>
+          ${showPrice ? `<td class="num">${p.soldPrice ? mfmt(p.soldPrice) : "-"}</td>` : ""}
         </tr>`; }).join("")}</tbody></table></div>`;
     }
     const rows = tournamentRows(m);

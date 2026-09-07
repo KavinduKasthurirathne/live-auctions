@@ -70,7 +70,7 @@ Keep the offline `firebase-config.js` as well `firebase-init.js` still sets
 5. Capture `console`/`pageerror` events the app logs loudly on failure. A
    clean run has zero console errors and zero 404s.
 
-Flows worth driving after a change: home (hero, the Hall of Champions carousel —
+Flows worth driving after a change: home (hero, the Hall of Champions carousel
 registry-driven, this-year-only, live card first auto-advance ~6.5s, dots;
 roll the clock with an `addInitScript` Date override to test the year rule),
 the news list (`.news-card` rows) + story popup (`[data-news-open]`, Escape /

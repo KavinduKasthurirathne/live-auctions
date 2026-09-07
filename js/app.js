@@ -984,9 +984,9 @@ function renderRtmPanel() {
   // One decision, at the standing bid - no raise step.
   const afford = info && info.safeBid >= r.bidPrice && info.slotsLeft > 0;
   const head = `${ftName} may match ${money(r.bidPrice)}`;
-  const body = `<b>${esc(player ? player.name : "")}</b> played for <b>${esc(ftName)}</b> last season.
-    Using the card signs him at <b>${money(r.bidPrice)}</b> - the same price
-    <b>${esc(winName)}</b> bid. Passing sells him to <b>${esc(winName)}</b>.`;
+  // const body = `<b>${esc(player ? player.name : "")}</b> played for <b>${esc(ftName)}</b> last season.
+  //   Using the card signs him at <b>${money(r.bidPrice)}</b> - the same price
+  //   <b>${esc(winName)}</b> bid. Passing sells him to <b>${esc(winName)}</b>.`;
   const actions = `<button class="btn btn-yellow" data-rtm="use" ${afford ? "" : "disabled"}
                      title="${afford ? "" : "Beyond their Safe Bid or squad is full"}">Use RTM  ${money(r.bidPrice)}</button>
                    <button class="btn btn-dark" data-rtm="pass">Pass</button>`;
