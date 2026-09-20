@@ -7,13 +7,13 @@
                                 legacy?, order, createdAt }
      tournaments/_config        { activeId }  (what visitors land on)
 
-   Every tournament-bound module (auction, fantasy, fixtures, MVP)
-   asks THIS module for its data-path prefix:
+   Every tournament-bound module (auction, fantasy) asks THIS module
+   for its data-path prefix:
      prefix() -> []                      for the legacy tournament
                  ["tournaments", tid]    for everything else
    The legacy tournament (HCCL Season 6) keeps reading/writing the
-   ORIGINAL roots (auction/league, fantasy/league, mvp, matches) -
-   zero data movement for the live season.
+   ORIGINAL roots (auction/league, fantasy/league) - zero data
+   movement for the live season.
 
    If the registry can't be read (rules not published yet, offline),
    we fall back to a single legacy tournament and the app behaves
@@ -28,7 +28,7 @@
   const LEGACY_ID = "hccl-s6";
   const VIEW_KEY = "hccl_viewing_tournament";
   // The legacy entry is HCCL Season 06 - the LIVE season whose data stays at
-  // the ORIGINAL Firestore roots (auction/fantasy/mvp/matches). Every other
+  // the ORIGINAL Firestore roots (auction/fantasy). Every other
   // HCCL season is an archive-only entry (see seasonSeeds) whose stats come
   // from the bundled season archive, not from tournament data roots.
   const LEGACY_META = {
@@ -68,7 +68,7 @@
     return seeds;
   }
 
-  // Other HC tournaments (stats-sheet only: no auction/fantasy/MVP tabs - an
+  // Other HC tournaments (stats-sheet only: no auction/fantasy tabs - an
   // editor imports a Season-Stats-format CSV in each one's Details hub).
   // `order` slots them chronologically between the HCCL seasons (S4=4, S5=5,
   // S6=6). `solo: true` = players (not teams) contest the title, so the
@@ -155,7 +155,7 @@
   // Tournaments whose detail hub shows the HCCL season archive: the legacy
   // entry (Season 06), plus the seeded per-season entries tagged archive:"hccl".
   const isHcclFamily = m => !!(m && (m.legacy || m.archive === "hccl"));
-  // Archive-only entries have NO data roots (no auction/fixtures/fantasy) -
+  // Archive-only entries have NO data roots (no auction/fantasy) -
   // their Details hub is the whole content, so "viewing" them is meaningless.
   // Same for stats-sheet-only tournaments (Mini IPL, Solo Knockout, County
   // leagues): their record IS the imported stats sheet.
@@ -175,10 +175,6 @@
       // tournament created before this flag existed keeps its auction. When
       // false, the Auctions tab and all purse / base-price fields hide for it.
       hasAuction: d.hasAuction !== false,
-      // Match format. "test" switches the Fixtures & Results standings to the
-      // Test Championship points table (12/6/4/0 + per-innings bonuses, no NRR).
-      // Defaults to "limited" so every existing tournament is unchanged.
-      matchFormat: d.matchFormat === "test" ? "test" : "limited",
       // { champion, runnerUp, mvp, mostRuns?, mostWickets? } - drives this
       // tournament's card on the Home champions carousel once it's completed.
       honors: d.honors || null,
@@ -274,17 +270,15 @@
       }
       return [];
     },
+    // Chronology helpers, shared with home.js so one parser serves the
+    // Tournaments grid and the champions carousel.
+    durationStart: d => durationStart(d),
+    durationEnd: d => durationEnd(d),
     // Does the given (default: viewed) tournament run a player auction? Drives
     // whether app.js shows the Auctions tab + purse / base-price fields.
     hasAuction(id) {
       const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
       return !!(m && !isArchiveOnly(m) && m.hasAuction !== false);
-    },
-    // Is the given (default: viewed) tournament a TEST championship? Drives the
-    // Fixtures & Results points table and the 4-innings result entry form.
-    isTest(id) {
-      const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
-      return !!(m && m.matchFormat === "test");
     },
     isLegacy(id) {
       const m = metaOf(id == null ? (viewingId || LEGACY_ID) : id);
@@ -316,8 +310,8 @@
       if (ready) { try { cb(api); } catch (e) { console.error(e); } }
     },
     // Open the viewed tournament's page on a given inner tab. Used by the
-    // Fantasy nav pill and any legacy switchTab("fixtures"|"mvp"|"fantasy")
-    // (js/app.js HUB_TABS) now that those live inside the tournament page.
+    // Fantasy nav pill and any legacy switchTab("fantasy") (js/app.js
+    // HUB_TABS), now that Fantasy lives inside the tournament page.
     openHub(hubKey) {
       const id = (viewingId && metaOf(viewingId)) ? viewingId
         : (metaOf(activeId) ? activeId : LEGACY_ID);
@@ -329,13 +323,55 @@
   };
   window.HCCLSeries = api;
 
+  /* ---------------- chronology from the typed duration ----------------
+     The Tournaments grid orders itself by WHEN a tournament ran, read straight
+     out of the duration an admin typed ("OCT 2025" sorts before "SEP 2026").
+     Formats handled: "MAR 2026 - APR 2026", "13 MAY 2026 - 14 MAY 2026",
+     "JAN 2026". Anything unparseable ("COMING SOON") sinks to the end rather
+     than jumping the queue. home.js reuses these for the champions carousel. */
+  const MONTH_IDX = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
+  function monthHits(duration) {
+    const re = /(?:(\d{1,2})\s+)?(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?\s+(\d{4})/g;
+    const str = String(duration || "").toUpperCase();
+    const out = [];
+    let m;
+    while ((m = re.exec(str))) out.push(m);
+    return out;
+  }
+  // FIRST date of the duration ("MAR 2026 - APR 2026" -> 1 Mar 2026).
+  function durationStart(duration) {
+    const h = monthHits(duration)[0];
+    if (!h) return Infinity;                 // undated -> last
+    return new Date(+h[3], MONTH_IDX[h[2]], h[1] ? +h[1] : 1).getTime();
+  }
+  // LAST date ("MAR 2026 - APR 2026" -> 30 Apr; day 0 of the next month IS the
+  // last day of this one). Undated -> -Infinity, so it can't look "most recent".
+  function durationEnd(duration) {
+    const hits = monthHits(duration);
+    const h = hits[hits.length - 1];
+    if (!h) return -Infinity;
+    const y = +h[3], mo = MONTH_IDX[h[2]];
+    return h[1] ? new Date(y, mo, +h[1], 23, 59, 59).getTime()
+                : new Date(y, mo + 1, 0, 23, 59, 59).getTime();
+  }
+  /* Oldest first. Compared with < / > rather than subtraction because undated
+     entries are Infinity and Infinity - Infinity is NaN, which silently
+     corrupts a sort. `order` then createdAt keep ties deterministic. */
+  function byChronology(x, y) {
+    const a = durationStart(x.duration), b = durationStart(y.duration);
+    if (a !== b) return a < b ? -1 : 1;
+    const ox = x.order == null ? 999 : x.order, oy = y.order == null ? 999 : y.order;
+    if (ox !== oy) return ox - oy;
+    return (x.createdAt || 0) - (y.createdAt || 0);
+  }
+
   /* ---------------- registry sync ---------------- */
   function fallbackReady() {
     // Offline mode still shows the full HC story: HCCL season entries, the
     // live legacy season, the scheduled next season, and the other seeded
     // tournaments (Mini IPL, Solo Knockout, County leagues).
     tournaments = [...allSeeds().filter(t => t.id !== LEGACY_ID), LEGACY_META]
-      .sort((x, y) => (x.order - y.order) || (x.createdAt - y.createdAt));
+      .sort(byChronology);
     activeId = LEGACY_ID;
     viewingId = LEGACY_ID;
     if (!ready) { ready = true; render(); renderBanner(); fire(); }
@@ -354,7 +390,7 @@
         else metas.push(normMeta(d.id, d.data()));
       });
       if (metas.length) {
-        metas.sort((x, y) => (x.order - y.order) || (x.createdAt - y.createdAt));
+        metas.sort(byChronology);
         tournaments = metas;
         maybeMigrateLegacyMeta();    // one-time per-season restructure of the legacy entry
         maybeSeedSeasons(cfg);       // one-time seed of the bundled entries
@@ -521,6 +557,9 @@
     const roots = [
       ["tournaments", tid, "auction", "league", "teams"],
       ["tournaments", tid, "auction", "league", "players"],
+      // Matches & MVP are retired sections, but tournaments created while
+      // they existed can still hold their data - keep checking, or deleting
+      // the meta doc would orphan those subcollections for good.
       ["tournaments", tid, "matches"],
       ["tournaments", tid, "mvp"],
       ["tournaments", tid, "fantasy", "league", "teams"],
@@ -551,7 +590,6 @@
     const file = $("#serLogoFile").files[0];
     const srcId = $("#serCopyFrom") ? $("#serCopyFrom").value : "";
     const hasAuction = $("#serHasAuction") ? !!$("#serHasAuction").checked : true;
-    const matchFormat = ($("#serMatchFormat") && $("#serMatchFormat").value === "test") ? "test" : "limited";
 
     // Honors (all optional). Leaving every field blank clears them - the
     // setDoc below replaces the whole meta doc, so an omitted key is removed.
@@ -576,7 +614,7 @@
           name, short, duration, status,
           logo: logo || cur.logo || "",
           legacy: !!cur.legacy, order: cur.order, createdAt: cur.createdAt || Date.now(),
-          hasAuction, matchFormat,
+          hasAuction,
           // setDoc replaces the whole doc - carry the identity flags over.
           ...(cur.archive ? { archive: cur.archive } : {}),
           ...(cur.season ? { season: cur.season } : {}),
@@ -588,7 +626,7 @@
       } else {
         const id = slugify(name);
         await a.setDoc(a.doc(d, "tournaments", id), {
-          name, short, duration, status, logo, hasAuction, matchFormat,
+          name, short, duration, status, logo, hasAuction,
           order: tournaments.length, createdAt: Date.now(),
           ...(honors ? { honors } : {}),
         });
@@ -736,15 +774,6 @@
         <label class="ser-check">
           <input type="checkbox" id="serHasAuction"${(editing ? editing.hasAuction !== false : false) ? " checked" : ""} />
           <span>This tournament has a <b>player auction</b> (base prices &amp; team purses). Leave off for a normal fixed-squad tournament - add teams &amp; players directly in Setup. Turn on only to run a live auction: the Auctions tab and all purse / base-price fields appear for it.</span>
-        </label>
-        <label>Match format
-          <select id="serMatchFormat">
-            <option value="limited"${(editing && editing.matchFormat === "test") ? "" : " selected"}>Limited overs (T10 / T20 / LMS)</option>
-            <option value="test"${(editing && editing.matchFormat === "test") ? " selected" : ""}>Test championship</option>
-          </select>
-          <span class="hint">Limited overs uses the usual table: win 2, tie 1, loss 0, plus net run rate.
-            <b>Test</b> switches this tournament&rsquo;s standings to win 12 &middot; draw 6 &middot; tie 4 &middot; loss 0
-            with per-innings bonus points, and its results are entered as two innings per team.</span>
         </label>
         <label>Tournament logo${editing && editing.logo ? " (leave empty to keep current)" : ""}
           <input type="file" id="serLogoFile" accept="image/*" />
@@ -932,14 +961,14 @@
      TOURNAMENT PAGE (Cricbuzz-style) list ⇄ detail in #view-series.
      #view-series holds two PERSISTENT children (index.html): #seriesList and
      #tournamentDetail (a head + inner tab bar #tournamentTabs + #tournamentPanels).
-     Inline panels (overview/squads/players/stats) are filled here; the hosted
-     modules render into #view-fixtures / #view-mvp / #view-fantasy, which live in
-     #tournamentPanels as .hub-panel so a list/detail re-render never wipes them.
+     Inline panels (overview/squads/players/stats) are filled here; fantasy.js
+     renders into #view-fantasy, which lives in #tournamentPanels as a
+     .hub-panel so a list/detail re-render never wipes it.
      ============================================================ */
 
-  // A tournament has live data roots (auction squads, fixtures, MVP, fantasy)
-  // exactly when it isn't archive/stats-only. Those extra inner tabs appear only
-  // for such tournaments; stats-only ones show Overview / Squads / Players / Stats.
+  // A tournament has live data roots (auction squads, fantasy) exactly when it
+  // isn't archive/stats-only. The Fantasy inner tab appears only for such
+  // tournaments; stats-only ones show Overview / Squads / Players / Stats.
   const hasDataRoots = m => !!m && !isArchiveOnly(m);
   // Is `m` the tournament the rest of the app is currently synced to? Only then
   // do its live auction squads (window.HCCLAuction, which follows setViewing)
@@ -951,11 +980,10 @@
       { key: "overview", label: "Overview" },
       { key: "squads",   label: "Squads" },
       { key: "players",  label: "Players" },
+      { key: "stats",    label: isHcclFamily(m) ? "Record" : "Stats" },
     ];
-    const live = hasDataRoots(m);
-    if (live) tabs.push({ key: "matches", label: "Matches" });
-    tabs.push({ key: "stats", label: isHcclFamily(m) ? "Record" : "Stats" });
-    if (live) tabs.push({ key: "mvp", label: "MVP" }, { key: "fantasy", label: "Fantasy" });
+    // Fantasy needs a tournament with live data roots behind it.
+    if (hasDataRoots(m)) tabs.push({ key: "fantasy", label: "Fantasy" });
     return tabs;
   }
 
@@ -1107,8 +1135,6 @@
     else if (key === "squads")  { const el = $("#hub-squads");  if (el) el.innerHTML = squadsHtml(m); }
     else if (key === "players") { const el = $("#hub-players"); if (el) el.innerHTML = playersHtml(m); }
     else if (key === "stats")   fillStats(m);
-    else if (key === "matches" && window.HCCLFixturesView) window.HCCLFixturesView.render();
-    else if (key === "mvp" && window.HCCLMvpView) window.HCCLMvpView.render();
     else if (key === "fantasy" && window.HCCLFantasyView) window.HCCLFantasyView.render();
   }
 

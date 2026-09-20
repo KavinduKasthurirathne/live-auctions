@@ -9,7 +9,6 @@
         podium | Most Runs + Most Wickets, in tournament-date order.
         The LIVE one leads with an "in progress" card; one that hasn't
         been played yet says so instead of showing an empty podium.
-     3. News shell (#homeNews) - filled by js/news.js.
 
    The per-season honors & leaderboards that used to live here moved
    to js/season-archive.js and are shown inside the Series tab's
@@ -40,37 +39,15 @@
     return `<div class="champs-logo fallback">${initials}</div>`;
   }
 
-  /* ---- dates parsed out of the duration string an admin typed ---- */
-  const MONTH_IDX = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
-  function monthHits(duration) {
-    const re = /(?:(\d{1,2})\s+)?(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?\s+(\d{4})/g;
-    const s = String(duration || "").toUpperCase();
-    const out = [];
-    let m;
-    while ((m = re.exec(s))) out.push(m);
-    return out;
-  }
-  // Chronology key: the FIRST date of a duration ("MAR 2026 - APR 2026" -> 1 Mar
-  // 2026). Unparseable strings ("COMING SOON") sink to the end, so a tournament
-  // without dates never jumps the queue.
-  function startStamp(duration) {
-    const h = monthHits(duration)[0];
-    if (!h) return Infinity;
-    return new Date(+h[3], MONTH_IDX[h[2]], h[1] ? +h[1] : 1).getTime();
-  }
-  // Recency key: the LAST date ("MAR 2026 - APR 2026" -> 30 Apr; "JAN 2026" ->
-  // 31 Jan; day 0 of the next month IS the last day of this one). Used to pick
-  // the lead card when nothing is live. Undated -> -Infinity, so a "COMING
-  // SOON" tournament can never be mistaken for the most recent one.
-  function endStamp(duration) {
-    const hits = monthHits(duration);
-    const h = hits[hits.length - 1];
-    if (!h) return -Infinity;
-    const y = +h[3], mo = MONTH_IDX[h[2]];
-    return h[1]
-      ? new Date(y, mo, +h[1], 23, 59, 59).getTime()
-      : new Date(y, mo + 1, 0, 23, 59, 59).getTime();
-  }
+  /* ---- dates parsed out of the duration string an admin typed ----
+     ONE parser, owned by js/series.js (which also orders the Tournaments grid
+     by it), so the carousel and the grid can never disagree about when a
+     tournament ran. The fallbacks below only matter if series.js failed to
+     load: undated sinks last / reads as least-recent, exactly as before. */
+  const startStamp = d => (window.HCCLSeries && window.HCCLSeries.durationStart)
+    ? window.HCCLSeries.durationStart(d) : Infinity;
+  const endStamp = d => (window.HCCLSeries && window.HCCLSeries.durationEnd)
+    ? window.HCCLSeries.durationEnd(d) : -Infinity;
 
   // Four zones in one row: logo | name + duration | Champion/Runner-up/MVP
   // podium | Most Runs & Most Wickets. Cards without a leaders zone drop it.
@@ -188,8 +165,8 @@
       const midHtml = honors.champion
         ? A.podiumHtml(honors, t.solo ? "player" : "team")
         : live
-          ? note(`${what} in progress`, no ? "Champion crowned soon - follow it in 🏆 Series"
-            : "Follow it in the 🏆 Series tab")
+          ? note(`${what} in progress`, no ? "Champion crowned soon - follow it in 🏆 Tournaments"
+            : "Follow it in the 🏆 Tournaments tab")
           : t.status === "upcoming"
             ? note("Coming soon", `This ${what.toLowerCase()} hasn't been played yet`)
             : note("Champion to be confirmed", "The honors for this one aren't recorded yet");
@@ -213,8 +190,11 @@
     // oldest -> newest, so the carousel walks the story forward and wraps back
     // round to the current one. A tournament with no dates at all ("COMING
     // SOON") has no place in the chronology, so it sits at the end.
-    const live = cards.filter(c => c.live).sort((a, b) => a.start - b.start);
-    const rest = cards.filter(c => !c.live).sort((a, b) => a.start - b.start);
+    // Compared with < / > rather than subtraction: undated cards are Infinity
+    // and Infinity - Infinity is NaN, which makes the order arbitrary.
+    const byStart = (a, b) => (a.start === b.start ? 0 : a.start < b.start ? -1 : 1);
+    const live = cards.filter(c => c.live).sort(byStart);
+    const rest = cards.filter(c => !c.live).sort(byStart);
     const lead = [];
     if (!live.length && rest.length) {
       const newest = rest.reduce((best, c) => (c.end > best.end ? c : best), rest[0]);
@@ -377,13 +357,10 @@
           <span class="home-hero-country">SRI LANKA</span>
         </p>
         <p class="home-hero-sub">A PLACE WHERE HAND CRICKET CHAMPIONS SHINE</p>
-        <p class="home-hero-tags">Live Auctions · Fantasy League · Player Rankings</p>
+        <p class="home-hero-tags">Live Auctions · Fantasy League · Season Stats</p>
       </section>
-      ${champsHtml()}
-      <section class="home-news" id="homeNews"></section>`;
+      ${champsHtml()}`;
     initCarousel();
-    // news.js owns the feed; refill the shell we just rebuilt.
-    if (window.HCCLNews && typeof window.HCCLNews.render === "function") window.HCCLNews.render();
   }
 
   // The registry, the archive and auth all emit around the same moments

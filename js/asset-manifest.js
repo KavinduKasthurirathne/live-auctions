@@ -5,12 +5,12 @@
 
    Every lookup is keyed by the LOWERCASED file basename, so a name
    resolves regardless of case ("SUPER FIRE DRAGONS" -> the file).
-   Consumers: season-archive.js, mvp.js, fantasy.js.
+   Consumers: season-archive.js, fantasy.js.
    ============================================================ */
 window.HCCL_ASSETS = {
-    "generatedAt": "2026-07-21",
+    "generatedAt": "2026-09-20",
     "counts": {
-      "players": 43,
+      "players": 47,
       "teamLogos": 39,
       "seasonLogos": 7,
       "tournamentLogos": 6
@@ -18,13 +18,15 @@ window.HCCL_ASSETS = {
     "playerPhotoIndex": {
       "anupam rivisara": "assets/Players/Anupam Rivisara.jpg",
       "binura yeshan": "assets/Players/Binura Yeshan.jpg",
+      "chamika kaushila": "assets/Players/Chamika Kaushila.jpeg",
       "chamindu tishan": "assets/Players/Chamindu Tishan.jpg",
       "chathuka lakshan": "assets/Players/Chathuka Lakshan.jpeg",
+      "dineth ranvidu": "assets/Players/Dineth Ranvidu.jpeg",
       "hasitha lakmal": "assets/Players/Hasitha Lakmal.jpg",
+      "isuka thisen": "assets/Players/Isuka Thisen.jpeg",
       "kalana thenuja": "assets/Players/Kalana Thenuja.png",
       "kanishka supun": "assets/Players/Kanishka Supun.jpg",
       "kasun de silva": "assets/Players/Kasun de Silva.jpeg",
-      "chamika kaushila": "assets/Players/Chamika Kaushila.jpeg",
       "kavindu induwara": "assets/Players/Kavindu Induwara.jpg",
       "kavindu maleesha": "assets/Players/Kavindu Maleesha.jpg",
       "loku t rathnayake": "assets/Players/Loku T Rathnayake.jpg",
@@ -37,9 +39,11 @@ window.HCCL_ASSETS = {
       "pasindu dilshan": "assets/Players/Pasindu Dilshan.png",
       "poorna kavishka": "assets/Players/Poorna Kavishka.png",
       "rashen vihanga": "assets/Players/Rashen Vihanga.jpg",
+      "rashmika shan": "assets/Players/Rashmika Shan.jpeg",
       "rasindu rathanayke": "assets/Players/Rasindu Rathanayke.jpg",
       "rifan hass": "assets/Players/Rifan Hass.jpg",
       "sadaru nimsara": "assets/Players/Sadaru Nimsara.jpg",
+      "sadisha lakdul": "assets/Players/Sadisha Lakdul.png",
       "sameera gimhan": "assets/Players/Sameera Gimhan.jpg",
       "sandun chinthana": "assets/Players/Sandun Chinthana.jpg",
       "sasindu ashen": "assets/Players/Sasindu Ashen.jpg",
@@ -58,7 +62,6 @@ window.HCCL_ASSETS = {
       "wenura sandeepa": "assets/Players/Wenura Sandeepa.jpg",
       "yasantha ruwan": "assets/Players/Yasantha Ruwan.jpg",
       "yasitha nawod": "assets/Players/Yasitha Nawod.jpg",
-      "isuka thisen": "assets/Players/Isuka Thisen.jpeg",
       "yathish leyon": "assets/Players/Yathish Leyon.jpg"
     },
     "teamLogoIndex": {

@@ -18,7 +18,7 @@
    The SEASONS array below is the honors seed + offline fallback;
    when signed in, the same honors are read from Firestore
    (home/seasons) so they stay consistent across devices - "seed
-   once, read-only", mirroring ranking.js. The leaderboard stats
+   once, read-only". The leaderboard stats
    are always the bundled CSVs (plus a live CSV override for the
    ongoing season). No dependencies beyond the DOM.
    ============================================================ */
@@ -744,7 +744,7 @@
   }
 
   /* ---------------- Firestore: read cloud honors + editor seed --------------- */
-  // "Seed once, read-only" (mirrors ranking.js): everyone reads home/seasons; an
+  // "Seed once, read-only": everyone reads home/seasons; an
   // editor whose bundled data is newer than the stored doc (re)publishes it.
   // Viewers never write (Firestore rules enforce it) and fall back to SEASONS.
   let homeSyncStarted = false;
@@ -821,7 +821,7 @@
   }
 
   /* ------ Firestore: published season stats sheets (seasonStatsLive/S#) ------ */
-  // "Store raw CSV, recompute client-side" (mirrors ranking.js's ranking/stats):
+  // "Store raw CSV, recompute client-side":
   // an editor imports a Season Stats CSV; it's published as-is to
   // seasonStatsLive/S{no}; every signed-in client's onSnapshot listener picks
   // it up and seasonRows() prefers it over the bundled CSV for that season.
@@ -840,10 +840,33 @@
   // the COL map assumes. Every leaderboard cell is looked up by position, so a
   // wrong-shaped file must be rejected outright rather than silently accepted -
   // an accepted mismatch would corrupt every stat cell with no visible sign.
+  // Quote-aware CSV -> grid of cells. Owned here since the ranking module that
+  // used to provide it was retired: a validator that silently fails to parse
+  // would reject every legitimate sheet, so this must never depend on another
+  // module being loaded. Handles quoted fields, escaped "" and CRLF.
+  function parseCsvGrid(text) {
+    const rows = [];
+    let field = "", row = [], inQ = false;
+    text = String(text).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQ) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }
+          else inQ = false;
+        } else field += c;
+      } else if (c === '"') inQ = true;
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+      else field += c;
+    }
+    if (field !== "" || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
   function validateSeasonCsv(text) {
-    const parseCsv = window.HCCLRanking && window.HCCLRanking.parseCsv;
     let grid = [];
-    try { grid = parseCsv ? parseCsv(text) : null; } catch (e) { grid = null; }
+    try { grid = parseCsvGrid(text); } catch (e) { grid = null; }
     if (!grid) return { ok: false, reason: "Couldn't read that file as CSV." };
     grid = grid.filter(r => r && r.some(c => String(c || "").trim() !== ""));
     if (grid.length < 2) return { ok: false, reason: "Empty CSV - add at least one player row." };

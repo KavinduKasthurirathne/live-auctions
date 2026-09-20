@@ -4,7 +4,7 @@
 
    Embedded as raw CSV strings so home.js can build the per-season
    leaderboards offline (file://) - same "bundle the CSV" approach as
-   ranking-data.js. To refresh: re-run the generator over updated CSVs.
+   To refresh: re-run the generator over updated CSVs.
 
    Consumed by js/home.js.
    ============================================================ */

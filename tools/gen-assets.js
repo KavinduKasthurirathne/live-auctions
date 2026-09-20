@@ -106,7 +106,7 @@ const banner = `/* ============================================================
 
    Every lookup is keyed by the LOWERCASED file basename, so a name
    resolves regardless of case ("SUPER FIRE DRAGONS" -> the file).
-   Consumers: season-archive.js, mvp.js, fantasy.js.
+   Consumers: season-archive.js, fantasy.js.
    ============================================================ */
 window.HCCL_ASSETS = ${json};
 `;

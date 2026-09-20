@@ -321,7 +321,6 @@
 
   /* ============================================================
      ENTRIES SYNC - one live listener, for the match on screen only.
-     Same shape as watchComments/stopComments in js/news.js.
 
      Which listener depends on what the rules will actually allow:
        editors, and everyone once a match has closed -> the whole collection
@@ -452,7 +451,7 @@
 
   // Team logo for the Player of the Season board: resolved from the generated
   // js/asset-manifest.js (tools/gen-assets.js), which indexes every league's
-  // badge folder by lowercased basename - same set the MVP / home boards use.
+  // badge folder by lowercased basename - the same set the home boards use.
   // Falls back to a coloured initial when no file matches.
   const FAN_TEAM_LOGO_INDEX = (typeof window !== "undefined" && window.HCCL_ASSETS
     && window.HCCL_ASSETS.teamLogoIndex) || {};
@@ -492,7 +491,6 @@
   }
   function medal(i) { return i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : String(i + 1); }
   // <input type="datetime-local"> speaks local time, Firestore stores epoch ms.
-  // Same pair as js/fixtures.js - a private copy, per this codebase's convention.
   function toLocalInput(ms) {
     if (!ms) return "";
     const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000);

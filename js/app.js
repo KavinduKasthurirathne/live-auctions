@@ -79,7 +79,7 @@ function save() {
 
 /* ============================================================
    SHARED SYNC HELPERS (window.HCCLSync)
-   Used by this file, fantasy.js and fixtures.js - app.js loads first
+   Used by this file and fantasy.js - app.js loads first
    (see index.html), same as window.HCCLAuction / window.HCCLSeries.
 
    The key fact these exist for: onSnapshot's error callback is TERMINAL - the
@@ -165,31 +165,8 @@ function auStripTeam(t)   { const c = auStrip(t); delete c.logo;  return c; }
 function auApplyImages() {
   state.players.forEach(p => { p.photo = auImg.playerPhotos.get(p.id) || ""; });
   state.teams.forEach(t => { t.logo = auImg.teamLogos.get(t.id) || ""; });
-  publishTeamLogos();
 }
 
-// --- Global team-logo registry (for the standalone Rankings board) ---
-// The Rankings page is not tied to a tournament, but its crests come from team
-// logos. Reading them from the currently-viewed tournament's state.teams made
-// them vanish on every tournament switch. Instead we mirror each team's logo,
-// keyed by (normalized) team NAME, into ranking/logos/teams/{key} - one doc per
-// team (base64 logos would blow a single doc's size cap). Editors write, everyone
-// reads (firestore.rules: ranking/**). ranking.js reads this, decoupled from the
-// viewed tournament, so logos persist across switches / "set default".
-const auLogoRegCache = new Map();      // nameKey -> logo we last published (skip no-op writes)
-function auTeamNameKey(name) { return String(name || "").trim().toLowerCase().replace(/[^\w -]/g, "").slice(0, 120); }
-function publishTeamLogos() {
-  const H = window.HCCL, fs = auApi();
-  if (!H || !H.configured || !H.user || !auDb() || !fs || !fs.doc || !fs.setDoc || !auCanEdit()) return;
-  state.teams.forEach(t => {
-    const key = auTeamNameKey(t.name);
-    const logo = t.logo || "";
-    if (!key || !logo || auLogoRegCache.get(key) === logo) return; // nothing new to publish
-    auLogoRegCache.set(key, logo);
-    try { fs.setDoc(fs.doc(auDb(), "ranking", "logos", "teams", key), { name: t.name, logo }); }
-    catch (e) { /* registry is a convenience mirror - never block the auction on it */ }
-  });
-}
 // Build set/delete ops for an image collection by comparing current images to the mirror.
 // `allowDeletes` is false until this collection's listener has delivered once:
 // deletions are inferred from the mirror, and an empty mirror during the lazy
@@ -485,8 +462,8 @@ function money(n) {
 /* ---------- retention categories ----------
    The "Role / category" dropdown in the Retain / Pre-assign form. The chosen
    category becomes the player's tag EVERYWHERE a retained player shows up
-   (squads, Players page, fixtures line-ups) - replacing the old blanket "RET".
-   Kept global (app.js is global scope) so fixtures.js can read the same tag. */
+   (squads, Players page) - replacing the old blanket "RET". Kept global
+   (app.js is global scope) so sibling modules read the same tag. */
 const RETAIN_CATEGORIES = [
   { value: "Captain",     tag: "CAP" },
   { value: "Pre-signed",  tag: "PRE" },
@@ -666,17 +643,16 @@ function toast(msg, kind = "") {
    TABS
    ============================================================ */
 /* Old top-level tab names -> their new home after the nav regrouping.
-   Squads lives under Auctions; Player Ranking IS the Rankings view now.
-   Keeps every legacy switchTab()/[data-goto] call working. */
+   Squads lives under Auctions. Keeps every legacy switchTab()/[data-goto]
+   call working. */
 const TAB_ALIASES = {
-  squads:  { tab: "auctions", sub: "squads" },
-  ranking: { tab: "rankings" },   // Player Ranking is the whole Rankings view
+  squads: { tab: "auctions", sub: "squads" },
 };
 
-/* Fixtures, MVP and Fantasy moved INSIDE the tournament page (Cricbuzz-style
-   inner tabs). A legacy switchTab("fixtures"|"mvp"|"fantasy") - or the Fantasy
-   nav pill / any [data-goto] - opens the tournament page on that inner tab. */
-const HUB_TABS = { fixtures: "matches", mvp: "mvp", fantasy: "fantasy" };
+/* Fantasy lives INSIDE the tournament page as an inner tab. The Fantasy nav
+   pill - or any legacy switchTab("fantasy") / [data-goto] - opens the
+   tournament page on it. */
+const HUB_TABS = { fantasy: "fantasy" };
 
 function switchTab(name) {
   const hub = HUB_TABS[name];
@@ -691,6 +667,11 @@ function switchTab(name) {
   // [data-goto="setup"] shortcut, not via a direct switchTab call. Same for the
   // Members & engagement board (admin/moderator only).
   if ((name === "setup" || name === "members") && !auCanEdit()) name = "home";
+  // A name with no section behind it would deactivate EVERY view and leave a
+  // blank page. That is reachable from outside this file - a bookmark, a stale
+  // [data-goto], or a call naming a section that has since been retired
+  // (rankings, fixtures, mvp) - so land on Home instead of nothing.
+  if (!document.getElementById("view-" + name)) name = "home";
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
   // Open the new view at the top - otherwise it keeps the old view's scroll
@@ -701,10 +682,9 @@ function switchTab(name) {
   if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
 }
 
-/* Sub-tabs: each section owns its own group (Auction: Room / Players /
-   Teams & Purse / Squads / Dashboard - Rankings: MVP / Player Ranking).
-   Toggling is scoped to the group's `.view` so one bar never disturbs
-   the other section's selection. */
+/* Sub-tabs: the Auctions section owns the only group (Room / Players /
+   Teams & Purse / Squads / Dashboard). Toggling is scoped to the group's
+   `.view`, so it stays correct if another section ever grows its own bar. */
 function switchSubTab(name) {
   const btn = $$(".subtab").find(t => t.dataset.subtab === name);
   const scope = btn ? btn.closest(".view") : null;
@@ -735,7 +715,7 @@ function renderAll() {
     const mv = $("#view-members");
     if (!auCanEdit() || (mv && mv.classList.contains("active"))) window.HCCLMembers.render();
   }
-  // Sibling modules (fixtures.js) read teams/squads through window.HCCLAuction;
+  // Sibling modules (fantasy.js) read teams/squads through window.HCCLAuction;
   // this tells them the underlying data just changed (cloud snapshot, edit, …).
   document.dispatchEvent(new CustomEvent("hccl:data"));
 }
@@ -1641,7 +1621,6 @@ async function saveTeam() {
   clearTeamForm();
   save();
   renderAll();
-  publishTeamLogos(); // mirror the crest into the global registry for Rankings
   toast("Team saved", "good");
 }
 function editTeam(id) {
@@ -2148,7 +2127,7 @@ function wireEvents() {
      viewport - the "menu expands inside the navbar" bug), and `position: sticky`
      makes it a stacking context, which caps anything inside it at the header's
      own z-index. So below 900px we relocate the very same <nav id="tabs"> node
-     to <body> - same element, same id, same listeners (fantasy.js, fixtures.js
+     to <body> - same element, same id, same listeners (fantasy.js
      and series.js all hold references to it) - and hand it back to the header
      on desktop, where the layout is untouched. */
   const mq = window.matchMedia("(max-width: 900px)");
@@ -2236,8 +2215,8 @@ function wireEvents() {
   });
   mq.addEventListener("change", placeNav);
   placeNav();
-  // Sub-tab bars - the Auction and Rankings sections share the same
-  // .subtab pattern; switchSubTab scopes the toggle to the right section.
+  // Sub-tab bars - the Auctions section owns the only .subtab group today;
+  // switchSubTab scopes the toggle to the right section regardless.
   document.addEventListener("click", e => {
     const st = e.target.closest(".subtab");
     if (st) switchSubTab(st.dataset.subtab);

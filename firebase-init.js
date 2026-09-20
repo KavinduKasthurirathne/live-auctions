@@ -126,7 +126,7 @@ function renderAuthGate() {
         <span class="gate-country">SRI LANKA</span>
       </p>
       <p class="gate-tagline">HAND CRICKET CHAMPIONS LEAGUE</p>
-      <p class="gate-tags">Live Auctions · Fantasy League · Player Rankings</p>
+      <p class="gate-tags">Live Auctions · Fantasy League · Season Stats</p>
     </div>
     <div class="gate-panel"><div class="gate-panel-card">${panel}</div></div>`;
   const b = document.getElementById("authGateBtn"); if (b) b.onclick = () => H.signIn();

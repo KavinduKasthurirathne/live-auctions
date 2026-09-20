@@ -1,7 +1,7 @@
 /* ============================================================
    HCCL Fantasy - scoring & rules engine
    Pure logic: no DOM, no Firebase, no globals beyond the one export.
-   Same split as fixtures-engine.js / mvp-engine.js, so the maths can be
+   Engine/view split, so the maths can be
    exercised from Node without a browser.
 
    Two vocabularies meet in here and it's worth being precise about them:

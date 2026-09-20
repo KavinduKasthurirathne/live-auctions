@@ -10,7 +10,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Russo+One&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/fantasy.css" />
-  <link rel="stylesheet" href="css/fixtures.css" />
 </head>
 <body>
 
@@ -36,7 +35,6 @@
       <button class="tab active" data-tab="home">🏠 Home</button>
       <button class="tab" data-tab="series">🏆 Tournaments</button>
       <button class="tab" data-tab="auctions">🔨 Auctions</button>
-      <button class="tab" data-tab="rankings">📊 Rankings</button>
       <button class="tab" data-tab="fantasy">🏏 Fantasy</button>
       <button class="tab" data-tab="setup">⚙️ Setup</button>
       <button class="tab" data-tab="members">📈 Members</button>
@@ -58,13 +56,12 @@
 
     <!-- ============ TOURNAMENTS (built by series.js) ============
          Two persistent children so a list/detail re-render never wipes the
-         hosted module panels (#view-fixtures / #view-mvp / #view-fantasy).
-         The Cricbuzz-style tournament page = #tournamentDetail: a head, an
-         inner tab bar, and a panel per section. Inline panels (overview /
-         squads / players / table / stats) are filled by series.js; the three
-         <section>/<div> targets keep their ids so fixtures.js / mvp.js /
-         fantasy.js render into them unchanged - now as .hub-panel, not .view,
-         so switchTab leaves them alone and the inner tab bar owns them. -->
+         hosted module panel (#view-fantasy).
+         The tournament page = #tournamentDetail: a head, an inner tab bar, and
+         a panel per section. Inline panels (overview / squads / players /
+         stats) are filled by series.js; #view-fantasy keeps its id so
+         fantasy.js renders into it unchanged - as a .hub-panel, not a .view,
+         so switchTab leaves it alone and the inner tab bar owns it. -->
     <section class="view" id="view-series">
       <div id="seriesList"></div>
       <div id="tournamentDetail" hidden>
@@ -74,10 +71,7 @@
           <div class="hub-panel active" id="hub-overview" data-hub="overview"></div>
           <div class="hub-panel" id="hub-squads" data-hub="squads"></div>
           <div class="hub-panel" id="hub-players" data-hub="players"></div>
-          <section class="hub-panel" id="view-fixtures" data-hub="matches"></section>
-          <div class="hub-panel" id="hub-table" data-hub="table"></div>
           <div class="hub-panel" id="hub-stats" data-hub="stats"></div>
-          <div class="hub-panel" id="view-mvp" data-hub="mvp"></div>
           <section class="hub-panel" id="view-fantasy" data-hub="fantasy"></section>
         </div>
       </div>
@@ -188,9 +182,6 @@
       <!-- Dashboard sub-tab (Insights - built by app.js renderInsights) -->
       <div class="subview" id="subview-dashboard"></div>
     </section><!-- /view-auctions -->
-
-    <!-- Fixtures & Results now render inside the tournament page (#view-fixtures
-         lives under #tournamentPanels above). -->
 
     <!-- ===================== SETUP ===================== -->
     <section class="view" id="view-setup">
@@ -392,13 +383,6 @@
          the real backstop. -->
     <section class="view" id="view-members"></section>
 
-    <!-- ============ RANKINGS: Player Ranking (global, ranking.js) ============
-         MVP moved into the tournament page (#view-mvp under #tournamentPanels).
-         Rankings is now the single global Player-Ranking view. -->
-    <section class="view" id="view-rankings">
-      <div id="view-ranking"></div>
-    </section>
-
   </main>
 
   <!-- ===================== RESULT OVERLAY ===================== -->
@@ -418,8 +402,8 @@
 
   <!-- Image manifest (player photos, team badges, season & tournament logos).
        GENERATED from assets/ by `node tools/gen-assets.js` - re-run it after
-       adding or renaming any image. Must load before season-archive.js,
-       mvp.js and fantasy.js, which resolve every badge/photo through it. -->
+       adding or renaming any image. Must load before season-archive.js and
+       fantasy.js, which resolve every badge/photo through it. -->
   <script src="js/asset-manifest.js"></script>
   <!-- Firebase config must load before the modules that read it -->
   <script src="firebase-config.js"></script>
@@ -436,10 +420,8 @@
        Knockout, County leagues) - shown in their Series hubs. -->
   <script src="js/tournament-stats-data.js"></script>
   <script src="js/season-archive.js"></script>
-  <!-- Home page (hero + champions carousel + news shell) -->
+  <!-- Home page (hero + champions carousel) -->
   <script src="js/home.js"></script>
-  <!-- HC News feed (renders into the #homeNews shell home.js builds) -->
-  <script src="js/news.js"></script>
   <!-- Members & engagement dashboard (admin/moderator only) -->
   <script src="js/members.js"></script>
   <!-- DOM-to-PNG for the leaderboard share cards (exposes window.htmlToImage) -->
@@ -449,18 +431,6 @@
   <!-- Fantasy: scoring/lock/validation engine -> the view that uses it -->
   <script src="js/fantasy-engine.js"></script>
   <script src="js/fantasy.js"></script>
-  <!-- Player Ranking: bundled stats CSV -> engine -> boards -->
-  <script src="js/ranking-data.js"></script>
-  <script src="js/ranking-engine.js"></script>
-  <script src="js/ranking.js"></script>
-  <!-- Season MVP: STUMPS match-report PDF parsing (pdf.js) -> engine -> boards -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-  <script src="js/mvp-engine.js"></script>
-  <script src="js/mvp.js"></script>
-  <!-- Fixtures & Results: reuses the STUMPS parser (mvp-engine) + pdf.js text
-       extraction (mvp.js), so both must load first. -->
-  <script src="js/fixtures-engine.js"></script>
-  <script src="js/fixtures.js"></script>
   <!-- Auth + roles (Google sign-in); exposes window.HCCL -->
   <script type="module" src="firebase-init.js"></script>
 </body>
