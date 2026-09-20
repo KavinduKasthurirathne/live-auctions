@@ -38,7 +38,7 @@ window.HCCL_ASSETS = {
       "nisitha gihan": "assets/Players/Nisitha Gihan.jpg",
       "pasindu dilshan": "assets/Players/Pasindu Dilshan.png",
       "poorna kavishka": "assets/Players/Poorna Kavishka.png",
-      "rashen vihanga": "assets/Players/Rashen Vihanga.jpg",
+      "rashen vihanga": "assets/Players/Rashen Vihanga.jpeg",
       "rashmika shan": "assets/Players/Rashmika Shan.jpeg",
       "rasindu rathanayke": "assets/Players/Rasindu Rathanayke.jpg",
       "rifan hass": "assets/Players/Rifan Hass.jpg",
@@ -65,6 +65,8 @@ window.HCCL_ASSETS = {
       "yathish leyon": "assets/Players/Yathish Leyon.jpg",
       "navindu pamod": "assets/Players/Navindu Pamod.jpeg",
       "dilvan dissanayake": "assets/Players/Dilvan Dissanayake.jpeg",
+      "rashmika rajathunga": "assets/Players/Rashmika Rajathunga.jpeg",
+      "nayomal dilshan": "assets/Players/Nayomal Dilshan.png",
     },
     "teamLogoIndex": {
       "aura dynasty": "assets/HCCL Team Logos/Aura Dynasty.jpeg",
