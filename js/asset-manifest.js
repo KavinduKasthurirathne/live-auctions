@@ -104,7 +104,16 @@ window.HCCL_ASSETS = {
       "baggy ashford": "assets/Test Championship Logos/Baggy Ashford.jpeg",
       "horizon hunters": "assets/Test Championship Logos/Horizon Hunters.jpeg",
       "london originals": "assets/Test Championship Logos/London Originals.jpeg",
-      "the cartel": "assets/Test Championship Logos/The Cartel.jpeg"
+      "the cartel": "assets/Test Championship Logos/The Cartel.jpeg",
+      "4 horsemen": "assets/Fatal 4 Logos/4 Horsemen.jpeg",
+      "dragon hunters": "assets/Fatal 4 Logos/Dragon Hunters.jpeg",
+      "elite 4": "assets/Fatal 4 Logos/Elite 4.jpeg",
+      "fantastic 4": "assets/Fatal 4 Logos/Fantastic 4.jpeg",
+      "inferno blaze kings": "assets/Fatal 4 Logos/Inferno Blaze Kings.jpeg",
+      "iron titans": "assets/Fatal 4 Logos/Iron Titans.jpeg",
+      "phoenix strikers": "assets/Fatal 4 Logos/Phoenix Strikers.jpeg",
+      "pro gang": "assets/Fatal 4 Logos/Pro Gang.jpeg",
+      "savage legion": "assets/Fatal 4 Logos/Savage Legion.jpeg"
     },
     "seasonLogos": {
       "1": "assets/HCCL Logos/S1 LOGO.png",
@@ -121,6 +130,7 @@ window.HCCL_ASSETS = {
       "hc mini ipl s1": "assets/Tournament Logos/HC Mini IPL S1.png",
       "hc test championship": "assets/Tournament Logos/HC Test Championship.jpeg",
       "solo knockout s1": "assets/Tournament Logos/Solo Knockout S1.png",
-      "solo knockout s2": "assets/Tournament Logos/Solo Knockout S2.png"
+      "solo knockout s2": "assets/Tournament Logos/Solo Knockout S2.png",
+      "fatal four logo:": "assets/Tournament Logos/Fatal Four Logo.jpeg"
     }
   };
