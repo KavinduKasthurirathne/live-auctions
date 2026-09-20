@@ -63,7 +63,8 @@ window.HCCL_ASSETS = {
       "yasantha ruwan": "assets/Players/Yasantha Ruwan.jpg",
       "yasitha nawod": "assets/Players/Yasitha Nawod.jpg",
       "yathish leyon": "assets/Players/Yathish Leyon.jpg",
-      "navindu pamod": "assets/Players/Navindu Pamod.jpeg"
+      "navindu pamod": "assets/Players/Navindu Pamod.jpeg",
+      "dilvan dissanayake": "assets/Players/Dilvan Dissanayake.jpeg",
     },
     "teamLogoIndex": {
       "aura dynasty": "assets/HCCL Team Logos/Aura Dynasty.jpeg",
