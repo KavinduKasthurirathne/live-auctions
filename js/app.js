@@ -954,21 +954,16 @@ function renderRtmPanel() {
   const r = state.auction.rtm;
   if (!r) { box.classList.add("hidden"); box.innerHTML = ""; return; }
 
-  const ft = getTeam(r.formerTeamId), win = getTeam(r.winnerTeamId);
-  const player = getPlayer(r.playerId);
+  const ft = getTeam(r.formerTeamId);
   const ftName = ft ? ft.name : "Former team";
-  const winName = win ? win.name : "the bidder";
   const info = ft ? squadInfo(state, ft.id) : null;
   const badge = logoHTML("team-logo", ft ? ft.logo : "", ftName);
 
   // One decision, at the standing bid - no raise step.
   const afford = info && info.safeBid >= r.bidPrice && info.slotsLeft > 0;
   const head = `${ftName} may match ${money(r.bidPrice)}`;
-  // const body = `<b>${esc(player ? player.name : "")}</b> played for <b>${esc(ftName)}</b> last season.
-  //   Using the card signs him at <b>${money(r.bidPrice)}</b> - the same price
-  //   <b>${esc(winName)}</b> bid. Passing sells him to <b>${esc(winName)}</b>.`;
   const actions = `<button class="btn btn-yellow" data-rtm="use" ${afford ? "" : "disabled"}
-                     title="${afford ? "" : "Beyond their Safe Bid or squad is full"}">Use RTM  ${money(r.bidPrice)}</button>
+                     title="${afford ? "" : "Beyond their Safe Bid or squad is full"}">Use RTM · ${money(r.bidPrice)}</button>
                    <button class="btn btn-dark" data-rtm="pass">Pass</button>`;
 
   box.classList.remove("hidden");
@@ -981,8 +976,7 @@ function renderRtmPanel() {
       ${badge}
       <div class="rtm-text">
         <div class="rtm-title">${esc(head)}</div>
-        <div class="rtm-sub">${body}</div>
-        ${info ? `<div class="rtm-meta">${esc(ftName)}: ${money(info.remaining)} left  ${info.slotsLeft} slot${info.slotsLeft === 1 ? "" : "s"}  RTM ${rtmLeft(state, r.formerTeamId)}/${rtmCardsPerTeam(state)}</div>` : ""}
+        ${info ? `<div class="rtm-meta">${esc(ftName)}: ${money(info.remaining)} left · ${info.slotsLeft} slot${info.slotsLeft === 1 ? "" : "s"} · RTM ${rtmLeft(state, r.formerTeamId)}/${rtmCardsPerTeam(state)}</div>` : ""}
       </div>
     </div>
     <div class="rtm-actions">${actions}
@@ -1063,7 +1057,7 @@ function placeBid(teamId) {
 
 function advanceSold() {  const a = state.auction;
   if (a.rtm) return;                    // an RTM handshake owns the board right now
-  if (a.currentBidderId == null) { toast("No bids yetuse Unsold instead", "bad"); return; }
+  if (a.currentBidderId == null) { toast("No bids yet - use Unsold instead", "bad"); return; }
   if (a.soldStage < 3) { a.soldStage++; save(); renderSoldButton(); }
   // The final tap doesn't sell outright any more: if the player's last-season
   // team can match, pause here and let them decide (maybeStartRtm returns true).
@@ -1124,7 +1118,7 @@ function maybeStartRtm() {
   save();
   renderAll();
   const ft = getTeam(el.formerTeamId);
-  toast(`Right to Match  ${ft ? ft.name : "former team"} may match ${money(price)}`, "good");
+  toast(`Right to Match - ${ft ? ft.name : "former team"} may match ${money(price)}`, "good");
   return true;
 }
 
