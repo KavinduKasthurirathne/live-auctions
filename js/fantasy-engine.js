@@ -224,7 +224,18 @@
     return (players || []).map(p => {
       let total = 0, n = 0;
       (days || []).forEach(d => {
-        if (!d.hasResults || !(d.teamIds || []).includes(p.teamId)) return;
+        if (!d.hasResults) return;
+        // Did he play THIS match? Scoring a match writes a performance entry for
+        // every player in the pool (0/0 included), so `performance` is a
+        // snapshot of who actually turned out, taken at the time. Asking instead
+        // whether his CURRENT team is in this match silently erased the whole
+        // history of anyone later transferred, of a team deleted and re-created,
+        // and of any match whose teams were re-picked after it was scored - the
+        // Contestants board kept those points, so the two boards disagreed.
+        // The team check stays as a fallback for matches published before a
+        // performance record existed; it can only add matches back, never drop one.
+        const played = d.performance && Object.prototype.hasOwnProperty.call(d.performance, p.id);
+        if (!played && !(d.teamIds || []).includes(p.teamId)) return;
         total += playerDayPoints(d, p.id); n++;
       });
       return { player: p, total, days: n, avg: n ? total / n : 0 };

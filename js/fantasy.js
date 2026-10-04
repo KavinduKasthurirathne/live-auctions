@@ -1396,7 +1396,11 @@
   function saveScores(publish) {
     const day = currentDay(); if (!day) return;
     const root = fanEl();
-    const perf = {};
+    // Start from what's already recorded rather than from {}. The form only
+    // renders players whose CURRENT team is in this match, so a player
+    // transferred since the match was scored has no inputs here - rebuilding
+    // from scratch would silently delete the runs & wickets he actually made.
+    const perf = Object.assign({}, day.performance);
     dayPool(day).forEach(p => {
       const r = root.querySelector(`[data-runs="${p.id}"]`);
       const w = root.querySelector(`[data-wkts="${p.id}"]`);
