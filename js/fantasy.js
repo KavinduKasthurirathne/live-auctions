@@ -1359,8 +1359,15 @@
       // deadline passed while our countdown still said otherwise - or that the
       // rules haven't been published yet.
       console.error("fantasy entry save failed:", e);
-      if (e && e.code === "permission-denied") ftoast("Entries have closed", "bad");
-      else ftoast("Couldn't save your team", "bad");
+      // A denial when OUR clock still says the match is wide open is far more
+      // likely to be the rules (unpublished, or rejecting this entry's shape)
+      // than a passed deadline. Saying "Entries have closed" there sends
+      // everyone hunting for the wrong problem - as it did once already.
+      if (e && e.code === "permission-denied") {
+        ftoast(ENG.isOpen(day, nowMs())
+          ? "The server refused this entry - ask an admin to check firestore.rules is published"
+          : "Entries have closed", "bad");
+      } else ftoast("Couldn't save your team", "bad");
     } finally {
       UI.saving = false;
       if (pendingRender) { pendingRender = false; renderFantasy(); }

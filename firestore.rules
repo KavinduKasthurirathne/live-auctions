@@ -122,9 +122,17 @@ service cloud.firestore {
       // contestant could store any string, and a team that isn't playing can
       // never lose. A normal match must not carry the field at all, so a pick
       // can't be smuggled onto a fixture that was never a playoff.
+      //
+      // BOTH reads go through .get(key, default), never day.isPlayoff or
+      // d.winnerPick. Reading a field that does not exist is an EVALUATION
+      // ERROR in rules, not a false - and it fails the whole allow expression.
+      // Every match created before this feature shipped has no isPlayoff field
+      // (syncDiff only rewrites a day document when something about it
+      // changes), so the bare property read denied every entry on every older
+      // match, which the client reported as "Entries have closed".
       function pickOk(d, day) {
-        return day.isPlayoff == true
-             ? (d.winnerPick is string && (d.winnerPick in day.teamIds))
+        return day.get('isPlayoff', false) == true
+             ? (d.get('winnerPick', '') is string && (d.get('winnerPick', '') in day.teamIds))
              : !('winnerPick' in d);
       }
       function squadMatches() {
