@@ -80,6 +80,11 @@ service cloud.firestore {
     // contestant because their countdown changes, and unpublishes the points
     // first if they were already out.
     //
+    // The playoff bonus itself is never stored on an entry - only the
+    // contestant's PICK is. Who actually won lives on the match document, which
+    // only an editor can write, so the bonus is derived at scoring time and a
+    // contestant cannot award it to themselves.
+    //
     // NOT enforced here: the match's optional "max players from one team" cap.
     // Checking it would mean reading every picked player's document to learn its
     // team, far past the access-call budget. Squad size, distinctness, C/VC
@@ -112,16 +117,28 @@ service cloud.firestore {
             && (d.viceCaptainId in d.playerIds)
             && d.captainId != d.viceCaptainId;
       }
+      // A PLAYOFF match carries one extra call: the winning team, worth a flat
+      // bonus. It must name one of this match's OWN two teams - otherwise a
+      // contestant could store any string, and a team that isn't playing can
+      // never lose. A normal match must not carry the field at all, so a pick
+      // can't be smuggled onto a fixture that was never a playoff.
+      function pickOk(d, day) {
+        return day.isPlayoff == true
+             ? (d.winnerPick is string && (d.winnerPick in day.teamIds))
+             : !('winnerPick' in d);
+      }
       function squadMatches() {
-        return (isLegacy() && squadOk(request.resource.data, legacyDay()))
-            || (!isLegacy() && squadOk(request.resource.data, tourneyDay()));
+        return (isLegacy() && squadOk(request.resource.data, legacyDay())
+                           && pickOk(request.resource.data, legacyDay()))
+            || (!isLegacy() && squadOk(request.resource.data, tourneyDay())
+                            && pickOk(request.resource.data, tourneyDay()));
       }
       // A closed allowlist. Points are always DERIVED from the match's own
       // performance map, never stored on the entry, so an injected score field
       // can't forge a result.
       function shapeOk() {
         return request.resource.data.keys().hasOnly(
-                 ['uid','name','photo','teamName','playerIds','captainId','viceCaptainId','createdAt','updatedAt'])
+                 ['uid','name','photo','teamName','playerIds','captainId','viceCaptainId','winnerPick','createdAt','updatedAt'])
             && request.resource.data.keys().hasAll(
                  ['uid','name','playerIds','captainId','viceCaptainId'])
             && request.resource.data.uid is string

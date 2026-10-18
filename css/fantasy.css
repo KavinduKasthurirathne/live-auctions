@@ -138,6 +138,57 @@
    sticky at z-index 30, so this has to park BELOW it (81px at full width, 71px
    from 900px down) rather than slide underneath. */
 .fan-picked-card { position: sticky; top: 89px; z-index: 3; }
+/* ===================== PLAYOFF: winner call ===================== */
+/* Shown on a playoff match only - the contestant's extra pick, the editor's
+   result recorder, and the verdict on each team card. The picker deliberately
+   borrows the C/VC slot's dashed-until-chosen language so it reads as one more
+   decision in the same builder, not a different kind of control. */
+.fan-playoff-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--gold); background: rgba(255, 204, 0, 0.12);
+  border: 1px solid rgba(255, 204, 0, 0.35); border-radius: 999px; padding: 3px 9px;
+}
+/* Its own card under the sticky picked strip - never inside it, or the sticky
+   header grows and the options end up behind the sticky save bar. */
+.fan-winner-pick { margin-top: 12px; border: 1px solid rgba(255, 204, 0, 0.3); }
+.fan-winner-box { margin-bottom: 14px; padding: 12px; border: 1px solid rgba(255, 204, 0, 0.3); border-radius: 12px; }
+.fan-winner-k {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+.fan-winner-k .hint { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.fan-winner-opts { display: flex; flex-wrap: wrap; gap: 10px; }
+.fan-winner-opt {
+  flex: 1 1 140px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 700;
+  background: var(--panel-2); border: 1px dashed var(--border); color: var(--text);
+  padding: 10px 12px; border-radius: 12px; min-height: 44px;   /* comfortable tap target */
+}
+.fan-winner-opt:hover { border-color: #4a4a52; }
+.fan-winner-opt.is-on {
+  border-style: solid; border-color: var(--gold);
+  background: rgba(255, 204, 0, 0.12); color: var(--yellow);
+}
+.fan-winner-opt.is-none { flex: 0 1 auto; font-weight: 600; color: var(--muted); }
+.fan-winner-opt.is-none.is-on { color: var(--text); }
+
+/* Verdict line on a team card once the result is in. */
+.fan-call {
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--panel-3);
+  font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.fan-call b { color: var(--text); }
+.fan-call .is-hit { color: var(--green); }
+.fan-call .is-miss { color: var(--muted); font-weight: 600; }
+.fan-call.is-none { font-style: italic; }
+
+/* The checkbox on the match form. */
+.fan-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; line-height: 1.45; }
+.fan-check input { margin-top: 3px; flex: none; width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; }
+.fan-check span { font-size: 13px; color: var(--muted); }
+.fan-check b { color: var(--text); }
+
 @media (max-width: 900px) { .fan-picked-card { top: 79px; } }
 .fan-picked-strip { display: flex; flex-wrap: wrap; gap: 8px; }
 .fan-picked-chip {

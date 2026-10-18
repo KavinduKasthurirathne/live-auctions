@@ -14,8 +14,9 @@
                 their own documents under fantasyEntries/**; legacy entries are
                 the inline objects in match.entries[].
 
-   Scoring is unchanged from the original implementation: a player scores
-   runs + wickets*10, the captain doubles, the vice-captain gets 1.5x.
+   Scoring: a player scores runs + wickets*10, the captain doubles, the
+   vice-captain gets 1.5x. A PLAYOFF match adds one more call - predict the
+   winning team - worth a flat PLAYOFF_BONUS on top of the entry's squad total.
    ============================================================ */
 (function () {
   "use strict";
@@ -28,16 +29,39 @@
     return (Number(perf.runs) || 0) + (Number(perf.wickets) || 0) * 10;
   }
 
-  /* `entry` needs only { playerIds, captainId, viceCaptainId }, which both the
-     modern entry document and the legacy inline object satisfy. */
+  /* ---------------- playoff winner bonus ----------------
+     A PLAYOFF match asks for one extra call: which team wins. Get it right and
+     a flat bonus lands on that match's entry total, so it flows into the day
+     standings and the season leaderboard exactly like squad points do.
+
+     It belongs to the ENTRY, not to any player - the same reasoning that keeps
+     captaincy multipliers out of the Player of the Season board. A player's
+     own season total is unaffected by what anyone predicted about his team. */
+  const PLAYOFF_BONUS = 50;
+
+  const isPlayoff = day => !!(day && day.isPlayoff);
+
+  /* 0 unless this is a playoff match, the result has been recorded, and the
+     entry called it. An unrecorded result (or a no-result/tie, which the editor
+     stores as an empty winnerTeamId) pays nobody. */
+  function winnerBonus(day, entry) {
+    if (!isPlayoff(day)) return 0;
+    const actual = (day && day.winnerTeamId) || "";
+    if (!actual) return 0;
+    return (entry && entry.winnerPick === actual) ? PLAYOFF_BONUS : 0;
+  }
+
+  /* `entry` needs only { playerIds, captainId, viceCaptainId, winnerPick }, which
+     both the modern entry document and the legacy inline object satisfy. */
   function entryPoints(day, entry) {
     if (!entry || !Array.isArray(entry.playerIds)) return 0;
-    return entry.playerIds.reduce((sum, pid) => {
+    const squad = entry.playerIds.reduce((sum, pid) => {
       let pts = playerDayPoints(day, pid);
       if (pid === entry.captainId) pts *= 2;
       else if (pid === entry.viceCaptainId) pts *= 1.5;
       return sum + pts;
     }, 0);
+    return squad + winnerBonus(day, entry);
   }
 
   /* What a single player contributed to one entry, multiplier included. */
@@ -139,6 +163,14 @@
     if (draft.captainId === draft.viceCaptainId) return { ok: false, msg: "Captain and vice-captain must be different" };
     if (ids.indexOf(draft.captainId) < 0 || ids.indexOf(draft.viceCaptainId) < 0)
       return { ok: false, msg: "Captain and vice-captain must be in your team" };
+
+    // Last, so the save bar walks the squad first and only then asks for the call.
+    if (isPlayoff(day)) {
+      const teams = (day && day.teamIds) || [];
+      if (!draft.winnerPick) return { ok: false, msg: "Pick who wins this match" };
+      if (teams.length && teams.indexOf(draft.winnerPick) < 0)
+        return { ok: false, msg: "Pick one of the two teams to win" };
+    }
 
     return { ok: true, msg: "" };
   }
@@ -243,8 +275,8 @@
   }
 
   const api = {
-    LEGACY, OPEN, LOCKED, PUBLISHED,
-    playerDayPoints, entryPoints, playerEntryPoints,
+    LEGACY, OPEN, LOCKED, PUBLISHED, PLAYOFF_BONUS,
+    playerDayPoints, entryPoints, playerEntryPoints, isPlayoff, winnerBonus,
     lockState, isOpen, fmtCountdown,
     countByTeam, canPick, validateEntry,
     guestId, standingsFor, legacyStandings, rowsForDay, seasonRows, playerSeasonRows,

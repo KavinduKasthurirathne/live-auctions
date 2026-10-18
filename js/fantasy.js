@@ -53,8 +53,14 @@
         id: e.id, contestantId: e.contestantId,
         playerIds: Array.isArray(e.playerIds) ? e.playerIds : [],
         captainId: e.captainId || null, viceCaptainId: e.viceCaptainId || null,
+        winnerPick: e.winnerPick || "",
       })),
       hasResults: !!d.hasResults,
+      // PLAYOFF match: contestants also call the winner, worth a flat bonus.
+      // winnerTeamId is the result an editor records - "" means not decided yet
+      // (or a no-result), and pays nobody.
+      isPlayoff: !!d.isPlayoff,
+      winnerTeamId: d.winnerTeamId || "",
       // Self-service fields. A day with no lockAt is a legacy day.
       teamSize: Number(d.teamSize) || 0,
       maxPerTeam: Number(d.maxPerTeam) || 0,
@@ -70,6 +76,7 @@
       id, uid: d.uid || "", name: d.name || "", photo: d.photo || "", teamName: d.teamName || "",
       playerIds: Array.isArray(d.playerIds) ? d.playerIds : [],
       captainId: d.captainId || "", viceCaptainId: d.viceCaptainId || "",
+      winnerPick: d.winnerPick || "",   // playoff matches only
       createdAt: Number(d.createdAt) || 0,
       // serverTimestamp() resolves to a Timestamp on the server round-trip and
       // to null in the optimistic local snapshot before it.
@@ -520,7 +527,8 @@
      view never has to care which era a team came from. */
   const legacyToEntry = e => ({
     id: "c:" + e.contestantId, uid: "", name: cname(e.contestantId), photo: "", teamName: "",
-    playerIds: e.playerIds, captainId: e.captainId, viceCaptainId: e.viceCaptainId, legacy: true,
+    playerIds: e.playerIds, captainId: e.captainId, viceCaptainId: e.viceCaptainId,
+    winnerPick: e.winnerPick || "", legacy: true,
   });
   /* Every team submitted for a match: the live subcollection (when it's the
      match we're listening to) plus any legacy inline ones. Both can coexist if
@@ -675,6 +683,7 @@
           <span class="fan-mc-team">${teamIcon(teamName(ids[1]))}<b>${esc(teamName(ids[1]))}</b></span>
         </div>
         <div class="fan-mc-meta">${esc(dayLabel(d))}${d.teamSize ? ` · pick ${d.teamSize}` : ""}${d.maxPerTeam ? ` · max ${d.maxPerTeam}/team` : ""}</div>
+        ${d.isPlayoff ? `<span class="fan-playoff-tag">🏆 PLAYOFF · +${ENG.PLAYOFF_BONUS} for the winner call</span>` : ""}
         ${stateChip(d)}
         ${myStatusHtml(d)}
         <div class="fan-mc-actions">${ctaHtml(d)}</div>
@@ -704,6 +713,7 @@
       playerIds: e ? e.playerIds.slice() : [],
       captainId: e ? e.captainId : "",
       viceCaptainId: e ? e.viceCaptainId : "",
+      winnerPick: e ? (e.winnerPick || "") : "",
       name: e ? (e.name || "") : "",
       teamName: e ? (e.teamName || "") : "",
       dirty: false,
@@ -733,7 +743,7 @@
     }
 
     html += `<div class="card fan-builder-intro">
-      <p class="hint">Pick <b>${day.teamSize}</b> player${day.teamSize === 1 ? "" : "s"} from the two squads${day.maxPerTeam ? `, at most <b>${day.maxPerTeam}</b> from either team` : ""}. Your captain scores <b>2×</b> and your vice-captain <b>1.5×</b>. You can change your team until entries close.</p>
+      <p class="hint">Pick <b>${day.teamSize}</b> player${day.teamSize === 1 ? "" : "s"} from the two squads${day.maxPerTeam ? `, at most <b>${day.maxPerTeam}</b> from either team` : ""}. Your captain scores <b>2×</b> and your vice-captain <b>1.5×</b>.${ENG.isPlayoff(day) ? ` This is a <b>playoff match</b>: also call the winner for <b>+${ENG.PLAYOFF_BONUS}</b> bonus points.` : ""} You can change your team until entries close.</p>
       <div class="form-row">
         ${draftNeedsName()
           ? `<label style="flex:1 1 200px">${UI.guest ? "Contestant's name" : "Your name"}<input id="fanEntryName" value="${esc(UI.draft.name)}" placeholder="e.g. Yasitha" ${UI.editEntryId ? "disabled" : ""}/></label>`
@@ -745,7 +755,7 @@
     // The two sticky regions ARE these elements, not something paintBuilder puts
     // inside them: position:sticky slides an element within its PARENT's box, so
     // a shrink-wrapped wrapper would leave it nowhere to travel.
-    html += `<div id="fanPicked" class="card fan-picked-card"></div><div class="fan-squad-cols">`;
+    html += `<div id="fanPicked" class="card fan-picked-card"></div><div id="fanWinner"></div><div class="fan-squad-cols">`;
     (day.teamIds || []).forEach(tid => {
       const ps = F.players.filter(p => p.teamId === tid);
       html += `<div class="fan-squad-col" data-fan-col="${tid}">
@@ -794,6 +804,8 @@
 
     const strip = document.getElementById("fanPicked");
     if (strip) strip.innerHTML = pickedStripHtml(day);
+    const win = document.getElementById("fanWinner");
+    if (win) win.innerHTML = winnerPickHtml(day);
     const bar = document.getElementById("fanSaveBar");
     if (bar) bar.innerHTML = saveBarHtml(day);
   }
@@ -823,6 +835,22 @@
       </div>`;
   }
 
+  /* Playoff matches only: the extra call. It lives in its own region rather
+     than inside the picked strip, because that strip is position:sticky -
+     anything added to it makes the sticky header taller and, on a short screen,
+     pushes the options underneath the sticky save bar. */
+  function winnerPickHtml(day) {
+    if (!ENG.isPlayoff(day)) return "";
+    const picked = UI.draft.winnerPick || "";
+    return `<div class="card fan-winner-pick">
+      <div class="fan-winner-k">🏆 Who wins this playoff? <span class="hint">+${ENG.PLAYOFF_BONUS} if you call it</span></div>
+      <div class="fan-winner-opts">
+        ${(day.teamIds || []).map(tid => `<button class="fan-winner-opt ${picked === tid ? "is-on" : ""}" data-fan-winner="${tid}">
+          ${teamIcon(teamName(tid))}<span>${esc(teamName(tid))}</span></button>`).join("")}
+      </div>
+    </div>`;
+  }
+
   function saveBarHtml(day) {
     const v = ENG.validateEntry(day, UI.draft, pickCtx());
     const size = day.teamSize || 0;
@@ -844,7 +872,7 @@
 
     let html = bare ? "" : `<div class="fan-builder-head">
       <button class="btn btn-dark btn-mini fan-back" data-fan-back>‹ Matches</button>
-      <div class="fan-builder-title">${esc(matchTitle(day))}</div>
+      <div class="fan-builder-title">${esc(matchTitle(day))}${day.isPlayoff ? ` <span class="fan-playoff-tag">🏆 PLAYOFF</span>` : ""}</div>
       ${stateChip(day)}
     </div>`;
 
@@ -872,10 +900,25 @@
           ${canEditApp() && ENG.isOpen(day, nowMs()) ? `<button class="icon-btn del" data-fan-del-entry="${e.id}" title="Remove this team">✕</button>` : ""}
         </div>
         <div class="fan-entry-players">${e.playerIds.map(pid => playerChip(pid, e, day)).join("")}</div>
+        ${winnerCallHtml(day, e)}
       </div>`;
     });
     html += `</div>`;
     return html + renderDayStandings(day);
+  }
+
+  /* One line per team card on a playoff match: who they called, and - once the
+     result is in - whether it paid. Reads the same winnerBonus() the score uses,
+     so the badge can never disagree with the number above it. */
+  function winnerCallHtml(day, e) {
+    if (!ENG.isPlayoff(day)) return "";
+    const pick = e.winnerPick || "";
+    if (!pick) return `<div class="fan-call is-none">No winner call</div>`;
+    const decided = !!day.winnerTeamId;
+    const hit = ENG.winnerBonus(day, e) > 0;
+    const verdict = !decided ? "" : hit ? `<b class="is-hit">+${ENG.PLAYOFF_BONUS}</b>` : `<b class="is-miss">missed</b>`;
+    return `<div class="fan-call ${decided ? (hit ? "is-hit" : "is-miss") : ""}">
+      🏆 Called <b>${esc(teamName(pick))}</b> ${verdict}</div>`;
   }
 
   function playerChip(pid, e, day) {
@@ -897,6 +940,7 @@
       id: null, date: today(), label: "",
       teamA: ids[0] || "", teamB: ids[1] || "",
       teamSize: 6, maxPerTeam: 0, lockAt: at.getTime(), entryCount: 0,
+      isPlayoff: false,
     };
   }
   function renderMatchForm() {
@@ -906,7 +950,7 @@
     const opts = (sel) => F.teams.map(t => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("");
     return `<div class="card fan-form">
       <h3>${editing ? "Edit match" : "New match"}</h3>
-      ${frozen ? `<div class="fan-form-warn">⚠ ${f.entryCount} team${f.entryCount === 1 ? " has" : "s have"} already been submitted, so the two squads and the team size are fixed - changing them would invalidate every entry. The date, label, per-team cap and closing time are still yours to change.
+      ${frozen ? `<div class="fan-form-warn">⚠ ${f.entryCount} team${f.entryCount === 1 ? " has" : "s have"} already been submitted, so the two squads, the team size and the playoff setting are fixed - changing them would invalidate every entry. The date, label, per-team cap and closing time are still yours to change.
         <button class="btn btn-danger btn-mini" data-fan-clear-entries="${f.id}">Clear all entries</button></div>` : ""}
       <div class="form-row">
         <label style="flex:1 1 180px">Team A<select id="fanFormA" ${frozen ? "disabled" : ""}>${opts(f.teamA)}</select></label>
@@ -920,6 +964,10 @@
         <label style="flex:1 1 150px">Players per team<input type="number" min="1" max="15" id="fanFormSize" value="${f.teamSize}" ${frozen ? "disabled" : ""}/></label>
         <label style="flex:1 1 190px">Max from one team <span class="hint">(blank = no limit)</span><input type="number" min="1" max="15" id="fanFormCap" value="${f.maxPerTeam || ""}" placeholder="no limit"/></label>
       </div>
+      <label class="fan-check">
+        <input type="checkbox" id="fanFormPlayoff" ${f.isPlayoff ? "checked" : ""} ${frozen ? "disabled" : ""}/>
+        <span>This is a <b>playoff match</b> - contestants also pick who wins it, worth <b>+${ENG.PLAYOFF_BONUS}</b> bonus points on their total for this match if they call it right. Record the winner on the Scores page before you publish.</span>
+      </label>
       <label>Entries close at<input type="datetime-local" id="fanFormLock" value="${toLocalInput(f.lockAt)}"/></label>
       <p class="hint">After this moment nobody can submit or change a team - moderators and admins included. To reopen, come back and push the time forward.</p>
       <div class="form-row">
@@ -938,6 +986,17 @@
       ${stateChip(day)}
     </div><div class="card"><h3>Match scores</h3>`;
     if (!pool.length) return html + `<p class="hint">This match has no players - check the two squads.</p></div>`;
+    if (day.isPlayoff) {
+      const ids = day.teamIds || [];
+      html += `<div class="fan-winner-box">
+        <div class="fan-winner-k">🏆 Playoff result <span class="hint">- who won? Everyone who called it gets +${ENG.PLAYOFF_BONUS}.</span></div>
+        <div class="fan-winner-opts">
+          ${ids.map(tid => `<button class="fan-winner-opt ${day.winnerTeamId === tid ? "is-on" : ""}" data-fan-set-winner="${tid}">
+            ${teamIcon(teamName(tid))}<span>${esc(teamName(tid))}</span></button>`).join("")}
+          <button class="fan-winner-opt is-none ${!day.winnerTeamId ? "is-on" : ""}" data-fan-set-winner="">No result / tie</button>
+        </div>
+      </div>`;
+    }
     html += `<p class="hint">Enter each player's runs &amp; wickets. Points = runs + wickets × 10. Saving scores doesn't reveal anything; publishing is what puts the points on the leaderboard.</p><div class="fan-results">`;
     (day.teamIds || []).forEach(tid => {
       const ps = F.players.filter(p => p.teamId === tid);
@@ -1232,6 +1291,17 @@
     if (t) UI.draft.teamName = (t.value || "").trim();
   }
 
+  /* Tapping the same team again clears the call, so a pick is never a trap -
+     the save bar then tells them one is still needed. */
+  function pickWinner(teamId) {
+    const day = currentDay(), d = UI.draft;
+    if (!day || !d || !ENG.isPlayoff(day)) return;
+    if (!(day.teamIds || []).includes(teamId)) return;
+    d.winnerPick = d.winnerPick === teamId ? "" : teamId;
+    d.dirty = true;
+    paintBuilder();
+  }
+
   async function submitEntry() {
     const day = currentDay(), d = UI.draft;
     if (!day || !d) return;
@@ -1247,8 +1317,9 @@
       let c = F.contestants.find(x => x.name.toLowerCase() === d.name.toLowerCase());
       if (!c) { c = { id: fid("c"), name: d.name }; F.contestants.push(c); }
       const ex = day.entries.find(e => e.contestantId === c.id);
-      if (ex) { ex.playerIds = d.playerIds.slice(); ex.captainId = d.captainId; ex.viceCaptainId = d.viceCaptainId; }
-      else day.entries.push({ id: fid("e"), contestantId: c.id, playerIds: d.playerIds.slice(), captainId: d.captainId, viceCaptainId: d.viceCaptainId });
+      const pick = ENG.isPlayoff(day) ? (d.winnerPick || "") : "";
+      if (ex) { ex.playerIds = d.playerIds.slice(); ex.captainId = d.captainId; ex.viceCaptainId = d.viceCaptainId; ex.winnerPick = pick; }
+      else day.entries.push({ id: fid("e"), contestantId: c.id, playerIds: d.playerIds.slice(), captainId: d.captainId, viceCaptainId: d.viceCaptainId, winnerPick: pick });
       saveF(); backToList(); ftoast("Team saved", "good");
       return;
     }
@@ -1267,6 +1338,9 @@
       photo: UI.guest ? "" : (H.user.photoURL || ""),
       teamName: d.teamName || "",
       playerIds: d.playerIds.slice(), captainId: d.captainId, viceCaptainId: d.viceCaptainId,
+      // Only sent for playoff matches: the rules allowlist accepts the key but a
+      // normal match has nothing to predict, so don't store a dead field on it.
+      ...(ENG.isPlayoff(day) ? { winnerPick: d.winnerPick || "" } : {}),
       createdAt: existing && existing.createdAt ? existing.createdAt : sentAt,
       updatedAt: fs.serverTimestamp ? fs.serverTimestamp() : sentAt,
     };
@@ -1325,6 +1399,7 @@
       teamA: ids[0] || "", teamB: ids[1] || "",
       teamSize: day.teamSize || 6, maxPerTeam: day.maxPerTeam || 0,
       lockAt: day.lockAt || 0, entryCount: 0,
+      isPlayoff: !!day.isPlayoff,
     };
     UI.view = "form";
     renderFanBody();
@@ -1351,6 +1426,11 @@
     if (!f.entryCount) {
       f.teamA = val("#fanFormA"); f.teamB = val("#fanFormB");
       f.teamSize = Math.max(1, Math.min(15, parseInt(val("#fanFormSize"), 10) || 6));
+      // Frozen alongside the squads: turning this on after people have entered
+      // would hand the bonus only to whoever re-opens their team, and turning it
+      // off would strip a pick the rules have already accepted.
+      const pl = root.querySelector("#fanFormPlayoff");
+      f.isPlayoff = pl ? !!pl.checked : !!f.isPlayoff;
     }
     f.date = val("#fanFormDate") || today();
     f.label = (val("#fanFormLabel") || "").trim();
@@ -1373,12 +1453,17 @@
       const day = fDay(f.id); if (!day) return;
       day.date = f.date; day.label = f.label;
       day.maxPerTeam = f.maxPerTeam; day.lockAt = f.lockAt;
-      if (!f.entryCount) { day.teamIds = [f.teamA, f.teamB]; day.teamSize = f.teamSize; }
+      if (!f.entryCount) {
+        day.teamIds = [f.teamA, f.teamB]; day.teamSize = f.teamSize;
+        day.isPlayoff = !!f.isPlayoff;
+        if (!day.isPlayoff) day.winnerTeamId = "";   // no longer a playoff: drop the recorded result
+      }
       ftoast("Match updated", "good");
     } else {
       F.days.unshift(normDay({
         id: fid("d"), date: f.date, label: f.label, teamIds: [f.teamA, f.teamB],
         teamSize: f.teamSize, maxPerTeam: f.maxPerTeam, lockAt: f.lockAt,
+        isPlayoff: !!f.isPlayoff, winnerTeamId: "",
         performance: {}, entries: [], hasResults: false,
         createdAt: Date.now(), createdBy: who,
       }));
@@ -1387,6 +1472,17 @@
     UI.form = null; UI.view = "list"; UI.dayId = null;
     saveF(); renderFanBody();
   }
+  /* Record who won a playoff match. Stored on the match, not on any entry, so
+     the bonus is recomputed from one source and editing it later is enough to
+     correct everybody's total (re-publish to push it to the leaderboard). */
+  function setPlayoffWinner(teamId) {
+    const day = currentDay(); if (!day || !day.isPlayoff) return;
+    if (teamId && !(day.teamIds || []).includes(teamId)) return;
+    day.winnerTeamId = teamId || "";
+    saveF(); renderFanBody();
+    ftoast(teamId ? `Winner: ${teamName(teamId)}` : "Marked as no result - nobody gets the bonus", "good");
+  }
+
   function lockNow(dayId) {
     const day = fDay(dayId); if (!day) return;
     if (!confirm("Close entries for this match right now? Nobody will be able to submit or change a team afterwards.")) return;
@@ -1416,6 +1512,10 @@
   async function publishPoints(day) {
     if (ENG.isOpen(day, nowMs()) &&
         !confirm("Entries are still open for this match - people can change their team after you publish. Publish anyway?")) return;
+    // The bonus is frozen into the standings at publish time, so an unrecorded
+    // playoff result silently pays nobody. Say so before it happens.
+    if (day.isPlayoff && !day.winnerTeamId &&
+        !confirm(`You haven't recorded who won this playoff match, so nobody gets the +${ENG.PLAYOFF_BONUS} bonus. Publish anyway?`)) return;
     let list = [];
     if (usingFirestore) {
       try {
@@ -1704,6 +1804,7 @@
     if ((m = t.closest("[data-fan-pick]"))) return togglePick(m.getAttribute("data-fan-pick"));
     if ((m = t.closest("[data-fan-unpick]"))) return togglePick(m.getAttribute("data-fan-unpick"));
     if ((m = t.closest("[data-fan-assign]"))) return armAssign(m.getAttribute("data-fan-assign"));
+    if ((m = t.closest("[data-fan-winner]"))) return pickWinner(m.getAttribute("data-fan-winner"));
     if (t.closest("[data-fan-submit]")) return submitEntry();
     if (t.closest("[data-fan-withdraw]")) return withdrawEntry();
     if ((m = t.closest("[data-fan-del-entry]"))) return withdrawEntry(m.getAttribute("data-fan-del-entry"));
@@ -1719,6 +1820,7 @@
       renderFanBody(); return;
     }
     if ((m = t.closest("[data-fan-clear-entries]"))) return clearAllEntries(m.getAttribute("data-fan-clear-entries"));
+    if ((m = t.closest("[data-fan-set-winner]"))) return setPlayoffWinner(m.getAttribute("data-fan-set-winner"));
     if (t.closest("[data-fan-save-scores]")) return saveScores(false);
     if (t.closest("[data-fan-publish]")) return saveScores(true);
     if (t.closest("[data-fan-unpublish]")) return unpublish();
