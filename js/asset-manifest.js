@@ -67,7 +67,9 @@ window.HCCL_ASSETS = {
       "wenura sandeepa": "assets/Players/Wenura Sandeepa.png",
       "yasantha ruwan": "assets/Players/Yasantha Ruwan.png",
       "yasitha nawod": "assets/Players/Yasitha Nawod.png",
-      "yathish leyon": "assets/Players/Yathish Leyon.png"
+      "yathish leyon": "assets/Players/Yathish Leyon.png",
+      "thisanga ranthisa": "assets/Players/Thisanga Ranthisa.png",
+      "thisaru thathsara": "assets/Players/Thisaru Thathsara.png"
     },
     "teamLogoIndex": {
       "aura dynasty": "assets/HCCL Team Logos/Aura Dynasty.jpeg",
