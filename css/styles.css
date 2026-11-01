@@ -1363,3 +1363,33 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .mb-pages { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
 .mb-page { font-size: 11px; color: var(--muted); background: var(--panel-3); border-radius: 999px; padding: 3px 9px; }
 .mb-page b { color: var(--text); font-weight: 700; }
+
+/* ============ PLAYER PHOTO LIBRARY (Setup, editor-only) ============
+   js/photo-library.js. Spans the whole Setup grid - it's a gallery, and a
+   single grid column would crush the thumbnails to a strip. */
+.photo-lib-card { grid-column: 1 / -1; }
+.pl-upload { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 10px; }
+.pl-upload input[type="text"] { flex: 1 1 220px; min-width: 0; }
+.pl-upload input[type="file"] { flex: 1 1 200px; min-width: 0; font-size: 13px; }
+.pl-bar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--panel-3); }
+.pl-count { font-size: 13px; color: var(--muted); }
+.pl-count b { color: var(--text); }
+.pl-bar input[type="search"] { margin-left: auto; flex: 0 1 220px; min-width: 0; }
+.pl-grid {
+  display: grid; gap: 10px; margin-top: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(min(118px, 100%), 1fr));
+  max-height: 520px; overflow-y: auto; padding-right: 2px;
+}
+.pl-item {
+  position: relative; display: flex; flex-direction: column; gap: 6px; align-items: center;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px;
+}
+.pl-thumb {
+  width: 100%; max-width: 96px; aspect-ratio: 1; border-radius: 50%;
+  background: var(--panel-3) center / cover no-repeat;
+}
+.pl-name { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.25; overflow-wrap: anywhere; }
+.pl-item .icon-btn.del { position: absolute; top: 4px; right: 4px; }
+@media (max-width: 520px) {
+  .pl-bar input[type="search"] { margin-left: 0; flex-basis: 100%; }
+}

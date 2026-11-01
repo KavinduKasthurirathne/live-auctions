@@ -8,12 +8,12 @@
    Consumers: season-archive.js, fantasy.js.
    ============================================================ */
 window.HCCL_ASSETS = {
-    "generatedAt": "2026-09-20",
+    "generatedAt": "2026-11-01",
     "counts": {
-      "players": 47,
-      "teamLogos": 39,
+      "players": 52,
+      "teamLogos": 62,
       "seasonLogos": 7,
-      "tournamentLogos": 6
+      "tournamentLogos": 11
     },
     "playerPhotoIndex": {
       "anupam rivisara": "assets/Players/Anupam Rivisara.png",
@@ -109,15 +109,112 @@ window.HCCL_ASSETS = {
       "horizon hunters": "assets/Test Championship Logos/Horizon Hunters.jpeg",
       "london originals": "assets/Test Championship Logos/London Originals.jpeg",
       "the cartel": "assets/Test Championship Logos/The Cartel.jpeg",
-      "iv horsemen": "assets/Fatal 4 Logos/IV Horsemen.jpeg",
+      "dawn breakers": "assets/County Championship Logos/Dawn Breakers.jpg",
+      "dragoz legends": "assets/County Championship Logos/Dragoz Legends.jpg",
+      "hellfire warriors": "assets/County Championship Logos/Hellfire Warriors.jpg",
+      "kinghts kingdom": "assets/County Championship Logos/Kinghts Kingdom.jpg",
+      "legendary demons": "assets/County Championship Logos/Legendary Demons.jpg",
+      "obsidian titans": "assets/County Championship Logos/Obsidian Titans.jpg",
+      "pro teens": "assets/County Championship Logos/Pro Teens.jpg",
+      "shadow syndicate": "assets/County Championship Logos/Shadow Syndicate.jpg",
       "dragon hunters": "assets/Fatal 4 Logos/Dragon Hunters.jpeg",
       "elite iv": "assets/Fatal 4 Logos/Elite IV.jpeg",
       "fantastic 4": "assets/Fatal 4 Logos/Fantastic 4.jpeg",
       "inferno blaze kings": "assets/Fatal 4 Logos/Inferno Blaze Kings.jpeg",
       "iron titans": "assets/Fatal 4 Logos/Iron Titans.jpeg",
+      "iv horsemen": "assets/Fatal 4 Logos/IV Horsemen.jpeg",
       "phoenix strikers": "assets/Fatal 4 Logos/Phoenix Strikers.jpeg",
       "pro gang": "assets/Fatal 4 Logos/Pro Gang.jpeg",
-      "savage legion": "assets/Fatal 4 Logos/Savage Legion.jpeg"
+      "savage legion": "assets/Fatal 4 Logos/Savage Legion.jpeg",
+      "apex predators": "assets/Freestyle Logos/Apex Predators.jpeg",
+      "dark wolves": "assets/Freestyle Logos/Dark Wolves.jpg",
+      "imperial vanguard": "assets/Freestyle Logos/Imperial Vanguard.jpg",
+      "living dinosours": "assets/Freestyle Logos/Living Dinosours.jpg",
+      "shadow hunters": "assets/Freestyle Logos/Shadow Hunters.png",
+      "shadow warriors": "assets/Freestyle Logos/Shadow Warriors.jpg"
+    },
+    "teamLogoFolders": {
+      "HCCL Team Logos": {
+        "aura dynasty": "assets/HCCL Team Logos/Aura Dynasty.jpeg",
+        "aura nemesis": "assets/HCCL Team Logos/Aura Nemesis.jpeg",
+        "invincible lords": "assets/HCCL Team Logos/Invincible Lords.jpeg",
+        "matrix": "assets/HCCL Team Logos/Matrix.jpeg",
+        "mind gamers": "assets/HCCL Team Logos/Mind Gamers.jpeg",
+        "noble knights": "assets/HCCL Team Logos/Noble Knights.png",
+        "silentearz": "assets/HCCL Team Logos/Silentearz.jpeg",
+        "super fire dragons": "assets/HCCL Team Logos/Super Fire Dragons.jpeg",
+        "thickheaders": "assets/HCCL Team Logos/Thickheaders.png",
+        "velocity reapers": "assets/HCCL Team Logos/Velocity Reapers.jpeg",
+        "wizard titans": "assets/HCCL Team Logos/Wizard Titans.jpeg",
+        "zyco kings": "assets/HCCL Team Logos/Zyco Kings.jpeg"
+      },
+      "Rising League Logos": {
+        "apex risers": "assets/Rising League Logos/Apex Risers.jpg",
+        "knights of future": "assets/Rising League Logos/Knights of Future.jpg",
+        "nova rising force": "assets/Rising League Logos/Nova Rising Force.jpg",
+        "rising falcons": "assets/Rising League Logos/Rising Falcons.jpg",
+        "rising mavericks": "assets/Rising League Logos/Rising Mavericks.jpg",
+        "rising strikers": "assets/Rising League Logos/Rising Strikers.jpg",
+        "young velocity kings": "assets/Rising League Logos/Young Velocity Kings.jpg"
+      },
+      "Legends League Logos": {
+        "blackout reapers": "assets/Legends League Logos/Blackout Reapers.jpg",
+        "legend strikers": "assets/Legends League Logos/Legend Strikers.png",
+        "majestic maestros": "assets/Legends League Logos/Majestic Maestros.jpg",
+        "mx legends": "assets/Legends League Logos/MX Legends.jpg",
+        "supreme iv greats": "assets/Legends League Logos/Supreme IV Greats.png",
+        "zyther legends": "assets/Legends League Logos/Zyther Legends.jpg"
+      },
+      "Mini IPL Logos": {
+        "chennai super kings": "assets/Mini IPL Logos/Chennai Super Kings.png",
+        "delhi capitals": "assets/Mini IPL Logos/Delhi Capitals.jpg",
+        "gujarat titans": "assets/Mini IPL Logos/Gujarat Titans.jpg",
+        "kolkata knight riders": "assets/Mini IPL Logos/Kolkata Knight Riders.jpg",
+        "lucknow super giants": "assets/Mini IPL Logos/Lucknow Super Giants.jpg",
+        "mumbai indians": "assets/Mini IPL Logos/Mumbai Indians.jpg",
+        "punjab kings": "assets/Mini IPL Logos/Punjab Kings.jpg",
+        "rajasthan royals": "assets/Mini IPL Logos/Rajasthan Royals.jpg",
+        "royal challengers bengaluru": "assets/Mini IPL Logos/Royal Challengers Bengaluru.png",
+        "sunrisers hyderabad": "assets/Mini IPL Logos/Sunrisers Hyderabad.jpg"
+      },
+      "Test Championship Logos": {
+        "baggy ashford": "assets/Test Championship Logos/Baggy Ashford.jpeg",
+        "horizon hunters": "assets/Test Championship Logos/Horizon Hunters.jpeg",
+        "london originals": "assets/Test Championship Logos/London Originals.jpeg",
+        "the cartel": "assets/Test Championship Logos/The Cartel.jpeg"
+      },
+      "County Championship Logos": {
+        "apex risers": "assets/County Championship Logos/Apex Risers.jpg",
+        "dawn breakers": "assets/County Championship Logos/Dawn Breakers.jpg",
+        "dragoz legends": "assets/County Championship Logos/Dragoz Legends.jpg",
+        "hellfire warriors": "assets/County Championship Logos/Hellfire Warriors.jpg",
+        "kinghts kingdom": "assets/County Championship Logos/Kinghts Kingdom.jpg",
+        "legendary demons": "assets/County Championship Logos/Legendary Demons.jpg",
+        "majestic maestros": "assets/County Championship Logos/Majestic Maestros.jpg",
+        "obsidian titans": "assets/County Championship Logos/Obsidian Titans.jpg",
+        "pro teens": "assets/County Championship Logos/Pro Teens.jpg",
+        "rising falcons": "assets/County Championship Logos/Rising Falcons.jpg",
+        "shadow syndicate": "assets/County Championship Logos/Shadow Syndicate.jpg"
+      },
+      "Fatal 4 Logos": {
+        "dragon hunters": "assets/Fatal 4 Logos/Dragon Hunters.jpeg",
+        "elite iv": "assets/Fatal 4 Logos/Elite IV.jpeg",
+        "fantastic 4": "assets/Fatal 4 Logos/Fantastic 4.jpeg",
+        "inferno blaze kings": "assets/Fatal 4 Logos/Inferno Blaze Kings.jpeg",
+        "iron titans": "assets/Fatal 4 Logos/Iron Titans.jpeg",
+        "iv horsemen": "assets/Fatal 4 Logos/IV Horsemen.jpeg",
+        "phoenix strikers": "assets/Fatal 4 Logos/Phoenix Strikers.jpeg",
+        "pro gang": "assets/Fatal 4 Logos/Pro Gang.jpeg",
+        "savage legion": "assets/Fatal 4 Logos/Savage Legion.jpeg"
+      },
+      "Freestyle Logos": {
+        "apex predators": "assets/Freestyle Logos/Apex Predators.jpeg",
+        "dark wolves": "assets/Freestyle Logos/Dark Wolves.jpg",
+        "imperial vanguard": "assets/Freestyle Logos/Imperial Vanguard.jpg",
+        "living dinosours": "assets/Freestyle Logos/Living Dinosours.jpg",
+        "shadow hunters": "assets/Freestyle Logos/Shadow Hunters.png",
+        "shadow warriors": "assets/Freestyle Logos/Shadow Warriors.jpg"
+      }
     },
     "seasonLogos": {
       "1": "assets/HCCL Logos/S1 LOGO.png",
@@ -129,12 +226,16 @@ window.HCCL_ASSETS = {
       "7": "assets/HCCL Logos/S7 LOGO.jpeg"
     },
     "tournamentLogoIndex": {
+      "fatal four logo": "assets/Tournament Logos/Fatal Four Logo.jpeg",
+      "hc county league s2": "assets/Tournament Logos/HC County League S2.jpeg",
       "hc county legends league s1": "assets/Tournament Logos/HC County Legends League S1.jpeg",
       "hc county rising league s1": "assets/Tournament Logos/HC County Rising League S1.png",
       "hc mini ipl s1": "assets/Tournament Logos/HC Mini IPL S1.png",
       "hc test championship": "assets/Tournament Logos/HC Test Championship.jpeg",
       "solo knockout s1": "assets/Tournament Logos/Solo Knockout S1.png",
       "solo knockout s2": "assets/Tournament Logos/Solo Knockout S2.png",
-      "fatal four logo:": "assets/Tournament Logos/Fatal Four Logo.jpeg"
+      "tag team championship s01": "assets/Tag Team Championship/Tag Team Championship S01.jpeg",
+      "tag team championship s02": "assets/Tag Team Championship/Tag Team Championship S02.jpeg",
+      "tag team championship s03": "assets/Tag Team Championship/Tag Team Championship S03.jpeg"
     }
   };

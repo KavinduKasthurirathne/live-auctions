@@ -205,7 +205,13 @@
     const p = TEAM_LOGO_INDEX[keyOf(team)];
     return p ? assetUrl(p) : "";
   }
+  // The permanent cloud library first (an admin's deliberate choice, and the
+  // only home for players added since the last manifest regen), then the
+  // bundled file. A data URL must not go through encodeURI.
   function playerPhoto(name) {
+    const L = (typeof window !== "undefined") && window.HCCLPhotoLib;
+    const lib = L ? L.fromLibrary(name) : "";
+    if (lib) return lib;
     const p = PLAYER_PHOTO_INDEX[keyOf(name)];
     return p ? assetUrl(p) : "";
   }
@@ -1123,6 +1129,9 @@
     // The registry owns each season's live/completed status and honors
     // (see withRegistry) - repaint the moment an admin changes them, and let
     // home.js rebuild its carousel off the same event.
+    // Library photos land after sign-in: repaint the boards, and emit so Home's
+    // carousel (which draws its podium through this module) repaints too.
+    document.addEventListener("hccl:photos", () => { render(); emit(); });
     if (window.HCCLSeries && typeof window.HCCLSeries.onChange === "function") {
       window.HCCLSeries.onChange(() => { render(); emit(); });
     }

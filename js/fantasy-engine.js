@@ -274,12 +274,140 @@
     }).sort((a, b) => (b.total - a.total) || (b.avg - a.avg));
   }
 
+  /* ============================================================
+     WEEKLY + OVERALL modes
+     A WEEK is a scoring period over the WHOLE tournament pool (every team,
+     every player). Editors enter runs & wickets on it through the week, the
+     same way they do for a daily match. One week sheet feeds two contests:
+       - Weekly:  contestants pick a fresh team for that week only.
+       - Overall: one season-long team, scored week by week.
+     So a week is entered once and both leaderboards follow.
+
+     OVERALL teams are versioned. history[0] is the pre-season team, stamped
+     at:0 so it applies from the start; every post-lock change appends a
+     version stamped with when it was made. A week is scored with the version
+     in force when that week LOCKED, so a swap made mid-week counts from the
+     next week - never retroactively for points already on the board.
+     ============================================================ */
+  const DEFAULT_TEAM_SIZE = 7;
+  const DEFAULT_SWAPS = 3;
+
+  /* How many players in `newIds` weren't in `oldIds` - i.e. swaps used. */
+  function swapDiff(oldIds, newIds) {
+    const before = new Set(oldIds || []);
+    return (newIds || []).filter(id => !before.has(id)).length;
+  }
+
+  /* The version of an overall entry in force at time `ts`: the latest one
+     stamped strictly BEFORE it. Scans everything rather than assuming order -
+     the rules guarantee append-only, but scoring shouldn't depend on it. */
+  function versionAt(entry, ts) {
+    const h = entry && Array.isArray(entry.history) ? entry.history : [];
+    if (!h.length) return entry;           // no history yet: the current team is all there is
+    let best = null;
+    h.forEach(v => {
+      const at = Number(v && v.at) || 0;
+      if (at < ts && (!best || at >= (Number(best.at) || 0))) best = v;
+    });
+    return best || h[0];
+  }
+
+  /* setup  - no lock time yet; nobody can enter
+     open   - building / editing freely
+     swaps  - locked; only swaps (and captaincy with them)
+     closed - the editor ended the season; frozen */
+  function seasonState(season, now) {
+    if (!season || !(Number(season.lockAt) > 0)) return "setup";
+    if (season.closed) return "closed";
+    return (now || Date.now()) < season.lockAt ? "open" : "swaps";
+  }
+
+  const maxSwapsOf = season => (season && season.maxSwaps != null) ? Math.max(0, Number(season.maxSwaps) || 0) : DEFAULT_SWAPS;
+  function swapsLeft(season, entry) {
+    return Math.max(0, maxSwapsOf(season) - (Number(entry && entry.swapsUsed) || 0));
+  }
+
+  /* Can this post-lock change be submitted? -> { ok, msg, swaps }.
+     Squad shape first (same rules as any team), then the swap budget. Unless
+     the editor turned on freeCaptaincy, captain/vice-captain may only change
+     in a submission that also swaps a player: post-lock, the swap IS the edit. */
+  function validateSwap(season, entry, draft, ctx) {
+    const base = validateEntry(season, draft, ctx);
+    const swaps = swapDiff(entry && entry.playerIds, draft && draft.playerIds);
+    if (!base.ok) return { ok: false, msg: base.msg, swaps };
+    const left = swapsLeft(season, entry);
+    const capChanged = !!entry && (draft.captainId !== entry.captainId || draft.viceCaptainId !== entry.viceCaptainId);
+    if (left <= 0) return { ok: false, msg: "No swaps left - your team is final", swaps };
+    if (!swaps && !capChanged) return { ok: false, msg: "Swap at least one player", swaps: 0 };
+    if (!swaps && !(season && season.freeCaptaincy))
+      return { ok: false, msg: "Captaincy can only change when you swap a player", swaps: 0 };
+    if (swaps > left) return { ok: false, msg: "That's " + swaps + " swaps - you have " + left + " left", swaps };
+    return { ok: true, msg: "", swaps };
+  }
+
+  /* Weeks that locked before the season did are left out of Overall: until
+     the season locks, teams can still be rebuilt with that week's scores in
+     full view. */
+  function countsForOverall(season, week) {
+    const L = Number(season && season.lockAt) || 0;
+    return L > 0 && (Number(week && week.lockAt) || 0) >= L;
+  }
+
+  /* One week's Overall points per entry, with the version in force when the
+     week locked. Same row shape as standingsFor, so it aggregates the same way. */
+  function overallStandingsFor(season, week, entries) {
+    if (!countsForOverall(season, week)) return [];
+    return sortRows((entries || []).map(e => ({
+      k: e.id, n: e.name || "", p: e.photo || "",
+      pts: entryPoints(week, versionAt(e, Number(week.lockAt) || 0)),
+    })));
+  }
+
+  /* Season tables from published weeks. `field` picks which denormalised
+     standings to sum: "standings" (Weekly) or "overallStandings" (Overall). */
+  function weekSeasonRows(weeks, field) {
+    const map = new Map();
+    (weeks || []).forEach(w => {
+      if (!w || !w.hasResults || !Array.isArray(w[field])) return;
+      w[field].forEach(r => {
+        if (!r || !r.k) return;
+        const cur = map.get(r.k) || { key: r.k, name: r.n || "", photo: r.p || "", total: 0, days: 0 };
+        cur.total += Number(r.pts) || 0;
+        cur.days += 1;
+        if (r.n) cur.name = r.n;
+        if (r.p) cur.photo = r.p;
+        map.set(r.k, cur);
+      });
+    });
+    return [...map.values()]
+      .map(r => Object.assign(r, { avg: r.days ? r.total / r.days : 0 }))
+      .sort((a, b) => (b.total - a.total) || (b.avg - a.avg));
+  }
+
+  /* One entry's Overall points week by week - for "my season" breakdowns.
+     Only weeks that have LOCKED (a future week has nothing to score yet); a
+     locked-but-unpublished week is computed live from the sheet as it stands. */
+  function overallBreakdown(season, weeks, entry, now) {
+    const t = now || Date.now();
+    return (weeks || [])
+      .filter(w => countsForOverall(season, w) && (Number(w.lockAt) || 0) <= t)
+      .sort((a, b) => (Number(a.lockAt) || 0) - (Number(b.lockAt) || 0))
+      .map(w => ({
+        id: w.id, label: w.label || "", lockAt: Number(w.lockAt) || 0, published: !!w.hasResults,
+        pts: entryPoints(w, versionAt(entry, Number(w.lockAt) || 0)),
+      }));
+  }
+
   const api = {
     LEGACY, OPEN, LOCKED, PUBLISHED, PLAYOFF_BONUS,
     playerDayPoints, entryPoints, playerEntryPoints, isPlayoff, winnerBonus,
     lockState, isOpen, fmtCountdown,
     countByTeam, canPick, validateEntry,
     guestId, standingsFor, legacyStandings, rowsForDay, seasonRows, playerSeasonRows,
+    // weekly + overall
+    DEFAULT_TEAM_SIZE, DEFAULT_SWAPS,
+    swapDiff, versionAt, seasonState, swapsLeft, validateSwap,
+    countsForOverall, overallStandingsFor, weekSeasonRows, overallBreakdown,
   };
 
   if (typeof window !== "undefined") window.HCCLFantasyEngine = api;

@@ -189,6 +189,68 @@
 .fan-check span { font-size: 13px; color: var(--muted); }
 .fan-check b { color: var(--text); }
 
+/* ===================== MODES: Daily / Weekly / Overall =====================
+   js/fantasy-season.js. A segmented control under the header; it only exists
+   when more than one mode is visible, so a Daily-only league looks unchanged. */
+.fan-modebar {
+  display: flex; gap: 4px; padding: 4px; margin: 0 0 16px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  width: fit-content; max-width: 100%;
+}
+.fan-mode {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+  color: var(--muted); background: transparent; border: 0; border-radius: 10px;
+  padding: 9px 16px; min-height: 40px; white-space: nowrap;
+}
+.fan-mode:hover { color: var(--text); background: var(--panel-2); }
+.fan-mode.active { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); }
+.fan-mode-off {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted);
+}
+.fan-mode.active .fan-mode-off { background: rgba(0,0,0,.18); color: #1a1300; }
+.fs-off-note { border-color: rgba(255, 204, 0, 0.35); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.fs-off-note .hint { margin: 0; }
+.fs-modes-card { margin-bottom: 16px; }
+.fs-mode-row { padding: 8px 0; border-top: 1px solid var(--panel-3); }
+.fs-mode-row:first-of-type { border-top: 0; }
+.fan-intro .hint { margin-top: 6px; }
+.fs-row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+/* Pool tiles can carry a photo from the player library. */
+.fan-ptile-av.has-photo { background-size: cover; background-position: center; color: transparent; }
+
+/* Swap builder: what's coming in, what's going out, what it costs. */
+.fan-picked-chip.fs-new { border-color: var(--green); }
+.fs-new-tag {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .5px; padding: 1px 5px; border-radius: 6px;
+  background: rgba(34,197,94,.16); color: var(--green);
+}
+.fs-out-line { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.fs-out-line b { color: var(--red); font-weight: 700; }
+.fs-swap-cost { font-size: 12.5px; font-weight: 700; color: var(--yellow); }
+.fs-swap-cost.is-bad { color: var(--red); }
+
+/* Season team card footer + swap budget. */
+.fs-team-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--panel-3);
+}
+.fs-swaps-pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700;
+  padding: 5px 11px; border-radius: 999px;
+  background: rgba(255, 204, 0, 0.12); color: var(--yellow); border: 1px solid rgba(255, 204, 0, 0.3);
+}
+.fs-swaps-pill.is-out { background: var(--panel-2); color: var(--muted); border-color: var(--border); }
+.fs-note { margin: -4px 2px 14px; }
+.fs-hist { list-style: none; margin: 0; padding: 0; }
+.fs-hist li { padding: 9px 0; border-top: 1px solid var(--panel-3); font-size: 13px; line-height: 1.5; }
+.fs-hist li:first-child { border-top: 0; }
+.fs-hist-when { color: var(--muted); font-size: 12px; margin-right: 6px; white-space: nowrap; }
+.fan-table tr.is-me td { background: rgba(255, 204, 0, 0.06); }
+.fan-mc-you.is-in { color: var(--green); }
+
 @media (max-width: 900px) { .fan-picked-card { top: 79px; } }
 .fan-picked-strip { display: flex; flex-wrap: wrap; gap: 8px; }
 .fan-picked-chip {

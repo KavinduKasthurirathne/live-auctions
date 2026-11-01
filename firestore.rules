@@ -174,6 +174,202 @@ service cloud.firestore {
       allow delete: if signedIn() && matchOpen() && (entryId == request.auth.uid || canEdit());
     }
 
+    // ===================== WEEKLY + OVERALL FANTASY =====================
+    // Both sit outside fantasy/** for the same reason fantasyEntries does: that
+    // root grants every editor write and every member read, recursively, and
+    // rules are OR-ed - nothing under it could hide rivals' picks or bind the
+    // deadline. The CONTEST documents (weeks, the season config) stay under
+    // fantasy/league/ because only editors write those anyway.
+    //
+    // Every read of a contest field goes through .get(key, default). A bare
+    // read of a field the document doesn't have is an evaluation ERROR, which
+    // denies the whole request - that is precisely what locked every older daily
+    // match when the playoff field was added. Never again.
+
+    // Weekly teams: fantasyWeekly/{tid}/weeks/{weekId}/entries/{uid}.
+    // One team per member per week, picked from the WHOLE tournament pool.
+    // Same contract as a daily match: editable until the week locks, then
+    // frozen for everyone; rivals' picks hidden until then.
+    match /fantasyWeekly/{tid}/weeks/{weekId}/entries/{entryId} {
+      function legacyWeek()  { return get(/databases/$(database)/documents/fantasy/league/weeks/$(weekId)).data; }
+      function tourneyWeek() { return get(/databases/$(database)/documents/tournaments/$(tid)/fantasy/league/weeks/$(weekId)).data; }
+      function isLegacy()    { return tid == 'hccl-s6'; }
+
+      function openFor(w) {
+        return w.get('lockAt', 0) is number
+            && request.time.toMillis() < w.get('lockAt', 0)
+            && w.get('hasResults', false) != true;
+      }
+      function weekOpen() {
+        return (isLegacy() && openFor(legacyWeek())) || (!isLegacy() && openFor(tourneyWeek()));
+      }
+      function squadOk(d, w) {
+        return w.get('teamSize', 0) is int && w.get('teamSize', 0) > 0 && w.get('teamSize', 0) <= 15
+            && d.playerIds is list
+            && d.playerIds.size() == w.get('teamSize', 0)
+            && d.playerIds.toSet().size() == w.get('teamSize', 0)
+            && (d.captainId in d.playerIds)
+            && (d.viceCaptainId in d.playerIds)
+            && d.captainId != d.viceCaptainId;
+      }
+      function squadMatches() {
+        return (isLegacy() && squadOk(request.resource.data, legacyWeek()))
+            || (!isLegacy() && squadOk(request.resource.data, tourneyWeek()));
+      }
+      function shapeOk() {
+        return request.resource.data.keys().hasOnly(
+                 ['uid','name','photo','teamName','playerIds','captainId','viceCaptainId','createdAt','updatedAt'])
+            && request.resource.data.keys().hasAll(['uid','name','playerIds','captainId','viceCaptainId'])
+            && request.resource.data.uid is string
+            && request.resource.data.name is string
+            && request.resource.data.name.size() > 0
+            && request.resource.data.name.size() <= 120;
+      }
+
+      allow get:  if signedIn() && (entryId == request.auth.uid || canEdit() || !weekOpen());
+      allow list: if signedIn() && (canEdit() || !weekOpen());
+      allow create, update: if signedIn() && weekOpen() && shapeOk() && squadMatches()
+                            && entryId == request.auth.uid
+                            && request.resource.data.uid == request.auth.uid;
+      // Members withdraw only while the week is open. Editors can moderate at
+      // any time - deleting a whole week clears its teams in one batch, which
+      // would be refused outright if a locked week's teams were undeletable.
+      allow delete: if signedIn() && (canEdit() || (weekOpen() && entryId == request.auth.uid));
+    }
+
+    // Overall (season-long) teams: fantasyOverall/{tid}/entries/{uid}.
+    // Season settings live on the editor-owned config doc:
+    //   fantasy/league/settings/config.overall = { lockAt, teamSize, maxSwaps,
+    //                                              maxPerTeam, freeCaptaincy, closed }
+    //
+    // Before lockAt: build and rebuild freely. history must be exactly one
+    // version - the current team, stamped at:0 ("from the start").
+    // After lockAt: no new teams. Each change appends ONE version and spends
+    // one swap per player brought in. Earlier versions can never be rewritten,
+    // which is what stops a contestant re-scoring a past week. Once the swaps
+    // are spent - or the editor closes the season - the team is final.
+    match /fantasyOverall/{tid}/entries/{entryId} {
+      function legacyCfg()  { return get(/databases/$(database)/documents/fantasy/league/settings/config).data; }
+      function tourneyCfg() { return get(/databases/$(database)/documents/tournaments/$(tid)/fantasy/league/settings/config).data; }
+      function isLegacy()   { return tid == 'hccl-s6'; }
+
+      function season(c)    { return c.get('overall', {}); }
+      function lockAt(c)    { return season(c).get('lockAt', 0); }
+      function preSeason(c) {
+        return lockAt(c) is number && lockAt(c) > 0 && request.time.toMillis() < lockAt(c);
+      }
+      function inSeason(c) {
+        return lockAt(c) is number && lockAt(c) > 0 && request.time.toMillis() >= lockAt(c)
+            && season(c).get('closed', false) != true;
+      }
+      function revealedFor(c) {
+        return lockAt(c) is number && lockAt(c) > 0 && request.time.toMillis() >= lockAt(c);
+      }
+      function revealed() {
+        return (isLegacy() && revealedFor(legacyCfg())) || (!isLegacy() && revealedFor(tourneyCfg()));
+      }
+      function preSeasonNow() {
+        return (isLegacy() && preSeason(legacyCfg())) || (!isLegacy() && preSeason(tourneyCfg()));
+      }
+
+      function squadOk(d, c) {
+        return season(c).get('teamSize', 7) is int
+            && season(c).get('teamSize', 7) > 0 && season(c).get('teamSize', 7) <= 15
+            && d.playerIds is list
+            && d.playerIds.size() == season(c).get('teamSize', 7)
+            && d.playerIds.toSet().size() == season(c).get('teamSize', 7)
+            && (d.captainId in d.playerIds)
+            && (d.viceCaptainId in d.playerIds)
+            && d.captainId != d.viceCaptainId;
+      }
+      function shapeOk() {
+        return request.resource.data.keys().hasOnly(
+                 ['uid','name','photo','teamName','playerIds','captainId','viceCaptainId',
+                  'swapsUsed','history','createdAt','updatedAt'])
+            && request.resource.data.keys().hasAll(
+                 ['uid','name','playerIds','captainId','viceCaptainId','swapsUsed','history'])
+            && request.resource.data.name is string
+            && request.resource.data.name.size() > 0
+            && request.resource.data.name.size() <= 120
+            && entryId == request.auth.uid
+            && request.resource.data.uid == request.auth.uid;
+      }
+      // Pre-season: one version, the current team, from the start; no swaps spent.
+      function freshOk(d) {
+        return d.swapsUsed == 0
+            && d.history is list && d.history.size() == 1
+            && d.history[0].get('at', -1) == 0
+            && d.history[0].get('playerIds', []) == d.playerIds
+            && d.history[0].get('captainId', '') == d.captainId
+            && d.history[0].get('viceCaptainId', '') == d.viceCaptainId;
+      }
+      // Post-lock: exactly one appended version, the earlier ones untouched,
+      // stamped "now" (within a minute, for clock skew), mirroring the team.
+      function swapOk(c) {
+        let o = resource.data;
+        let n = request.resource.data;
+        let maxSwaps = season(c).get('maxSwaps', 3);
+        let used = o.get('swapsUsed', 0);
+        let oh = o.get('history', []);
+        let last = n.history[n.history.size() - 1];
+        let swaps = n.playerIds.toSet().difference(o.playerIds.toSet()).size();
+        let capChanged = n.captainId != o.captainId || n.viceCaptainId != o.viceCaptainId;
+        return used < maxSwaps
+            && n.history is list
+            && n.history.size() == oh.size() + 1
+            && n.history.size() <= 40
+            && n.history[0:oh.size()] == oh
+            && last.keys().hasOnly(['at','playerIds','captainId','viceCaptainId'])
+            && last.at is int
+            && last.at >= request.time.toMillis() - 60000
+            && last.at <= request.time.toMillis() + 60000
+            && last.playerIds == n.playerIds
+            && last.captainId == n.captainId
+            && last.viceCaptainId == n.viceCaptainId
+            && n.swapsUsed == used + swaps
+            && n.swapsUsed <= maxSwaps
+            && (swaps > 0 || (capChanged && season(c).get('freeCaptaincy', false) == true))
+            && n.get('createdAt', 0) == o.get('createdAt', 0);
+      }
+      function createOk(c) {
+        return preSeason(c) && squadOk(request.resource.data, c) && freshOk(request.resource.data);
+      }
+      function updateOk(c) {
+        return squadOk(request.resource.data, c)
+            && ((preSeason(c) && freshOk(request.resource.data)) || (inSeason(c) && swapOk(c)));
+      }
+
+      allow get:  if signedIn() && (entryId == request.auth.uid || canEdit() || revealed());
+      allow list: if signedIn() && (canEdit() || revealed());
+      allow create: if signedIn() && shapeOk()
+                    && ((isLegacy() && createOk(legacyCfg())) || (!isLegacy() && createOk(tourneyCfg())));
+      allow update: if signedIn() && shapeOk()
+                    && ((isLegacy() && updateOk(legacyCfg())) || (!isLegacy() && updateOk(tourneyCfg())));
+      // Members may withdraw only before the lock (after it, a team can't be
+      // re-created, so deleting would just lose it). Editors can always moderate.
+      allow delete: if signedIn() && (canEdit() || (entryId == request.auth.uid && preSeasonNow()));
+    }
+
+    // Player photo library: photoLibrary/{key} = { name, data, updatedAt, updatedBy }.
+    // ONE permanent, name-keyed photo per player, shared by every tournament
+    // (js/photo-library.js). Everyone signed in reads; editors write.
+    // create/update and delete are split on purpose: on a delete
+    // request.resource is null, so the shape checks would deny every removal.
+    // The size cap keeps one runaway upload well clear of Firestore's 1 MiB doc
+    // limit - the client stores 320px JPEGs of a few tens of KB.
+    match /photoLibrary/{key} {
+      allow read: if signedIn();
+      allow create, update: if canEdit()
+                            && request.resource.data.keys().hasOnly(['name','data','updatedAt','updatedBy'])
+                            && request.resource.data.name is string
+                            && request.resource.data.name.size() > 0
+                            && request.resource.data.name.size() <= 120
+                            && request.resource.data.data is string
+                            && request.resource.data.data.size() <= 400000
+                            && request.resource.data.data.matches('data:image/(jpeg|png|webp);base64,.*');
+      allow delete: if canEdit();
+    }
+
     // Shared auction data (Phase D): auction/league/{teams|players}/{id} + state docs.
     match /auction/{document=**} {
       allow read: if signedIn();

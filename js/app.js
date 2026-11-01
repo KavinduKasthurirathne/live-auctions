@@ -725,9 +725,9 @@ function renderAll() {
    auction owns - in both cloud and localStorage mode. */
 window.HCCLAuction = {
   teams:    () => state.teams.map(t => ({ id: t.id, name: t.name, logo: t.logo || "" })),
-  squad:    id => teamPlayers(id).map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained, rtm: !!p.rtmBy, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
+  squad:    id => teamPlayers(id).map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: photoOf(p), retained: !!p.retained, rtm: !!p.rtmBy, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
   team:     id => { const t = getTeam(id); return t ? { id: t.id, name: t.name, logo: t.logo || "" } : null; },
-  players:  () => state.players.map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: p.photo || "", retained: !!p.retained, rtm: !!p.rtmBy, status: p.status, soldTo: p.soldTo || null, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
+  players:  () => state.players.map(p => ({ id: p.id, name: p.name, role: p.role || "", photo: photoOf(p), retained: !!p.retained, rtm: !!p.rtmBy, status: p.status, soldTo: p.soldTo || null, soldPrice: p.soldPrice != null ? p.soldPrice : null })),
   money,
   settings: () => ({ ...state.settings }),
 };
@@ -735,8 +735,20 @@ window.HCCLAuction = {
 function renderHeader() {
   // The header carries the SITE brand (HC Community), not the viewed tournament -
   // that identity lives in the Series tab and the viewing banner. The brand
-  // badge / favicon stay on the static assets/brand-logo.jpeg from index.html.
+  // badge / favicon stay on the static assets/brand-logo.jpg from index.html.
   document.title = "HC Community";
+}
+
+/* A player's photo for DISPLAY. This tournament's own upload wins (someone
+   chose it for this auction); otherwise the permanent name-keyed library
+   (js/photo-library.js), which falls back to the bundled assets/Players file.
+   Never written back into state - the library is the store, so a returning
+   player's photo isn't re-uploaded into every tournament that signs him. */
+function photoOf(p) {
+  if (!p) return "";
+  if (p.photo) return p.photo;
+  const L = window.HCCLPhotoLib;
+  return L ? L.forName(p.name) : "";
 }
 
 /* ---------- LIVE AUCTION ---------- */
@@ -798,7 +810,7 @@ function renderAuction() {
   const a = state.auction;
 
   // Player card
-  setPhoto($("#playerPhoto"), player.photo, initials(player.name));
+  setPhoto($("#playerPhoto"), photoOf(player), initials(player.name));
   $("#playerName").textContent = player.name;
   $("#playerRole").textContent = player.role || "";
   // Last-season franchise (drives Right to Match) - shown on the block so the
@@ -1367,7 +1379,7 @@ function renderPlayers() {
     const card = document.createElement("div");
     card.className = "pcard";
     card.innerHTML = `
-      <div class="pcard-photo" style="${p.photo ? `background-image:url('${p.photo}')` : ""}">${p.photo ? "" : esc(initials(p.name))}</div>
+      <div class="pcard-photo" style="${photoOf(p) ? `background-image:url('${photoOf(p)}')` : ""}">${photoOf(p) ? "" : esc(initials(p.name))}</div>
       <div class="pcard-body">
         <span class="pcard-name">${esc(p.name)}</span>
         ${(p.role && !p.retained) ? `<span class="pcard-role">${esc(p.role)}</span>` : ""}
@@ -1431,7 +1443,7 @@ function renderSquads() {
     const rows = players.length
       ? players.map(p => `
         <div class="squad-row">
-          <span class="mini-photo" style="${p.photo ? `background-image:url('${p.photo}')` : ""}">${p.photo ? "" : esc(initials(p.name))}</span>
+          <span class="mini-photo" style="${photoOf(p) ? `background-image:url('${photoOf(p)}')` : ""}">${photoOf(p) ? "" : esc(initials(p.name))}</span>
           <span class="sr-name">${esc(p.name)}</span>
           ${p.retained ? `<span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>` : ""}
           ${p.rtmBy ? `<span class="ret-tag rt-rtm" title="Signed with a Right to Match card">RTM</span>` : ""}
@@ -1534,7 +1546,7 @@ function renderSetup() {
       <button class="icon-btn" data-down="${p.id}" title="Move down">▼</button>`;
     }
     row.innerHTML = `
-      ${logoHTML("ml-logo", p.photo, p.name)}
+      ${logoHTML("ml-logo", photoOf(p), p.name)}
       <span class="ml-name">${esc(p.name)}</span>
       <span class="ml-sub">${sub}</span>${reorder}
       <button class="icon-btn" data-edit-player="${p.id}" title="Edit">✎</button>
@@ -1564,7 +1576,7 @@ function renderSetup() {
     const row = document.createElement("div");
     row.className = "mini-row";
     row.innerHTML = `
-      ${logoHTML("ml-logo", p.photo, p.name)}
+      ${logoHTML("ml-logo", photoOf(p), p.name)}
       <span class="ml-name">${esc(p.name)}</span>
       <span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>
       <span class="ml-sub">${team ? esc(team.name) : "-"}${p.soldPrice ? " · " + money(p.soldPrice) : ""}</span>
@@ -1706,6 +1718,15 @@ async function savePlayer() {
   save();
   renderAll();
   toast("Player saved", "good");
+  // Keep a permanent copy by name, so he has this photo in every future
+  // tournament too. Only fills a gap - an existing library photo is never
+  // overwritten from here (replace it deliberately in the library panel).
+  const L = window.HCCLPhotoLib;
+  if (photo && L && L.has && !L.has(name)) {
+    L.put(name, photo, { onlyIfMissing: true })
+      .then(added => { if (added) toast(`Photo saved to the library for ${name}`, "good"); })
+      .catch(() => { /* offline or rules not published - the tournament copy still worked */ });
+  }
 }
 function editPlayer(id) {
   const p = getPlayer(id); if (!p) return;
@@ -2404,6 +2425,9 @@ function init() {
   ensureCurrentPlayer();
   save();
   renderAll();
+  // The photo library arrives after the first render (it waits for sign-in);
+  // repaint so library photos replace the initials once they land.
+  document.addEventListener("hccl:photos", () => renderAll());
   // Real-time auction (Phase D): start syncing once SIGNED IN (reads require auth).
   let wasSignedIn = false;
   if (window.HCCL && typeof window.HCCL.onChange === "function") {

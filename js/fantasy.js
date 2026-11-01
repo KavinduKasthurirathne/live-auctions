@@ -96,6 +96,7 @@
 
   let F = loadF();
   const UI = {
+    mode: "daily",         // daily | weekly | overall  (weekly/overall: js/fantasy-season.js)
     sub: "matches",        // matches | leaderboard | manage
     view: "list",          // list | build | teams | form | scores
     dayId: null,           // the match `view` is about
@@ -567,18 +568,36 @@
     return !H || !H.configured || H.canEdit();
   }
   let renderId = 0;
+  /* Daily / Weekly / Overall. Weekly and Overall live in js/fantasy-season.js;
+     this file stays the Daily mode it always was and just hands the body over.
+     With only Daily switched on (the default) there is no mode bar at all, so
+     members see exactly what they saw before. */
+  function seasonMod() { return window.HCCLFantasySeason || null; }
+  function resolveMode() {
+    const S = seasonMod();
+    const modes = S ? S.visibleModes(canEditApp()) : ["daily"];
+    if (!modes.includes(UI.mode)) {
+      const saved = S ? S.savedMode() : "";
+      UI.mode = modes.includes(saved) ? saved : modes[0];
+    }
+    return modes;
+  }
   function renderFantasy() {
     const v = fanEl(); if (!v) return;
     if (!canEditApp() && UI.sub === "manage") UI.sub = "matches";
+    resolveMode();
+    const S = seasonMod();
+    const daily = UI.mode === "daily" || !S;
     v.innerHTML = `
       <div class="view-head">
         <h2>FANTASY LEAGUE</h2>
-        <div class="fan-subnav">
+        <div class="fan-subnav">${daily ? `
           ${subBtn("matches", "🏏 Matches")}
           ${subBtn("leaderboard", "🏆 Leaderboards")}
-          ${subBtn("manage", "⚙️ Manage")}
+          ${subBtn("manage", "⚙️ Manage")}` : S.subnavHtml(UI.mode)}
         </div>
       </div>
+      ${S ? S.modeBarHtml(UI.mode, canEditApp()) : ""}
       ${fsFellBack ? `<div class="card" style="border-color:var(--red)"><p class="hint" style="margin:0">⚠ ${esc(fsFellBackMsg)}. Showing this device only - changes won't sync and the cloud-upload button is hidden. Fix the cause (publish rules / disable ad-blocker) and reload.</p></div>` : ""}
       <div id="fan-body"></div>`;
     renderFanBody();
@@ -590,6 +609,15 @@
     const body = document.getElementById("fan-body"); if (!body) return;
     if (usingFirestore && !fsReady) { body.innerHTML = `<div class="card"><p class="hint">Loading league data…</p></div>`; return; }
     if (!canEditApp() && UI.sub === "manage") UI.sub = "matches";
+
+    const S = seasonMod();
+    if (S && UI.mode !== "daily") {
+      stopEntries();
+      S.render(UI.mode, body);
+      body.setAttribute("data-render-id", String(++renderId));
+      return;
+    }
+    if (S) S.unmount();
 
     if (UI.sub === "leaderboard") body.innerHTML = renderLeaderboards();
     else if (UI.sub === "manage") body.innerHTML = renderManage();
@@ -1185,7 +1213,8 @@
   /* ---------- manage ---------- */
   function renderManage() {
     const teamOpts = F.teams.map(t => `<option value="${t.id}" ${UI.editPlayerId && fPlayer(UI.editPlayerId) && fPlayer(UI.editPlayerId).teamId === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("");
-    return `<div class="fan-board-grid">
+    const S = seasonMod();
+    return `${S ? S.modesCardHtml() : ""}<div class="fan-board-grid">
       <div class="card"><h3 id="fanTeamTitle">${UI.editTeamId ? "Edit Team" : "Add Team"}</h3>
         <label>Team name<input id="fanTeamName" value="${UI.editTeamId && fTeam(UI.editTeamId) ? esc(fTeam(UI.editTeamId).name) : ""}" placeholder="e.g. Wizard Titans"/></label>
         <div class="form-row"><button class="btn btn-red" data-save-team>${UI.editTeamId ? "Save" : "Add team"}</button>${UI.editTeamId ? `<button class="btn btn-dark" data-cancel-team>Cancel</button>` : ""}</div>
@@ -1800,6 +1829,12 @@
   function onClick(e) {
     const t = e.target;
     let m;
+    const modeBtn = t.closest("[data-fan-mode]");
+    if (modeBtn) {
+      UI.mode = modeBtn.getAttribute("data-fan-mode");
+      const S = seasonMod(); if (S) S.rememberMode(UI.mode);
+      resetUI(); stopEntries(); renderFantasy(); return;
+    }
     const sub = t.closest("[data-fan-sub]");
     if (sub) {
       UI.sub = sub.getAttribute("data-fan-sub");
@@ -1892,7 +1927,15 @@
   }
   // Public hook: the tournament page (series.js) hosts #view-fantasy as its
   // "Fantasy" panel and calls this when that inner tab opens.
-  if (typeof window !== "undefined") window.HCCLFantasyView = { render: renderFantasy };
+  /* render/refresh: repaint the whole view (the season module calls refresh
+     when its own data changes). pool: the shared teams & players every mode
+     picks from, plus the daily matches Weekly can total up. Read-only. */
+  if (typeof window !== "undefined") window.HCCLFantasyView = {
+    render: renderFantasy,
+    refresh: renderFantasy,
+    pool: () => ({ teams: F.teams, players: F.players, days: F.days }),
+    teamIcon, avatar,
+  };
   if (typeof document !== "undefined") {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();
