@@ -248,6 +248,15 @@
 .fs-hist li { padding: 9px 0; border-top: 1px solid var(--panel-3); font-size: 13px; line-height: 1.5; }
 .fs-hist li:first-child { border-top: 0; }
 .fs-hist-when { color: var(--muted); font-size: 12px; margin-right: 6px; white-space: nowrap; }
+/* Overall scores sheet */
+.frr-pts.fo-pts { width: 58px; line-height: 1.1; }
+.fo-gain { display: block; font-size: 11px; font-weight: 700; color: var(--green); }
+.fo-gain.is-neg { color: var(--red); }
+.fo-label { flex: 1 1 200px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.fo-upd { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fo-fill .hint { margin: 0 0 6px; }
+.fo-miss { margin-top: 6px; font-size: 13px; }
+.fo-miss summary { cursor: pointer; color: var(--yellow); font-weight: 600; }
 .fan-table tr.is-me td { background: rgba(255, 204, 0, 0.06); }
 .fan-mc-you.is-in { color: var(--green); }
 

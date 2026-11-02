@@ -278,16 +278,20 @@
      WEEKLY + OVERALL modes
      A WEEK is a scoring period over the WHOLE tournament pool (every team,
      every player). Editors enter runs & wickets on it through the week, the
-     same way they do for a daily match. One week sheet feeds two contests:
-       - Weekly:  contestants pick a fresh team for that week only.
-       - Overall: one season-long team, scored week by week.
-     So a week is entered once and both leaderboards follow.
+     same way they do for a daily match; contestants pick a fresh team for
+     that week only.
 
-     OVERALL teams are versioned. history[0] is the pre-season team, stamped
+     OVERALL is one season-long team with its OWN scores - nothing from the
+     daily or weekly sheets. Editors publish SCORE UPDATES: each one holds
+     every player's season-to-date runs & wickets (what the stats sheet says),
+     and the gain since the previous update is what gets scored.
+
+     Overall teams are versioned. history[0] is the pre-season team, stamped
      at:0 so it applies from the start; every post-lock change appends a
-     version stamped with when it was made. A week is scored with the version
-     in force when that week LOCKED, so a swap made mid-week counts from the
-     next week - never retroactively for points already on the board.
+     version stamped with when it was made. An update's gain is scored with
+     the version in force when that update's first match started (or, if the
+     editor doesn't say, when the previous update was published) - so a swap
+     never earns points already scored.
      ============================================================ */
   const DEFAULT_TEAM_SIZE = 7;
   const DEFAULT_SWAPS = 3;
@@ -345,26 +349,8 @@
     return { ok: true, msg: "", swaps };
   }
 
-  /* Weeks that locked before the season did are left out of Overall: until
-     the season locks, teams can still be rebuilt with that week's scores in
-     full view. */
-  function countsForOverall(season, week) {
-    const L = Number(season && season.lockAt) || 0;
-    return L > 0 && (Number(week && week.lockAt) || 0) >= L;
-  }
-
-  /* One week's Overall points per entry, with the version in force when the
-     week locked. Same row shape as standingsFor, so it aggregates the same way. */
-  function overallStandingsFor(season, week, entries) {
-    if (!countsForOverall(season, week)) return [];
-    return sortRows((entries || []).map(e => ({
-      k: e.id, n: e.name || "", p: e.photo || "",
-      pts: entryPoints(week, versionAt(e, Number(week.lockAt) || 0)),
-    })));
-  }
-
   /* Season tables from published weeks. `field` picks which denormalised
-     standings to sum: "standings" (Weekly) or "overallStandings" (Overall). */
+     standings to sum ("standings" for Weekly). */
   function weekSeasonRows(weeks, field) {
     const map = new Map();
     (weeks || []).forEach(w => {
@@ -384,18 +370,56 @@
       .sort((a, b) => (b.total - a.total) || (b.avg - a.avg));
   }
 
-  /* One entry's Overall points week by week - for "my season" breakdowns.
-     Only weeks that have LOCKED (a future week has nothing to score yet); a
-     locked-but-unpublished week is computed live from the sheet as it stands. */
-  function overallBreakdown(season, weeks, entry, now) {
-    const t = now || Date.now();
-    return (weeks || [])
-      .filter(w => countsForOverall(season, w) && (Number(w.lockAt) || 0) <= t)
-      .sort((a, b) => (Number(a.lockAt) || 0) - (Number(b.lockAt) || 0))
-      .map(w => ({
-        id: w.id, label: w.label || "", lockAt: Number(w.lockAt) || 0, published: !!w.hasResults,
-        pts: entryPoints(w, versionAt(entry, Number(w.lockAt) || 0)),
-      }));
+  /* Overall score updates, oldest first. Each is { id, at, label, totals:
+     { playerId: { runs, wickets } } } with season-to-date figures. */
+  const byAt = updates => (updates || []).filter(u => u && u.totals)
+    .slice().sort((a, b) => (Number(a.at) || 0) - (Number(b.at) || 0));
+
+  /* What each player added between two updates. A player missing from `cur`
+     keeps his previous totals (gain 0); a lowered figure is a correction and
+     comes through negative. */
+  function totalsGain(prev, cur) {
+    const out = {};
+    const ids = new Set([...Object.keys(prev || {}), ...Object.keys(cur || {})]);
+    ids.forEach(pid => {
+      const a = (prev && prev[pid]) || {}, b = (cur && cur[pid]) || a;
+      const runs = (Number(b.runs) || 0) - (Number(a.runs) || 0);
+      const wickets = (Number(b.wickets) || 0) - (Number(a.wickets) || 0);
+      if (runs || wickets) out[pid] = { runs, wickets };
+    });
+    return out;
+  }
+
+  /* One entry's Overall points update by update. The first update counts from
+     zero. Each gain is scored with the team as it stood at the update's
+     `teamsAt` - when its first match started, set by the editor - or, if
+     unset, when the previous update went out. Never later than the update
+     itself, so a swap made after the runs were scored can't collect them.
+     A `baseline` update only sets the starting totals (matches played before
+     teams locked) and scores 0. */
+  function overallTimeline(updates, entry) {
+    let prevTotals = {}, prevAt = 0;
+    return byAt(updates).map(u => {
+      const at = Number(u.at) || 0;
+      const teamsAt = Number(u.teamsAt) > 0 ? Math.min(Number(u.teamsAt), at) : prevAt;
+      const pts = u.baseline ? 0
+        : entryPoints({ performance: totalsGain(prevTotals, u.totals) }, versionAt(entry, teamsAt));
+      prevTotals = Object.assign({}, prevTotals, u.totals);
+      prevAt = at;
+      return { id: u.id, label: u.label || "", at, pts };
+    });
+  }
+
+  /* The Overall leaderboard: every entry, even on 0, with its latest gain. */
+  function overallStandings(updates, entries) {
+    return (entries || []).map(e => {
+      const t = overallTimeline(updates, e);
+      return {
+        key: e.id, name: e.name || "", photo: e.photo || "",
+        total: t.reduce((s, x) => s + x.pts, 0),
+        last: t.length ? t[t.length - 1].pts : 0,
+      };
+    }).sort((a, b) => (b.total - a.total) || (b.last - a.last));
   }
 
   const api = {
@@ -407,7 +431,7 @@
     // weekly + overall
     DEFAULT_TEAM_SIZE, DEFAULT_SWAPS,
     swapDiff, versionAt, seasonState, swapsLeft, validateSwap,
-    countsForOverall, overallStandingsFor, weekSeasonRows, overallBreakdown,
+    weekSeasonRows, totalsGain, overallTimeline, overallStandings,
   };
 
   if (typeof window !== "undefined") window.HCCLFantasyEngine = api;

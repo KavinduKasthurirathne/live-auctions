@@ -17,14 +17,19 @@
             the same submission as a swap. Once the swaps are spent, the team
             is final.
 
-   ONE WEEK SHEET FEEDS BOTH. Overall teams are scored week by week from the
-   same runs & wickets, using the team version in force when each week locked
-   - so a swap made mid-week counts from the next week, never backwards.
+   OVERALL HAS ITS OWN SCORES - nothing from the daily or weekly sheets.
+   Editors publish score updates of every player's season-to-date runs &
+   wickets (typed in, or filled from the tournament's imported stats sheet).
+   Each update scores the gain since the previous one, with the team version
+   in force when the update's first match started (the editor sets it;
+   default: when the previous update went out) - so a swap never counts
+   backwards.
 
    Where things live (prefix = [] for the legacy tournament, else
    ["tournaments", tid]):
      <prefix>/fantasy/league/settings/config     modes + season settings (editors)
      <prefix>/fantasy/league/weeks/{weekId}      the weeks + their sheets  (editors)
+     <prefix>/fantasy/league/overallScores/{id}  Overall score updates     (editors)
      fantasyWeekly/{tid}/weeks/{weekId}/entries/{uid}   weekly teams
      fantasyOverall/{tid}/entries/{uid}                 season teams
    Entries sit outside fantasy/** for the same reason daily entries do - see
@@ -155,7 +160,6 @@
       performance: (d.performance && typeof d.performance === "object") ? d.performance : {},
       hasResults: !!d.hasResults,
       standings: Array.isArray(d.standings) ? d.standings : null,
-      overallStandings: Array.isArray(d.overallStandings) ? d.overallStandings : null,
       createdAt: Number(d.createdAt) || 0,
       publishedAt: Number(d.publishedAt) || 0,
     };
@@ -182,12 +186,24 @@
       })) : [],
     };
   }
+  function normScore(id, d) {
+    d = d || {};
+    const totals = {};
+    Object.entries((d.totals && typeof d.totals === "object") ? d.totals : {}).forEach(([pid, v]) => {
+      totals[pid] = { runs: Number(v && v.runs) || 0, wickets: Number(v && v.wickets) || 0 };
+    });
+    return { id, at: Number(d.at) || 0, teamsAt: Number(d.teamsAt) || 0, label: d.label || "",
+      source: d.source || "manual", changed: Number(d.changed) || 0, baseline: !!d.baseline, totals };
+  }
 
   /* ---------------- state ---------------- */
   let cfg = normCfg(null), cfgLoaded = false;
   let weeks = [], weeksLoaded = false;
   let oMine = null, oMineLoaded = false;
   let oAll = [], oAllLoaded = false, oAllUnsub = null;
+  let oScores = [], oScoresLoaded = false;   // Overall score updates, oldest first
+  let oDraft = null;     // the Scores sheet as typed: { label, source, vals: { pid: { runs, wickets } } }
+  let oFill = null;      // what the last "fill from stats sheet" matched / missed
   const wEnt = { weekId: null, mode: null, list: [], loaded: false, unsub: null };
   const myWeekCache = new Map();             // weekId -> entry | null
   let tid = null, prefix = [], startedFor = "";
@@ -210,6 +226,8 @@
   const wEntryRef = (wid, uid) => fs().doc(db(), "fantasyWeekly", tid, "weeks", wid, "entries", uid);
   const oColl = () => fs().collection(db(), "fantasyOverall", tid, "entries");
   const oRef = uid => fs().doc(db(), "fantasyOverall", tid, "entries", uid);
+  const scoresColl = () => fs().collection(db(), ...prefix, "fantasy", "league", "overallScores");
+  const scoreRef = id => fs().doc(db(), ...prefix, "fantasy", "league", "overallScores", id);
 
   const weekById = id => weeks.find(w => w.id === id) || null;
   const weekOpen = w => ENG.lockState(w, now()) === ENG.OPEN;
@@ -239,6 +257,11 @@
       weeksLoaded = true;
       refresh();
     }, err => { console.warn("fantasy weeks:", err && err.code); weeksLoaded = true; refresh(); }));
+    unsubs.push(F.onSnapshot(scoresColl(), snap => {
+      oScores = snap.docs.map(d => normScore(d.id, d.data())).sort((a, b) => a.at - b.at);
+      oScoresLoaded = true;
+      refresh();
+    }, err => { console.warn("overall scores:", err && err.code); oScoresLoaded = true; refresh(); }));
     const me = myUid();
     if (me) unsubs.push(F.onSnapshot(oRef(me), snap => {
       oMine = snap.exists() ? normOEntry(snap.id, snap.data()) : null;
@@ -257,6 +280,7 @@
     cfg = normCfg(null); cfgLoaded = false;
     weeks = []; weeksLoaded = false;
     oMine = null; oMineLoaded = false; oAll = []; oAllLoaded = false;
+    oScores = []; oScoresLoaded = false; oDraft = null; oFill = null;
     myWeekCache.clear();
     B = null; draft = null; assign = null;
     // A new account (or tournament) starts on the front tabs, not wherever the
@@ -388,7 +412,7 @@
       return tab("team", "🧢 My Team", UI.oTab, "data-fs-otab")
         + tab("board", "🏆 Leaderboard", UI.oTab, "data-fs-otab")
         + ((st === "swaps" || st === "closed" || canEdit()) ? tab("teams", "👥 All Teams", UI.oTab, "data-fs-otab") : "")
-        + (canEdit() ? tab("season", "⚙️ Season", UI.oTab, "data-fs-otab") : "");
+        + (canEdit() ? tab("scores", "📝 Scores", UI.oTab, "data-fs-otab") + tab("season", "⚙️ Season", UI.oTab, "data-fs-otab") : "");
     }
     return "";
   }
@@ -772,7 +796,7 @@
         <label style="flex:1 1 190px">Max from one team <span class="hint">(blank = no limit)</span><input type="number" min="1" max="15" id="fsWCap" value="${f.maxPerTeam || ""}" placeholder="no limit"/></label>
       </div>
       <label>Teams lock at<input type="datetime-local" id="fsWLock" value="${toLocalInput(f.lockAt)}"/></label>
-      <p class="hint">Before this moment members pick and change their team; after it nobody can, editors included. Set it before the week's first match. Overall teams are also frozen for this week at the same moment.</p>
+      <p class="hint">Before this moment members pick and change their team; after it nobody can, editors included. Set it before the week's first match.</p>
       <div class="form-row">
         <button class="btn btn-red" data-fs-save-week>${f.id ? "Save week" : "Open week"}</button>
         <button class="btn btn-dark" data-fs-back>Cancel</button>
@@ -798,7 +822,7 @@
       else {
         const id = "w" + Date.now().toString(36);
         await fs().setDoc(weekRef(id), { ...data, performance: {}, hasResults: false, standings: null,
-          overallStandings: null, createdAt: Date.now(), createdBy: (H().user.email || "") });
+          createdAt: Date.now(), createdBy: (H().user.email || "") });
       }
       say(f.id ? "Week updated" : "Week opened", "good");
       UI.wForm = null; UI.wView = "list";
@@ -812,7 +836,7 @@
   }
   async function deleteWeek(id) {
     const w = weekById(id); if (!w) return;
-    if (!confirm(`Delete ${w.label || "this week"}, its scores and every team picked for it? Overall points from it go too. This can't be undone.`)) return;
+    if (!confirm(`Delete ${w.label || "this week"}, its scores and every team picked for it? This can't be undone.`)) return;
     try {
       const s = await fs().getDocs(wEntryColl(id));
       const batch = fs().writeBatch(db());
@@ -870,7 +894,7 @@
     let html = `<div class="fan-builder-head"><button class="btn btn-dark btn-mini fan-back" data-fs-back>‹ Weeks</button>
       <div class="fan-builder-title">${esc(w.label || "Week")} · scores</div>${stateChipWeek(w)}</div>
       <div class="card"><h3>Runs &amp; wickets this week</h3>
-      <p class="hint">Points = runs + wickets × 10. Update through the week as matches finish - saving doesn't reveal anything; <b>publishing</b> puts the week on both the Weekly and Overall leaderboards.</p>
+      <p class="hint">Points = runs + wickets × 10. Update through the week as matches finish - saving doesn't reveal anything; <b>publishing</b> puts the week on the Weekly leaderboard. (Overall has its own sheet.)</p>
       <div class="form-row"><button class="btn btn-dark btn-mini" data-fs-fill-daily="${w.id}" title="Adds up every daily match dated ${esc(dateRange(w) || "in this week")}">⬇ Fill from daily matches${w.startDate ? ` (${esc(dateRange(w))})` : ""}</button></div>
       <div class="fan-results">`;
     pool().teams.forEach(t => {
@@ -950,27 +974,21 @@
       // editor pressed the button, not whatever a listener happened to hold.
       const ws = await fs().getDocs(wEntryColl(w.id));
       const wList = ws.docs.map(d => normWEntry(d.id, d.data()));
-      let oList = [];
-      if (cfg.modes.overall && ENG.countsForOverall(cfg.overall, scored)) {
-        const os = await fs().getDocs(oColl());
-        oList = os.docs.map(d => normOEntry(d.id, d.data()));
-      }
       const standings = ENG.standingsFor(scored, wList);
-      const overallStandings = ENG.overallStandingsFor(cfg.overall, scored, oList);
       await fs().setDoc(weekRef(w.id), {
-        performance: perf, standings, overallStandings, hasResults: true,
+        performance: perf, standings, hasResults: true,
         publishedAt: Date.now(), publishedBy: (H().user.email || ""),
       }, { merge: true });
-      say(`Published - ${standings.length} weekly team${standings.length === 1 ? "" : "s"}${overallStandings.length ? `, ${overallStandings.length} overall` : ""}`, "good");
+      say(`Published - ${standings.length} weekly team${standings.length === 1 ? "" : "s"}`, "good");
     } catch (e) {
       console.error(e); say("Couldn't save the scores", "bad");
     } finally { saving = false; flush(); refresh(true); }
   }
   async function unpublishWeek() {
     const w = weekById(UI.weekId); if (!w) return;
-    if (!confirm("Take this week's points off both leaderboards? The scores are kept.")) return;
+    if (!confirm("Take this week's points off the Weekly leaderboard? The scores are kept.")) return;
     try {
-      await fs().setDoc(weekRef(w.id), { hasResults: false, standings: null, overallStandings: null, publishedAt: 0 }, { merge: true });
+      await fs().setDoc(weekRef(w.id), { hasResults: false, standings: null, publishedAt: 0 }, { merge: true });
       say("Unpublished", "good");
     } catch (e) { console.error(e); say("Couldn't unpublish", "bad"); }
   }
@@ -997,10 +1015,11 @@
     // device, say) falls back to My Team. Rendering the team page while the
     // tab still read "season" swallowed every Build / Swap click silently.
     const st = seasonSt();
-    if ((UI.oTab === "season" && !canEdit()) || (UI.oTab === "teams" && !canEdit() && st !== "swaps" && st !== "closed")) {
+    if (((UI.oTab === "season" || UI.oTab === "scores") && !canEdit()) || (UI.oTab === "teams" && !canEdit() && st !== "swaps" && st !== "closed")) {
       UI.oTab = "team";
     }
     if (UI.oTab === "season") return seasonFormHtml();
+    if (UI.oTab === "scores") return scoresSheetHtml();
     if (UI.oTab === "board") return overallBoardHtml();
     if (UI.oTab === "teams") return overallTeamsHtml();
     if (UI.oView === "build") return overallBuilderHtml();
@@ -1014,7 +1033,7 @@
   }
 
   function myOverallTotal() {
-    return ENG.weekSeasonRows(weeks, "overallStandings").find(r => r.key === myUid()) || null;
+    return oMine ? ENG.overallStandings(oScores, [oMine])[0] : null;
   }
 
   function overallTeamHtml() {
@@ -1047,16 +1066,16 @@
           ${left ? `<button class="btn btn-red" data-fs-start-swap>Make a swap</button>` : `<span class="hint">Your team is final.</span>`}` : ""}
         ${st === "closed" ? `<span class="hint">The season is over - this is your final team.</span>` : ""}
       </div></div>`;
-    if (!final && st === "swaps" && left) html += `<p class="hint fs-note">A swap counts from the next week that locks - never for points already scored.</p>`;
+    if (!final && st === "swaps" && left) html += `<p class="hint fs-note">A swap counts for matches that start after you make it - never for points already scored.</p>`;
     html += breakdownHtml(oMine) + historyHtml(oMine);
     return html;
   }
 
   function breakdownHtml(e) {
-    const rows = ENG.overallBreakdown(cfg.overall, weeks, e, now());
+    const rows = ENG.overallTimeline(oScores, e);
     if (!rows.length) return "";
-    return `<div class="card"><h3>Points by week</h3><table class="fan-table"><thead><tr><th>Week</th><th class="num">Points</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><td>${esc(r.label || "Week")}${r.published ? "" : ` <span class="hint">(live)</span>`}</td><td class="num strong">${fmtPts(r.pts)}</td></tr>`).join("")}</tbody></table></div>`;
+    return `<div class="card"><h3>Points by update</h3><table class="fan-table"><thead><tr><th>Update</th><th class="num">Points</th></tr></thead>
+      <tbody>${rows.slice().reverse().map(r => `<tr><td>${esc(r.label || "Update")} <span class="hint">${esc(whenLabel(r.at))}</span></td><td class="num strong">${r.pts < 0 ? "" : "+"}${fmtPts(r.pts)}</td></tr>`).join("")}</tbody></table></div>`;
   }
   function historyHtml(e) {
     const h = e.history || [];
@@ -1155,33 +1174,17 @@
     catch (e) { console.error(e); say("Couldn't withdraw it", "bad"); }
   }
 
-  /* Live points for a locked week that isn't published yet, so the board moves
-     through the week instead of jumping on publish night. */
-  function liveWeek() {
-    return weeks.filter(w => !w.hasResults && w.lockAt && w.lockAt <= now() && ENG.countsForOverall(cfg.overall, w))
-      .sort((a, b) => b.lockAt - a.lockAt)[0] || null;
-  }
   function overallBoardHtml() {
-    const rows = ENG.weekSeasonRows(weeks, "overallStandings");
-    const live = liveWeek();
-    if (live && oAllLoaded) {
-      const byKey = new Map(rows.map(r => [r.key, r]));
-      oAll.forEach(e => {
-        const pts = ENG.entryPoints(live, ENG.versionAt(e, live.lockAt));
-        const r = byKey.get(e.id) || { key: e.id, name: e.name, photo: e.photo, total: 0, days: 0 };
-        r.live = pts;
-        byKey.set(e.id, r);
-      });
-      const merged = [...byKey.values()].sort((a, b) => ((b.total + (b.live || 0)) - (a.total + (a.live || 0))));
-      return `<div class="card"><div class="fan-card-head"><h3>🏆 Overall standings</h3></div>
-        <p class="hint">Includes <b>${esc(live.label || "this week")}</b> live - it's scored but not published yet.</p>
-        ${boardTableHtml(merged, [
-          { h: "Published", v: r => fmtPts(r.total) },
-          { h: "Live", v: r => (r.live != null ? "+" + fmtPts(r.live) : "-") },
-          { h: "Total", v: r => fmtPts(r.total + (r.live || 0)), strong: true }])}</div>`;
-    }
-    return `<div class="card"><div class="fan-card-head"><h3>🏆 Overall standings</h3></div>
-      ${boardTableHtml(rows, [{ h: "Wks", v: r => r.days }, { h: "Total", v: r => fmtPts(r.total), strong: true }])}</div>`;
+    const head = `<div class="card"><div class="fan-card-head"><h3>🏆 Overall standings</h3></div>`;
+    const last = oScores[oScores.length - 1];
+    if (!oScoresLoaded) return head + `<p class="hint">Loading…</p></div>`;
+    if (!last) return head + `<p class="hint">No points yet - they appear when the first score update is published.</p></div>`;
+    const st = seasonSt();
+    if (!canEdit() && st !== "swaps" && st !== "closed") return head + `<p class="hint">🔒 Standings appear when teams lock.</p></div>`;
+    if (!oAllLoaded) return head + `<p class="hint">Loading teams…</p></div>`;
+    const rows = ENG.overallStandings(oScores, oAll);
+    return head + `<p class="hint">Last update: <b>${esc(last.label || "Update")}</b> · ${esc(whenLabel(last.at))}</p>
+      ${boardTableHtml(rows, [{ h: "Last update", v: r => (r.last < 0 ? "" : "+") + fmtPts(r.last) }, { h: "Total", v: r => fmtPts(r.total), strong: true }])}</div>`;
   }
 
   function overallTeamsHtml() {
@@ -1189,7 +1192,7 @@
     if (!canEdit() && st !== "swaps" && st !== "closed") return `<div class="card"><p class="hint">🔒 Everyone's teams appear when teams lock.</p></div>`;
     if (!oAllLoaded) return `<div class="card"><p class="hint">Loading teams…</p></div>`;
     if (!oAll.length) return `<div class="card"><p class="hint">Nobody has built a season team yet.</p></div>`;
-    const totals = new Map(ENG.weekSeasonRows(weeks, "overallStandings").map(r => [r.key, r.total]));
+    const totals = new Map(ENG.overallStandings(oScores, oAll).map(r => [r.key, r.total]));
     return `<div class="fan-teams-grid">${oAll.slice().sort((a, b) => (totals.get(b.id) || 0) - (totals.get(a.id) || 0)).map(e => `
       <div class="card fan-team-card ${e.id === myUid() ? "is-me" : ""}">
         <div class="fan-tc-head">${avatar(e.name, e.photo)}
@@ -1199,6 +1202,201 @@
         <div class="fs-team-foot"><span class="fs-swaps-pill ${ENG.swapsLeft(cfg.overall, e) ? "" : "is-out"}">🔁 ${e.swapsUsed || 0}/${cfg.overall.maxSwaps} swaps used</span>
           ${canEdit() ? `<button class="icon-btn del" data-fs-del-oentry="${e.id}" title="Remove this team">✕</button>` : ""}</div>
       </div>`).join("")}</div>`;
+  }
+
+  /* ---- Overall scores (editors) ----
+     The sheet holds SEASON TOTALS, exactly as the stats sheet shows them. Each
+     publish adds an update doc; the engine scores what changed since the last
+     one. Publishing never touches anyone's team. */
+  function latestTotals() {
+    const out = {};
+    oScores.forEach(u => Object.assign(out, u.totals));
+    return out;
+  }
+  const seasonPts = v => (Number(v && v.runs) || 0) + (Number(v && v.wickets) || 0) * 10;
+  const signed = n => (n > 0 ? "+" : "") + fmtPts(n);
+  const blankDraft = () => ({ label: null, teamsAt: null, source: "manual", baseline: false, vals: {} });
+  // Until the editor says otherwise, an update's gains are scored with the
+  // teams as they were when the previous update went out (or at the lock).
+  function defaultTeamsAt() {
+    const last = oScores[oScores.length - 1];
+    return last ? last.at : (cfg.overall.lockAt || 0);
+  }
+
+  function scoresSheetHtml() {
+    if (!oScoresLoaded) return `<div class="card"><p class="hint">Loading scores…</p></div>`;
+    const base = latestTotals();
+    const inPool = new Set(pool().players.map(p => p.id));
+    const orphans = Object.keys(base).filter(pid => !inPool.has(pid));
+    const d = oDraft || blankDraft();
+    let html = `<div class="card fan-intro"><h3>Season scores</h3>
+      <p class="hint">Enter every player's <b>season totals so far</b> - runs and wickets exactly as the stats sheet shows them - then publish. Each update scores what changed since the previous one: 1 per run, 10 per wicket, captain 2×, vice-captain 1.5×. Only Overall uses this sheet - Daily and Weekly keep their own.</p>
+      <div class="form-row"><button class="btn btn-dark btn-mini" data-fo-fill>⬇ Fill from stats sheet</button>
+        ${oDraft ? `<button class="btn btn-dark btn-mini" data-fo-discard>↺ Discard changes</button>` : ""}</div></div>`;
+    html += fillReportHtml();
+    html += `<div class="card"><h3>Runs &amp; wickets - season totals</h3><div class="fan-results">`;
+    pool().teams.forEach(t => {
+      const ps = pool().players.filter(p => p.teamId === t.id);
+      if (!ps.length) return;
+      html += `<div class="fan-results-team"><div class="fan-pool-team-name">${esc(t.name)}</div>${ps.map(p => oScoreRowHtml(p.id, p.name, base)).join("")}</div>`;
+    });
+    if (orphans.length) {
+      html += `<div class="fan-results-team"><div class="fan-pool-team-name">No longer in the pool</div>${orphans.map(pid => oScoreRowHtml(pid, pname(pid), base)).join("")}</div>`;
+    }
+    html += `</div>
+      ${oScores.length ? "" : `<label class="fan-check"><input type="checkbox" id="foBaseline" ${d.baseline ? "checked" : ""}/>
+        <span><b>Starting point only</b> - record these totals as the baseline and score nothing. Tick this only if the sheet already includes matches played <i>before</i> Overall teams locked.</span></label>`}
+      <div class="fan-publish-bar">
+        <label class="fo-label">Update name<input id="foLabel" value="${esc(d.label != null ? d.label : `Update ${oScores.length + 1}`)}" placeholder="e.g. After match 12"/></label>
+        <label class="fo-label">Teams as they stood at<input type="datetime-local" id="foTeamsAt" value="${esc(d.teamsAt != null ? d.teamsAt : toLocalInput(defaultTeamsAt()))}"/></label>
+        <button class="btn btn-red" data-fo-publish>📣 Publish update</button>
+      </div>
+      <p class="hint">Set <b>Teams as they stood at</b> to when the first match in this update started: swaps made before then count for these runs &amp; wickets, swaps made after don't. Left as it is, it's when the last update went out.</p></div>`;
+    return html + updatesListHtml();
+  }
+  function oScoreRowHtml(pid, name, base) {
+    const b = base[pid] || null;
+    const typed = oDraft && oDraft.vals[pid];
+    const runs = typed ? typed.runs : (b ? String(b.runs) : "");
+    const wkts = typed ? typed.wickets : (b ? String(b.wickets) : "");
+    return `<div class="fan-res-row"><span class="frr-name">${esc(name)}</span>
+      <div class="frr-inputs">
+        <input type="number" min="0" inputmode="numeric" data-fo-runs="${pid}" value="${esc(runs)}" placeholder="runs"/>
+        <input type="number" min="0" inputmode="numeric" data-fo-wkts="${pid}" value="${esc(wkts)}" placeholder="wkts"/>
+        <span class="frr-pts fo-pts" data-fo-rowpts="${pid}">${rowPtsHtml(runs, wkts, b)}</span>
+      </div></div>`;
+  }
+  /* The player's season points, and what this update adds for him. */
+  function rowPtsHtml(runs, wkts, b) {
+    const pts = (Number(runs) || 0) + (Number(wkts) || 0) * 10;
+    const gain = pts - seasonPts(b);
+    return `${fmtPts(pts)}${gain ? `<span class="fo-gain ${gain < 0 ? "is-neg" : ""}">${signed(gain)}</span>` : ""}`;
+  }
+  function fillReportHtml() {
+    if (!oFill) return "";
+    const list = (title, names) => names.length
+      ? `<details class="fo-miss"><summary>${title} (${names.length})</summary><p class="hint">${names.map(esc).join(", ")}</p></details>` : "";
+    return `<div class="card fo-fill"><p class="hint">⬇ Filled <b>${oFill.matched}</b> player${oFill.matched === 1 ? "" : "s"} from the stats sheet. Check the numbers, then publish.</p>
+      ${list("In the pool but not on the sheet - type these in", oFill.missing)}
+      ${list("On the sheet but not in the pool", oFill.extra)}</div>`;
+  }
+  function updatesListHtml() {
+    if (!oScores.length) return `<div class="card"><h3>Published updates</h3><p class="hint">None yet. The first update counts every run and wicket on the sheet.</p></div>`;
+    const lastId = oScores[oScores.length - 1].id;
+    return `<div class="card"><h3>Published updates</h3><ul class="fs-hist">${oScores.slice().reverse().map(u => `
+      <li class="fo-upd"><span><span class="fs-hist-when">${esc(whenLabel(u.at))}</span> <b>${esc(u.label || "Update")}</b>
+        <span class="hint">· ${u.baseline ? "starting point" : u.source === "sheet" ? "from stats sheet" : "typed in"}${u.changed ? ` · ${u.changed} player${u.changed === 1 ? "" : "s"} changed` : ""}${u.teamsAt && !u.baseline ? ` · teams as at ${esc(whenLabel(u.teamsAt))}` : ""}</span></span>
+        ${u.id === lastId ? `<button class="icon-btn del" data-fo-del="${u.id}" title="Remove this update">✕</button>` : ""}</li>`).join("")}</ul></div>`;
+  }
+
+  /* The viewed tournament's stats sheet, as series.js resolves it: HCCL
+     seasons from the season archive, everything else from its imported sheet
+     (falling back to a bundled one). -> [{ name, team, runs, wickets }] */
+  async function statsSheetPlayers() {
+    const S = window.HCCLSeries, A = window.HCCLSeasonArchive;
+    if (!A) return null;
+    const m = (S && S.list ? S.list() : []).find(x => x.id === tid)
+      || (tid === LEGACY_TID ? { id: tid, legacy: true, season: 6 } : { id: tid });
+    let rows = null;
+    if (m.legacy || m.archive === "hccl") {
+      const no = m.season || (m.legacy ? 6 : null);
+      rows = no ? A.seasonRows(no) : null;
+    } else {
+      let csv = "";
+      try {
+        const snap = await fs().getDoc(fs().doc(db(), "tournaments", tid, "stats", "sheet"));
+        const d = snap.exists() ? snap.data() : null;
+        csv = (d && typeof d.csv === "string") ? d.csv : "";
+      } catch (e) { console.warn("stats sheet:", e && e.code); }
+      if (!csv.trim()) csv = A.tournamentCsv(tid, m.name) || "";
+      rows = csv.trim() ? A.rowsFromCsv(csv) : null;
+    }
+    return rows && rows.length ? A.playersFromRows(rows) : null;
+  }
+  const nameKey = s => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const sheetNum = v => Math.max(0, Math.round(parseFloat(v) || 0));
+
+  /* Fills the inputs only - nothing is saved until Publish. Pool players are
+     matched to sheet rows by name; the team breaks a tie between namesakes. */
+  async function fillFromStats() {
+    let list = null;
+    try { list = await statsSheetPlayers(); } catch (e) { console.warn(e); }
+    if (!list || !list.length) { say("No stats sheet found for this tournament - import one on its Stats page first", "bad"); return; }
+    const byName = new Map();
+    list.forEach((s, i) => {
+      const k = nameKey(s.name); if (!k) return;
+      if (!byName.has(k)) byName.set(k, []);
+      byName.get(k).push(i);
+    });
+    const used = new Set(), missing = [], vals = {};
+    pool().players.forEach(p => {
+      const hits = byName.get(nameKey(p.name)) || [];
+      const i = hits.length === 1 ? hits[0] : hits.find(j => nameKey(list[j].team) === nameKey(teamName(p.teamId)));
+      if (i == null) { missing.push(p.name); return; }
+      used.add(i);
+      vals[p.id] = { runs: String(sheetNum(list[i].runs)), wickets: String(sheetNum(list[i].wickets)) };
+    });
+    const extra = list.filter((s, i) => !used.has(i) && nameKey(s.name)).map(s => s.name + (s.team ? ` (${s.team})` : ""));
+    const d = oDraft || blankDraft();
+    oDraft = { ...d, source: "sheet", vals: { ...d.vals, ...vals } };
+    oFill = { matched: Object.keys(vals).length, missing, extra };
+    say(`Filled ${oFill.matched} player${oFill.matched === 1 ? "" : "s"} from the stats sheet - check, then publish`, oFill.matched ? "good" : "bad");
+    refresh(true);
+  }
+
+  async function publishScores() {
+    if (!canEdit()) return;
+    const base = latestTotals();
+    const totals = { ...base };
+    let changed = 0;
+    // A blank box keeps the player's previous figure; it never zeroes him.
+    const pick = (s, prev) => (s === "" || s == null) ? (Number(prev) || 0) : Math.max(0, Math.round(Number(s) || 0));
+    Object.entries((oDraft && oDraft.vals) || {}).forEach(([pid, v]) => {
+      const b = base[pid];
+      if (!b && (v.runs === "" || v.runs == null) && (v.wickets === "" || v.wickets == null)) return;   // never touched
+      const next = { runs: pick(v.runs, b && b.runs), wickets: pick(v.wickets, b && b.wickets) };
+      if (next.runs !== ((b && b.runs) || 0) || next.wickets !== ((b && b.wickets) || 0)) changed++;
+      totals[pid] = next;
+    });
+    if (!changed) { say("Nothing changed since the last update", "bad"); return; }
+    const labelEl = document.getElementById("foLabel");
+    const label = ((labelEl && labelEl.value) || "").trim().slice(0, 60) || `Update ${oScores.length + 1}`;
+    const baselineEl = document.getElementById("foBaseline");
+    const baseline = !oScores.length && !!(baselineEl && baselineEl.checked);
+    // The input only has minute precision: left at its default, keep the exact time.
+    const def = defaultTeamsAt(), taEl = document.getElementById("foTeamsAt");
+    const taVal = taEl ? taEl.value : "";
+    const teamsAt = (!taVal || taVal === toLocalInput(def)) ? def : fromLocalInput(taVal);
+    await syncClock();
+    if (teamsAt > now()) { say("“Teams as they stood at” can't be in the future", "bad"); return; }
+    const st = seasonSt();
+    const warn = (st === "setup" || st === "open") && !baseline
+      ? "\n\n⚠ Teams haven't locked yet - members can still rebuild with these scores in view." : "";
+    const what = baseline ? "It records the starting totals and scores nothing." : "Everyone's Overall points update straight away.";
+    if (!confirm(`Publish "${label}"? ${changed} player${changed === 1 ? "" : "s"} changed. ${what}${warn}`)) return;
+    const id = "u" + Date.now().toString(36);
+    const data = {
+      at: Math.round(now()), label, source: (oDraft && oDraft.source) || "manual",
+      totals, changed, createdBy: (H().user.email || ""), createdAt: Date.now(),
+    };
+    if (teamsAt > 0) data.teamsAt = Math.round(teamsAt);
+    if (baseline) data.baseline = true;
+    saving = true;
+    try {
+      await fs().setDoc(scoreRef(id), data);
+      oDraft = null; oFill = null;
+      say(baseline ? "Starting point recorded" : `Published - ${changed} player${changed === 1 ? "" : "s"} updated`, "good");
+    } catch (e) {
+      console.error(e);
+      say(e && e.code === "permission-denied" ? "The server refused it - only admins and moderators can publish scores" : "Couldn't publish the update", "bad");
+    } finally { saving = false; flush(); refresh(true); }
+  }
+  async function deleteScoreUpdate(id) {
+    const u = oScores[oScores.length - 1];
+    if (!u || u.id !== id) { say("Only the latest update can be removed", "bad"); return; }
+    if (!confirm(`Remove "${u.label || "this update"}"? Its points come off everyone's Overall total. Teams aren't affected.`)) return;
+    try { await fs().deleteDoc(scoreRef(id)); say("Update removed", "good"); }
+    catch (e) { console.error(e); say("Couldn't remove it", "bad"); }
   }
 
   /* ---- season settings (editors) ---- */
@@ -1214,7 +1412,7 @@
         <label style="flex:1 1 190px">Max from one team <span class="hint">(blank = no limit)</span><input type="number" min="1" max="15" id="fsOCap" value="${o.maxPerTeam || ""}" placeholder="no limit"/></label>
       </div>
       <label>Teams lock at<input type="datetime-local" id="fsOLock" value="${toLocalInput(o.lockAt)}"/></label>
-      <p class="hint">Until then members build and rebuild freely. From then on, swaps only. Set it before the first week's lock - a week that locks before the season does isn't counted in Overall.</p>
+      <p class="hint">Until then members build and rebuild freely. From then on, swaps only. Points come from <b>📝 Scores</b> - publish the first update once teams have locked.</p>
       <label class="fan-check"><input type="checkbox" id="fsOFreeCap" ${o.freeCaptaincy ? "checked" : ""}/>
         <span><b>Free captaincy changes</b> - let members move captain / vice-captain without spending a swap (until their swaps run out). Off: the armbands can only move in the same submission as a swap.</span></label>
       <div class="form-row">
@@ -1333,10 +1531,15 @@
     if (t.closest("[data-fs-lock-season]")) return lockSeasonNow();
     if (t.closest("[data-fs-close-season]")) return closeSeason(true);
     if (t.closest("[data-fs-reopen-season]")) return closeSeason(false);
+    if (t.closest("[data-fo-fill]")) return fillFromStats();
+    if (t.closest("[data-fo-discard]")) { oDraft = null; oFill = null; return refresh(true); }
+    if (t.closest("[data-fo-publish]")) return publishScores();
+    if ((m = t.closest("[data-fo-del]"))) return deleteScoreUpdate(m.getAttribute("data-fo-del"));
   }
   function onChange(e) {
     const t = e.target;
     if (t && t.matches && t.matches("[data-fs-mode-toggle]")) toggleMode(t.getAttribute("data-fs-mode-toggle"), t.checked);
+    if (t && t.id === "foBaseline") { oDraft = oDraft || blankDraft(); oDraft.baseline = t.checked; }
   }
   function onInput(e) {
     const t = e.target;
@@ -1349,6 +1552,18 @@
       const out = root.querySelector(`[data-fs-rowpts="${pid}"]`);
       if (out) out.textContent = fmtPts(r + k * 10);
     }
+    // Overall sheet: keep what's typed so a snapshot re-render can't wipe it.
+    if (t.matches("[data-fo-runs], [data-fo-wkts]")) {
+      const pid = t.getAttribute("data-fo-runs") || t.getAttribute("data-fo-wkts");
+      const root = document.getElementById("fan-body");
+      const r = root.querySelector(`[data-fo-runs="${pid}"]`), k = root.querySelector(`[data-fo-wkts="${pid}"]`);
+      oDraft = oDraft || blankDraft();
+      oDraft.vals[pid] = { runs: r ? r.value : "", wickets: k ? k.value : "" };
+      const out = root.querySelector(`[data-fo-rowpts="${pid}"]`);
+      if (out) out.innerHTML = rowPtsHtml(oDraft.vals[pid].runs, oDraft.vals[pid].wickets, latestTotals()[pid]);
+    }
+    if (t.id === "foLabel") { oDraft = oDraft || blankDraft(); oDraft.label = t.value; }
+    if (t.id === "foTeamsAt") { oDraft = oDraft || blankDraft(); oDraft.teamsAt = t.value; }
     if (t.id === "fsTeamName" && draft) { draft.teamName = t.value; draft.dirty = true; }
   }
 
