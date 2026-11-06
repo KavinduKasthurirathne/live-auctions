@@ -112,7 +112,7 @@ window.HCCL_ASSETS = {
       "london originals": "assets/Test Championship Logos/London Originals.jpeg",
       "the cartel": "assets/Test Championship Logos/The Cartel.jpeg",
       "dawn breakers": "assets/County Championship Logos/Dawn Breakers.jpg",
-      "dragoz legends": "assets/County Championship Logos/Dragoz Legends.jpg",
+      "dragonz legends": "assets/County Championship Logos/Dragonz Legends.jpg",
       "hellfire warriors": "assets/County Championship Logos/Hellfire Warriors.jpg",
       "knights kingdom": "assets/County Championship Logos/Knights Kingdom.jpg",
       "legendary demons": "assets/County Championship Logos/Legendary Demons.jpg",
