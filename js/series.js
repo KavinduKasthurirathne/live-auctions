@@ -83,20 +83,21 @@
     },
     {
       id: "solo-knockout-championship-s01", name: "Solo Knockout Championship S01", short: "SKC S1",
-      logo: encodeURI("assets/Tournament Logos/Solo Knockout S1.png"),
+      logo: encodeURI("assets/Tournament Logos/Solo Knockout Cricket Championship S1.png"),
       duration: "13 MAY 2026 - 14 MAY 2026", status: "completed",
       statsOnly: true, solo: true, order: 5.3, createdAt: 0,
       honors: { champion: "Chathuka Lakshan", runnerUp: "Nehan Fernando", mvp: "Chathuka Lakshan" },
     },
     {
       id: "hc-county-rising-league-s01", name: "HC County Rising League S01", short: "CRL S1",
-      logo: encodeURI("assets/Tournament Logos/HC County Rising League S1.png"),
+      logo: encodeURI("assets/Tournament Logos/HC County Rising League Crest.png"),
       duration: "MAY 2026 - JUN 2026", status: "completed",
       statsOnly: true, order: 5.5, createdAt: 0,
       honors: { champion: "Nova Rising Force", runnerUp: "Knights of Future", mvp: "Sandun Chinthana" },
     },
     {
-      id: "hc-county-legends-league-s01", name: "HC County Legends League S01", short: "CLL S1", logo: "",
+      id: "hc-county-legends-league-s01", name: "HC County Legends League S01", short: "CLL S1",
+      logo: encodeURI("assets/Tournament Logos/HC County Legends League Crest.png"),
       duration: "MAY 2026 - JUN 2026", status: "completed",
       statsOnly: true, order: 5.6, createdAt: 0,
       honors: { champion: "Zyther Legends", runnerUp: "Legend Strikers", mvp: "Udara Perera" },
@@ -703,9 +704,12 @@
 
   function logoHtml(m) {
     const A = window.HCCLSeasonArchive;
-    // Meta logo (admin-uploaded dataURL or seeded asset path) wins; else the
-    // committed tournament badge matched by name; else initials.
-    const logo = m.logo || (A && A.tournamentLogo && A.tournamentLogo(m.name)) || "";
+    // Meta logo (admin-uploaded dataURL or seeded asset path) wins - unless it's
+    // a bundled file that has since been renamed; else the committed badge
+    // matched by season / name; else initials.
+    const no = m.season || (m.legacy ? 6 : 0);
+    const logo = (A && A.logoFor ? A.logoFor(m.logo, m.name, no)
+      : m.logo || (A && A.tournamentLogo && A.tournamentLogo(m.name))) || "";
     const style = logo ? ` style="background-image:url('${logo}')"` : "";
     const text = logo ? "" : esc((m.short || m.name || "?").trim().slice(0, 3).toUpperCase());
     return `<div class="series-logo"${style}>${text}</div>`;

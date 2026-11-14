@@ -8,12 +8,12 @@
    Consumers: season-archive.js, fantasy.js.
    ============================================================ */
 window.HCCL_ASSETS = {
-    "generatedAt": "2026-11-01",
+    "generatedAt": "2026-11-14",
     "counts": {
-      "players": 52,
+      "players": 54,
       "teamLogos": 62,
       "seasonLogos": 7,
-      "tournamentLogos": 11
+      "tournamentLogos": 13
     },
     "playerPhotoIndex": {
       "anupam rivisara": "assets/Players/Anupam Rivisara.png",
@@ -58,6 +58,8 @@ window.HCCL_ASSETS = {
       "shenal theekshana": "assets/Players/Shenal Theekshana.png",
       "thenu pabeesha": "assets/Players/Thenu Pabeesha.png",
       "thilanga dumindu": "assets/Players/Thilanga Dumindu.png",
+      "thisaga ranthisa": "assets/Players/Thisaga Ranthisa.png",
+      "thisaru thathsara": "assets/Players/Thisaru Thathsara.png",
       "thulanja theekshana": "assets/Players/Thulanja Theekshana.png",
       "udara perera": "assets/Players/Udara Perera.png",
       "umesh anjana": "assets/Players/Umesh Anjana.png",
@@ -67,9 +69,7 @@ window.HCCL_ASSETS = {
       "wenura sandeepa": "assets/Players/Wenura Sandeepa.png",
       "yasantha ruwan": "assets/Players/Yasantha Ruwan.png",
       "yasitha nawod": "assets/Players/Yasitha Nawod.png",
-      "yathish leyon": "assets/Players/Yathish Leyon.png",
-      "thisanga ranthisa": "assets/Players/Thisanga Ranthisa.png",
-      "thisaru thathsara": "assets/Players/Thisaru Thathsara.png"
+      "yathish leyon": "assets/Players/Yathish Leyon.png"
     },
     "teamLogoIndex": {
       "aura dynasty": "assets/HCCL Team Logos/Aura Dynasty.jpeg",
@@ -188,7 +188,7 @@ window.HCCL_ASSETS = {
       "County Championship Logos": {
         "apex risers": "assets/County Championship Logos/Apex Risers.jpg",
         "dawn breakers": "assets/County Championship Logos/Dawn Breakers.jpg",
-        "dragoz legends": "assets/County Championship Logos/Dragoz Legends.jpg",
+        "dragonz legends": "assets/County Championship Logos/Dragonz Legends.jpg",
         "hellfire warriors": "assets/County Championship Logos/Hellfire Warriors.jpg",
         "knights kingdom": "assets/County Championship Logos/Knights Kingdom.jpg",
         "legendary demons": "assets/County Championship Logos/Legendary Demons.jpg",
@@ -230,12 +230,14 @@ window.HCCL_ASSETS = {
     "tournamentLogoIndex": {
       "fatal four logo": "assets/Tournament Logos/Fatal Four Logo.jpeg",
       "hc county league s2": "assets/Tournament Logos/HC County League S2.jpeg",
-      "hc county legends league s1": "assets/Tournament Logos/HC County Legends League S1.jpeg",
-      "hc county rising league s1": "assets/Tournament Logos/HC County Rising League S1.png",
+      "hc county legends league crest": "assets/Tournament Logos/HC County Legends League Crest.png",
+      "hc county rising league crest": "assets/Tournament Logos/HC County Rising League Crest.png",
+      "hc freestyle cricket emblem": "assets/Tournament Logos/HC Freestyle Cricket Emblem.png",
       "hc mini ipl s1": "assets/Tournament Logos/HC Mini IPL S1.png",
+      "hc tag team cricket championship": "assets/Tournament Logos/HC Tag Team Cricket Championship.png",
       "hc test championship": "assets/Tournament Logos/HC Test Championship.jpeg",
-      "solo knockout s1": "assets/Tournament Logos/Solo Knockout S1.png",
-      "solo knockout s2": "assets/Tournament Logos/Solo Knockout S2.png",
+      "solo knockout cricket championship s1": "assets/Tournament Logos/Solo Knockout Cricket Championship S1.png",
+      "solo knockout cricket championship s2": "assets/Tournament Logos/Solo Knockout Cricket Championship S2.png",
       "tag team championship s01": "assets/Tag Team Championship/Tag Team Championship S01.jpeg",
       "tag team championship s02": "assets/Tag Team Championship/Tag Team Championship S02.jpeg",
       "tag team championship s03": "assets/Tag Team Championship/Tag Team Championship S03.jpeg"

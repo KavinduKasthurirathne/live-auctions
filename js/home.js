@@ -175,7 +175,8 @@
         live,
         start: startStamp(t.duration),
         end: endStamp(t.duration),
-        logo: t.logo || (no ? A.seasonLogo(no) : (A.tournamentLogo && A.tournamentLogo(t.name))) || "",
+        logo: (A.logoFor ? A.logoFor(t.logo, t.name, no)
+          : t.logo || (no ? A.seasonLogo(no) : (A.tournamentLogo && A.tournamentLogo(t.name)))) || "",
         league: no ? "HC Champions League" : "",
         title: no ? `Season ${pad2(no)}` : t.name,
         duration: t.duration || "",

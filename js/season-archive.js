@@ -188,14 +188,10 @@
   const PLAYER_PHOTO_INDEX = AM.playerPhotoIndex || {};
   const SEASON_LOGO_INDEX = AM.seasonLogos || {};
   const TOURNAMENT_LOGO_INDEX = AM.tournamentLogoIndex || {};
-  // Tournament badges whose FILE name differs from the registry tournament name.
-  // Anything named after its tournament resolves automatically (see below).
+  // Tournament badges whose FILE name can't be matched to the registry name even
+  // loosely (see logoCanon below - "S01"/"S1", "Crest", "Cricket" etc. need no entry).
   const TOURNAMENT_LOGO_ALIASES = {
     "hc mini ipl 2026": "hc mini ipl s1",
-    "solo knockout championship s01": "solo knockout s1",
-    "solo knockout championship s02": "solo knockout s2",
-    "hc county rising league s01": "hc county rising league s1",
-    "hc county legends league s01": "hc county legends league s1",
   };
   // Encode so the spaces in folder/file names survive inside url()/href.
   const assetUrl = p => encodeURI(p);
@@ -219,12 +215,61 @@
     const p = SEASON_LOGO_INDEX[no];
     return p ? assetUrl(p) : "";
   }
+  /* Badge files get renamed ("Solo Knockout S1" -> "Solo Knockout Cricket
+     Championship S1", "... League S1" -> "... League Crest"), so names are
+     compared loosely: case, "S01"/"Season 1"/"S1", "four"/"4", and filler
+     words like HC / Cricket / Crest / Emblem / Logo don't matter. */
+  const LOGO_FILLER = /\b(hc|cricket|logo|crest|emblem|badge|the)\b/g;
+  function logoCanon(s) {
+    return keyOf(s)
+      .replace(/\bs(?:eason)?\s*0*(\d+)\b/g, "s$1")
+      .replace(/\bfour\b/g, "4")
+      .replace(LOGO_FILLER, " ")
+      .replace(/[^a-z0-9 ]+/g, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+  const SEASON_TAG = /\bs\d+\b/;
+  const squash = s => s.replace(/\s+/g, " ").trim();
+  const noSeason = c => squash(c.replace(/\bs\d+\b/g, " "));
+  const noGeneric = c => squash(c.replace(/\b(championship|league|tournament|series|cup)\b/g, " "));
+  // exact: canonical name -> file. A badge WITHOUT a season tag is the
+  // tournament's generic emblem, so it also answers for any season of it
+  // (bare) and for a differently-worded title (loose). A season-tagged badge
+  // never stands in for another season.
+  const LOGO_TIERS = { exact: {}, bare: {}, loose: {} };
+  Object.keys(TOURNAMENT_LOGO_INDEX).forEach(k => {
+    const c = logoCanon(k);
+    if (!(c in LOGO_TIERS.exact)) LOGO_TIERS.exact[c] = k;
+    if (SEASON_TAG.test(c)) return;
+    if (!(c in LOGO_TIERS.bare)) LOGO_TIERS.bare[c] = k;
+    const g = noGeneric(c);
+    if (g && !(g in LOGO_TIERS.loose)) LOGO_TIERS.loose[g] = k;
+  });
   function tournamentLogo(name) {
-    const k = keyOf(name);
-    // Alias first, then a straight name match (a badge named after its
-    // tournament needs no alias entry).
-    const p = TOURNAMENT_LOGO_INDEX[TOURNAMENT_LOGO_ALIASES[k] || ""] || TOURNAMENT_LOGO_INDEX[k];
-    return p ? assetUrl(p) : "";
+    const k = keyOf(name), c = logoCanon(name);
+    if (!c) return "";
+    const alias = TOURNAMENT_LOGO_ALIASES[k];
+    const hit = (alias && TOURNAMENT_LOGO_INDEX[alias] && alias)
+      || (TOURNAMENT_LOGO_INDEX[k] && k)
+      || LOGO_TIERS.exact[c] || LOGO_TIERS.bare[noSeason(c)] || LOGO_TIERS.loose[noGeneric(noSeason(c))];
+    return hit ? assetUrl(TOURNAMENT_LOGO_INDEX[hit]) : "";
+  }
+
+  /* A logo saved on a registry entry is an admin upload (data URL) or a bundled
+     path a seed wrote. If that bundled file has since been renamed or removed,
+     ignore the stale path and find the badge by season / name instead -
+     otherwise a rename leaves a broken image that never falls back. */
+  const KNOWN_ASSETS = new Set();
+  (function collect(o) {
+    Object.values(o || {}).forEach(v => { if (typeof v === "string") KNOWN_ASSETS.add(v); else if (v && typeof v === "object") collect(v); });
+  })({ a: AM.playerPhotoIndex, b: AM.teamLogoFolders, c: AM.teamLogoIndex, d: AM.seasonLogos, e: AM.tournamentLogoIndex });
+  function logoFor(stored, name, seasonNo) {
+    const s = String(stored || "");
+    let p = s;
+    try { p = decodeURI(s); } catch (e) { /* not URI-encoded */ }
+    const stale = KNOWN_ASSETS.size > 0 && /^assets\//i.test(p) && !KNOWN_ASSETS.has(p);
+    if (s && !stale) return s;
+    return (seasonNo ? seasonLogo(seasonNo) : "") || tournamentLogo(name);
   }
   // A round bubble: team logo / player photo if known, else a colored initial.
   function bubble(kind, value) {
@@ -981,7 +1026,7 @@
         ${podiumItem("runner", "Runner-up", kind, h.runnerUp || "")}
       </div>`;
     },
-    extraItem, bubble, seasonLogo, tournamentLogo,
+    extraItem, bubble, seasonLogo, tournamentLogo, logoFor,
     /* ---- reusable stats-sheet machinery (per-tournament sheets in series.js) ---- */
     // Raw STUMPS exports carry a few preamble rows (app title, tournament
     // name, tour id) before the real header - drop everything above it so
