@@ -735,7 +735,7 @@ window.HCCLAuction = {
 function renderHeader() {
   // The header carries the SITE brand (HC Community), not the viewed tournament -
   // that identity lives in the Series tab and the viewing banner. The brand
-  // badge / favicon stay on the static assets/brand-logo.jpg from index.html.
+  // badge / favicon stay on the static assets/brand-logo.jpeg from index.html.
   document.title = "HC Community";
 }
 

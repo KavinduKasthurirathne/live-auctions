@@ -350,7 +350,7 @@
     // styles.css); the markup is shared with the sign-in gate.
     view.innerHTML = `
       <section class="home-hero">
-        <div class="home-hero-logo" style="background-image:url('assets/brand-logo.jpg')"></div>
+        <div class="home-hero-logo" style="background-image:url('assets/brand-logo.jpeg')"></div>
         <h1 class="home-hero-title">HC COMMUNITY</h1>
         <p class="home-hero-flagline">
           ${flagHtml()}
