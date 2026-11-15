@@ -46,11 +46,23 @@
   // bundled archive) and the scheduled next season. Derived from
   // window.HCCLSeasonArchive so the honors live in ONE place. Used both to
   // seed the cloud registry (once) and as the offline fallback list.
+  // The "coming soon" placeholder is the first season the archive hasn't
+  // completed yet (S06 is the legacy entry): S07 while the archive ends at
+  // S06, S08 once S07's honours are added to SEASONS. A fixed number here
+  // produced TWO hccl-s7 entries the moment S07 was crowned in the archive.
   const NEXT_SEASON = { no: 7, duration: "COMING SOON" };
+  function nextSeasonNo(completed) {
+    const covered = new Set([...completed.map(s => s.no), 6]);
+    let n = 1;
+    while (covered.has(n)) n++;
+    return Math.max(n, NEXT_SEASON.no);
+  }
   function seasonSeeds() {
     const A = window.HCCLSeasonArchive;
     const pad = n => String(n).padStart(2, "0");
-    const seeds = (A ? A.seasons() : []).filter(s => !s.ongoing && s.champion).map(s => ({
+    const completed = (A ? A.seasons() : []).filter(s => !s.ongoing && s.champion);
+    const nextNo = nextSeasonNo(completed);
+    const seeds = completed.map(s => ({
       id: `hccl-s${s.no}`,
       name: `HCCL Season ${pad(s.no)}`, short: `HCCL S${s.no}`,
       logo: (A && A.seasonLogo(s.no)) || "",
@@ -59,10 +71,10 @@
       honors: { champion: s.champion || "", runnerUp: s.runnerUp || "", mvp: s.mvp || "" },
     }));
     seeds.push({
-      id: `hccl-s${NEXT_SEASON.no}`,
-      name: `HCCL Season ${pad(NEXT_SEASON.no)}`, short: `HCCL S${NEXT_SEASON.no}`, logo: "",
+      id: `hccl-s${nextNo}`,
+      name: `HCCL Season ${pad(nextNo)}`, short: `HCCL S${nextNo}`, logo: "",
       duration: NEXT_SEASON.duration, status: "upcoming",
-      archive: "hccl", season: NEXT_SEASON.no, order: NEXT_SEASON.no, createdAt: 0,
+      archive: "hccl", season: nextNo, order: nextNo, createdAt: 0,
       honors: null,
     });
     return seeds;
