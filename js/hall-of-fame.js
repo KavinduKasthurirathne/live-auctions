@@ -79,8 +79,16 @@
     const A = archive();
     const S = series();
     if (!A) return [];
-    const isHccl = t => !!(t.legacy || t.archive === "hccl");
-    const seasonNoOf = t => t.season || (t.legacy ? 6 : 0);
+    // HCCL season number: the registry's own rule (series.js hcclSeasonNo), so a
+    // season an admin created by hand ("HCCL Season 07", no archive tag) still
+    // files under HC Champions League. Only the seasons the bundled archive
+    // actually holds read their stats from it; a newer season with live data
+    // roots uses its own imported sheet like any other tournament.
+    const seasonNoOf = t => (S && S.hcclSeasonNo ? S.hcclSeasonNo(t) : (t.season || (t.legacy ? 6 : 0)));
+    const inArchive = no => !!no && A.seasons().some(s => s.no === no);
+    // The archive has a stats SHEET for this season (bundled CSV or a live
+    // override) - an authored entry alone (honours typed into SEASONS) isn't one.
+    const archiveRows = no => (inArchive(no) && A.seasonRows ? (A.seasonRows(no) || []) : []);
 
     // The registry is the source of truth; if it never loaded, fall back to
     // the bundled archive so the story is still told.
@@ -97,7 +105,10 @@
     // honours fields an editor typed.
     const leadersOf = t => {
       const no = seasonNoOf(t);
-      if (isHccl(t) && no) return A.leaders(no);
+      // An archived season with its own sheet: derived from it (seasons 1-6).
+      if (archiveRows(no).length) return A.leaders(no);
+      // Otherwise (other tournaments, or a newer HCCL season run with live
+      // data roots): its imported / bundled sheet, else the honours fields.
       const h = t.honors || {};
       const lead = { mostRuns: h.mostRuns || "", mostWickets: h.mostWickets || "" };
       const csv = A.tournamentCsv ? A.tournamentCsv(t.id, t.name) : null;
@@ -106,18 +117,24 @@
         lead.mostRuns = der.mostRuns || lead.mostRuns;
         lead.mostWickets = der.mostWickets || lead.mostWickets;
       }
+      // Last resort: values authored for that season in the archive.
+      if (inArchive(no)) {
+        const al = A.leaders(no);
+        lead.mostRuns = lead.mostRuns || al.mostRuns;
+        lead.mostWickets = lead.mostWickets || al.mostWickets;
+      }
       return lead;
     };
 
     const seen = new Set();
     const cards = [];
     list.forEach(t => {
-      const no = isHccl(t) ? seasonNoOf(t) : 0;
+      const no = seasonNoOf(t);
       const s = no ? (A.seasons().find(x => x.no === no) || null) : null;
       const rh = t.honors || {};
       const c = {
         id: t.id, ids: t.ids || [t.id], name: t.name,
-        seasonNo: no, solo: !!t.solo, status: t.status, live: t.status === "live",
+        seasonNo: no, archived: archiveRows(no).length > 0, solo: !!t.solo, status: t.status, live: t.status === "live",
         league: no ? "HC Champions League" : "",
         title: no ? `Season ${pad2(no)}` : t.name,
         duration: t.duration || "",
@@ -245,7 +262,7 @@
     const out = [];
     cards.forEach(c => {
       let rows = null;
-      if (c.seasonNo && A.seasonRows) {
+      if (c.archived && A.seasonRows) {
         rows = A.seasonRows(c.seasonNo);
       } else {
         const ids = c.ids || [c.id];

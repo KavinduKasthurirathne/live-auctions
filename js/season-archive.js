@@ -71,12 +71,19 @@
       } },
     // Ongoing: fill slots in as they're decided. "" (or "TBD") renders a TBD
     // placeholder, so a partly-known bracket is fine - name teams as they qualify.
-    { no: 6, year: "JUN 2026 - JUL 2026", ongoing: true, champion: "", runnerUp: "", mvp: "", mostRuns: "SASINDU MADUSHAN", mostWickets: "CHAMIKA KAUSHILA",
+    { no: 6, year: "JUN 2026 - JUL 2026", champion: "VELOCITY REAPERS", runnerUp: "INVINCIBLE LORDS", mvp: "CHAMIKA KAUSHILA", mostRuns: "ISUKA THISEN", mostWickets: "CHAMIKA KAUSHILA",
       playoffs: {
         q1:    { a: "VELOCITY REAPERS", b: "INVINCIBLE LORDS", winner: "VELOCITY REAPERS" },
         elim:  { a: "SILENTEARZ", b: "SUPER FIRE DRAGONS", winner: "SILENTEARZ" },
         q2:    { winner: "INVINCIBLE LORDS" },
         final: { winner: "VELOCITY REAPERS" },
+      } },
+    { no: 7, year: "SEP 2026 - OCT 2026", champion: "MATRIX", runnerUp: "SUPER FIRE DRAGONS", mvp: "PASINDU DILSHAN", mostRuns: "SADISHA LAKDUL", mostWickets: "PASINDU DILSHAN",
+      playoffs: {
+        q1:    { a: "MATRIX", b: "SUPER FIRE DRAGONS", winner: "MATRIX" },
+        elim:  { a: "INVINCIBLE LORDS", b: "WIZARD TITANS", winner: "INVINCIBLE LORDS" },
+        q2:    { winner: "SUPER FIRE DRAGONS" },
+        final: { winner: "MATRIX" },
       } },
   ];
 

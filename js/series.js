@@ -154,6 +154,16 @@
   // Registry entries that are the same tournament as `m` but a different doc.
   const twinsOf = m => tournaments.filter(t => t.id !== m.id && identityKey(t) === identityKey(m));
 
+  // Season number of an HC Champions League season, however its entry was
+  // made: the seeded ones carry `season`, the legacy entry is S06, and one an
+  // admin created by hand through the form ("HCCL Season 07" - needed to run a
+  // real auction, so it has no archive tag) is recognised by its name, by the
+  // same rule identityKey uses. 0 = not an HCCL season.
+  function hcclSeasonNo(m) {
+    const hit = /^hccl-s(\d+)$/.exec(identityKey(m));
+    return hit ? +hit[1] : 0;
+  }
+
   // Tournaments whose detail hub shows the HCCL season archive: the legacy
   // entry (Season 06), plus the seeded per-season entries tagged archive:"hccl".
   const isHcclFamily = m => !!(m && (m.legacy || m.archive === "hccl"));
@@ -208,6 +218,8 @@
     // Same-tournament identity, so Home can fold duplicate registry entries
     // into a single Hall of Champions card.
     identityKey: m => identityKey(m),
+    // HCCL season number of an entry (0 if it isn't one) - see hcclSeasonNo().
+    hcclSeasonNo: m => hcclSeasonNo(m),
     /* name(lowercased) -> the price he sold for in that tournament's auction.
        Feeds the "Previous price" box on the Setup player form. Cached: one
        getDocs per tournament, per session. */
@@ -725,7 +737,7 @@
     // Meta logo (admin-uploaded dataURL or seeded asset path) wins - unless it's
     // a bundled file that has since been renamed; else the committed badge
     // matched by season / name; else initials.
-    const no = m.season || (m.legacy ? 6 : 0);
+    const no = hcclSeasonNo(m); // also finds a hand-made "HCCL Season 07" -> its S7 badge
     const logo = (A && A.logoFor ? A.logoFor(m.logo, m.name, no)
       : m.logo || (A && A.tournamentLogo && A.tournamentLogo(m.name))) || "";
     const style = logo ? ` style="background-image:url('${logo}')"` : "";
@@ -1174,7 +1186,7 @@
       <header class="t-hero${isViewing && hasDataRoots(m) ? " viewing" : ""}">
         ${logoHtml(m)}
         <div class="t-hero-meta">
-          ${isHcclFamily(m) ? `<p class="eyebrow">HC Champions League</p>` : ""}
+          ${hcclSeasonNo(m) ? `<p class="eyebrow">HC Champions League</p>` : ""}
           <h2>${esc(m.name)}</h2>
           ${m.duration ? `<div class="series-dur">${esc(m.duration)}</div>` : ""}
           <div class="series-chips">${chips}</div>
