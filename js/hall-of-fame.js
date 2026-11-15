@@ -288,8 +288,95 @@
     const cards = honorCards();
     const sheets = effectiveSheets(cards);
     const players = A && A.statLines ? A.statLines(sheets) : new Map();
-    model = { cards, sheets, players };
+    model = { cards, sheets, players, pairs: pairMembers(cards, players) };
     return model;
+  }
+
+  /* ===================== duo / tag-team names ("Kalana & Nehan") =====================
+     A Tag Team Championship crowns a PAIR, and the pair's name is made of its
+     players' names. Nothing else records who was in it, so the members are
+     read from the name: each part maps to a player when it points at exactly
+     ONE person - the full name, or a first name only one player carries
+     (spelling variants of one person - "Anjana"/"Anajana", "Thenu"/"Thenuja" -
+     count as one). A first name two different players share is never guessed. */
+  const PAIR_SPLIT = /\s*(?:&|\+|\/|,|\band\b|\s[x×]\s)\s*/i;
+  const PAIRS_EVENT = /tag\s*team|doubles|\bpairs?\b|\bduos?\b/i;
+  const pairParts = name => {
+    const parts = String(name || "").split(PAIR_SPLIT).map(s => s.trim()).filter(Boolean);
+    return parts.length >= 2 ? parts : [];
+  };
+  const tokens = n => keyOf(n).split(" ").filter(Boolean);
+  function editDistance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+    }
+    return d[a.length][b.length];
+  }
+  // Two surnames that are one person's spelling variants.
+  function sameSurname(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a))) return true;
+    return Math.min(a.length, b.length) >= 5 && editDistance(a, b) <= 2;
+  }
+  // Group full names (2+ words) by person: same first name + variant surname.
+  function people(names) {
+    const groups = [];
+    names.forEach(n => {
+      const t = tokens(n);
+      const g = groups.find(x => x.first === t[0] && sameSurname(x.last, t[t.length - 1]));
+      if (g) g.keys.add(keyOf(n)); else groups.push({ first: t[0], last: t[t.length - 1], keys: new Set([keyOf(n)]) });
+    });
+    return groups;
+  }
+  // card id + "|champion" / "|runnerUp" -> Set of player keys in that pair.
+  function pairMembers(cards, players) {
+    const out = new Map();
+    // Every name we know, so a shared first name is spotted even when the
+    // other player has no stats yet (bundled photos, cloud photo library).
+    const known = new Set([...players.values()].map(p => p.name));
+    const AM = window.HCCL_ASSETS || {};
+    Object.values(AM.playerPhotoIndex || {}).forEach(p => {
+      let f = String(p).split("/").pop().replace(/\.[^.]+$/, "");
+      try { f = decodeURI(f); } catch (e) { /* plain */ }
+      known.add(f);
+    });
+    const L = window.HCCLPhotoLib;
+    if (L && typeof L.list === "function") L.list().forEach(e => e && e.name && known.add(e.name));
+    const groups = people([...known].filter(n => tokens(n).length >= 2));
+
+    const resolve = part => {
+      const k = keyOf(part), t = tokens(part);
+      const hits = new Set();
+      if (players.has(k)) hits.add(k);                       // exact profile ("Nehan", or a full name)
+      const mine = t.length >= 2
+        ? groups.filter(g => g.first === t[0] && sameSurname(g.last, t[t.length - 1]))  // full name, any spelling
+        : groups.filter(g => g.first === t[0]);                                          // first name only
+      if (mine.length === 1) mine[0].keys.forEach(x => { if (players.has(x)) hits.add(x); });
+      return hits;
+    };
+
+    cards.forEach(c => {
+      const h = c.honors || {};
+      const pairsEvent = PAIRS_EVENT.test(`${c.name || ""} ${c.title || ""}`);
+      ["champion", "runnerUp"].forEach(role => {
+        const parts = pairParts(h[role]);
+        if (!parts.length) return;
+        const each = parts.map(resolve);
+        // A Tag Team / doubles event: credit every part we can pin down. Any
+        // other event: only when EVERY part is a known player - so an ordinary
+        // team called "Knights & Kings" never credits anyone.
+        if (!pairsEvent && each.some(s => !s.size)) return;
+        const set = new Set();
+        each.forEach(s => s.forEach(x => set.add(x)));
+        if (set.size) out.set(`${c.id}|${role}`, set);
+      });
+    });
+    return out;
   }
 
   /* ===================== records ===================== */
@@ -400,18 +487,24 @@
   /* ---- profile ---- */
   function honoursFor(m, p) {
     const out = [];
+    const me = keyOf(p.name);
     m.cards.forEach(c => {
       const h = c.honors || {};
       const line = p.lines.find(l => l.id === c.id);
       const where = c.seasonNo ? `HCCL ${c.title}` : c.title;
       const team = line && line.team;
-      if (c.solo) {
-        if (same(h.champion, p.name)) out.push({ gold: true, icon: "crown", title: "Champion", sub: where });
-        if (same(h.runnerUp, p.name)) out.push({ icon: "medal", title: "Runner-up", sub: where });
-      } else if (team) {
-        if (same(h.champion, team)) out.push({ gold: true, icon: "crown", title: `Champion with ${team}`, sub: where });
-        if (same(h.runnerUp, team)) out.push({ icon: "medal", title: `Runner-up with ${team}`, sub: where });
-      }
+      // In the pair named by this tournament's champion / runner-up?
+      const inPair = role => { const s = m.pairs && m.pairs.get(`${c.id}|${role}`); return !!s && s.has(me); };
+      const place = (role, gold, icon, label) => {
+        const won = h[role];
+        if (!real(won)) return;
+        if (c.solo && same(won, p.name)) out.push({ gold, icon, title: label, sub: where });
+        else if ((!c.solo && team && same(won, team)) || inPair(role)) {
+          out.push({ gold, icon, title: `${label} with ${String(won).trim()}`, sub: where });
+        }
+      };
+      place("champion", true, "crown", "Champion");
+      place("runnerUp", false, "medal", "Runner-up");
       if (same(h.mvp, p.name)) out.push({ gold: true, icon: "star", title: "Most Valuable Player", sub: where });
       if (!c.live && c.lead) {
         if (same(c.lead.mostRuns, p.name)) out.push({ icon: "zap", title: "Most runs", sub: where });
@@ -461,7 +554,7 @@
           </div>
         </section>
         <section class="stat-tiles six" aria-label="Career statistics">
-          ${tile("Matches", t.matches || dash, `${new Set(p.lines.map(l => l.id)).size} tournaments`)}
+          ${(n => tile("Matches", t.matches || dash, `${n} tournament${n === 1 ? "" : "s"}`))(new Set(p.lines.map(l => l.id)).size)}
           ${tile("Runs", t.runs.toLocaleString())}
           ${tile("Wickets", t.wickets.toLocaleString())}
           ${tile("Average", t.batted ? t.average : dash, "batting")}

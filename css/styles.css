@@ -766,8 +766,9 @@ button[data-player] { background: none; border: 0; padding: 0; font: inherit; co
 .honour { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3); border-radius: var(--r-md); background: var(--bg-2); }
 .honour-ico { width: 36px; height: 36px; flex: none; border-radius: var(--r-sm); display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-2); }
 .honour.gold .honour-ico { background: var(--gold-soft); color: var(--gold); }
-.honour b { display: block; font-size: var(--fs-md); }
-.honour span { font-size: var(--fs-sm); color: var(--text-2); }
+.honour div > b { display: block; font-size: var(--fs-md); }
+/* div > span: the sub-label only - never the icon box, which has its own colour */
+.honour div > span { font-size: var(--fs-sm); color: var(--text-2); }
 .profile-back { margin-bottom: var(--s-4); }
 .profile-stack { display: flex; flex-direction: column; gap: var(--s-5); }
 
