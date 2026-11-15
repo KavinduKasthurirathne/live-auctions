@@ -182,23 +182,23 @@
     if (!canSee()) { view.innerHTML = ""; return; }   // viewers never see content
     const h = H();
     if (h && h.configured && !h.user) {
-      view.innerHTML = `<div class="view-head"><h2>MEMBERS &amp; ENGAGEMENT</h2></div>
+      view.innerHTML = `<div class="view-head"><div><p class="eyebrow">Admin</p><h2>Members &amp; Engagement</h2></div></div>
         <p class="hint">Sign in to see member activity.</p>`;
       return;
     }
     if (h && !h.configured) {
-      view.innerHTML = `<div class="view-head"><h2>MEMBERS &amp; ENGAGEMENT</h2></div>
+      view.innerHTML = `<div class="view-head"><div><p class="eyebrow">Admin</p><h2>Members &amp; Engagement</h2></div></div>
         <p class="hint">Member activity lives in the shared cloud - it appears here once the site is connected.</p>`;
       return;
     }
     const body = loading && !rows.length
-      ? `<p class="hint">Loading members…</p>`
+      ? (window.HCCLUI ? window.HCCLUI.skeleton("tiles", 4, "Loading members…") + window.HCCLUI.skeleton("table", 6, "Loading members…") : `<p class="hint">Loading members…</p>`)
       : `${tiles()}${errorMsg && !rows.length ? `<p class="hint">${esc(errorMsg)}</p>` : ""}${table()}
          ${rows.length ? `<h3 class="mb-h3">Time on site</h3>${engagementCards()}` : ""}`;
     view.innerHTML = `
       <div class="view-head">
-        <h2>MEMBERS &amp; ENGAGEMENT</h2>
-        <div class="view-head-tools"><button class="btn btn-dark" data-mb-refresh>↻ Refresh</button></div>
+        <div><p class="eyebrow">Admin</p><h2>Members &amp; Engagement</h2></div>
+        <div class="view-head-tools"><button class="btn btn-dark" data-mb-refresh>${window.HCCLUI ? window.HCCLUI.icon("refresh-cw") : ""}<span>Refresh</span></button></div>
       </div>
       ${body}`;
   }

@@ -463,7 +463,7 @@
   // Falls back to a coloured initial when no file matches.
   const FAN_TEAM_LOGO_INDEX = (typeof window !== "undefined" && window.HCCL_ASSETS
     && window.HCCL_ASSETS.teamLogoIndex) || {};
-  const FAN_TEAM_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
+  const FAN_TEAM_COLORS = ["#60A5FA", "#2DD4BF", "#F5BD4F", "#A78BFA", "#F472B6", "#38BDF8", "#34D399", "#FB923C"];
   function fanTeamColor(name) {
     let h = 0; name = String(name || "");
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
@@ -497,7 +497,9 @@
     if (ids.length === 1) return teamName(ids[0]);
     return dayLabel(d) || "Match";
   }
-  function medal(i) { return i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : String(i + 1); }
+  // Rank cell: gold / silver / bronze badges for the podium, plain numbers after.
+  function medal(i) { return i < 3 ? `<span class="rank r${i + 1}">${i + 1}</span>` : `<span class="rank">${i + 1}</span>`; }
+  const ic = (n, c) => (window.HCCLUI ? window.HCCLUI.icon(n, c) : "");
   // <input type="datetime-local"> speaks local time, Firestore stores epoch ms.
   function toLocalInput(ms) {
     if (!ms) return "";
@@ -590,15 +592,15 @@
     const daily = UI.mode === "daily" || !S;
     v.innerHTML = `
       <div class="view-head">
-        <h2>FANTASY LEAGUE</h2>
+        <h2>Fantasy League</h2>
         <div class="fan-subnav">${daily ? `
-          ${subBtn("matches", "🏏 Matches")}
-          ${subBtn("leaderboard", "🏆 Leaderboards")}
-          ${subBtn("manage", "⚙️ Manage")}` : S.subnavHtml(UI.mode)}
+          ${subBtn("matches", `${ic("calendar")}<span>Matches</span>`)}
+          ${subBtn("leaderboard", `${ic("trophy")}<span>Leaderboards</span>`)}
+          ${subBtn("manage", `${ic("settings")}<span>Manage</span>`)}` : S.subnavHtml(UI.mode)}
         </div>
       </div>
       ${S ? S.modeBarHtml(UI.mode, canEditApp()) : ""}
-      ${fsFellBack ? `<div class="card" style="border-color:var(--red)"><p class="hint" style="margin:0">⚠ ${esc(fsFellBackMsg)}. Showing this device only - changes won't sync and the cloud-upload button is hidden. Fix the cause (publish rules / disable ad-blocker) and reload.</p></div>` : ""}
+      ${fsFellBack ? `<div class="card" style="border-color:var(--red)"><p class="hint" style="margin:0">${ic("circle-alert", "sm")} ${esc(fsFellBackMsg)}. Showing this device only - changes won't sync and the cloud-upload button is hidden. Fix the cause (publish rules / disable ad-blocker) and reload.</p></div>` : ""}
       <div id="fan-body"></div>`;
     renderFanBody();
   }
@@ -607,7 +609,7 @@
   }
   function renderFanBody() {
     const body = document.getElementById("fan-body"); if (!body) return;
-    if (usingFirestore && !fsReady) { body.innerHTML = `<div class="card"><p class="hint">Loading league data…</p></div>`; return; }
+    if (usingFirestore && !fsReady) { body.innerHTML = window.HCCLUI ? window.HCCLUI.skeleton("cards", 3, "Loading league data…") : `<div class="card"><p class="hint">Loading league data…</p></div>`; return; }
     if (!canEditApp() && UI.sub === "manage") UI.sub = "matches";
 
     const S = seasonMod();
@@ -643,7 +645,7 @@
     if (!F.teams.length) {
       return `<div class="card"><h3>Nothing to play for yet</h3>
         <p class="hint">${canEditApp()
-          ? "Add the tournament teams &amp; players first - open <b>⚙️ Manage</b>, or import them from the auction."
+          ? "Add the tournament teams &amp; players first - open <b>Manage</b>, or import them from the auction."
           : "The league hasn't been set up yet. Check back once an admin adds the teams."}</p>
         ${canEditApp() ? `<div class="form-row"><button class="btn btn-yellow" data-fan-sub="manage">Open Manage</button></div>` : ""}</div>`;
     }
@@ -657,11 +659,11 @@
 
   function stateChip(day) {
     const st = ENG.lockState(day, nowMs());
-    if (st === ENG.LEGACY) return `<span class="fan-clock is-legacy">📁 archived</span>`;
-    if (st === ENG.PUBLISHED) return `<span class="fan-clock is-done">🏁 result in</span>`;
-    if (st === ENG.LOCKED) return `<span class="fan-clock is-locked">🔒 entries closed</span>`;
+    if (st === ENG.LEGACY) return `<span class="fan-clock is-legacy">${ic("archive", "sm")}archived</span>`;
+    if (st === ENG.PUBLISHED) return `<span class="fan-clock is-done">${ic("flag", "sm")}result in</span>`;
+    if (st === ENG.LOCKED) return `<span class="fan-clock is-locked">${ic("lock", "sm")}entries closed</span>`;
     const left = day.lockAt - nowMs();
-    return `<span class="fan-clock ${left < 600000 ? "is-closing" : ""}" data-fan-countdown="${day.lockAt}" data-fan-day="${day.id}">⏳ closes in ${esc(ENG.fmtCountdown(left))}</span>`;
+    return `<span class="fan-clock ${left < 600000 ? "is-closing" : ""}" data-fan-countdown="${day.lockAt}" data-fan-day="${day.id}">closes in ${esc(ENG.fmtCountdown(left))}</span>`;
   }
 
   function myStatusHtml(day) {
@@ -670,11 +672,11 @@
     if (st === ENG.PUBLISHED) {
       const row = (day.standings || []).find(r => r.k === myUid());
       return row
-        ? `<div class="fan-mc-you is-scored">🏁 You scored <b>${fmtPts(row.pts)}</b> pts</div>`
+        ? `<div class="fan-mc-you is-scored">You scored <b>${fmtPts(row.pts)}</b> pts</div>`
         : `<div class="fan-mc-you is-out">You didn't enter this one</div>`;
     }
     const mine = myEntry(day);
-    if (mine) return `<div class="fan-mc-you is-in">✅ Your team is in</div>`;
+    if (mine) return `<div class="fan-mc-you is-in">${ic("circle-check", "sm")} Your team is in</div>`;
     if (st === ENG.LOCKED) return `<div class="fan-mc-you is-out">You didn't enter this one</div>`;
     return `<div class="fan-mc-you">You haven't picked a team yet</div>`;
   }
@@ -691,7 +693,7 @@
   function renderMatchList() {
     const days = sortedDays();
     const newBtn = canEditApp()
-      ? `<button class="btn btn-yellow" data-fan-new-match>＋ Create match</button>` : "";
+      ? `<button class="btn btn-yellow" data-fan-new-match>${ic("plus")}<span>Create match</span></button>` : "";
     let html = `<div class="fan-list-head">
       <p class="hint">${days.length
         ? "Pick a match, choose your squad and lock in a captain before the deadline."
@@ -711,7 +713,7 @@
           <span class="fan-mc-team">${teamIcon(teamName(ids[1]))}<b>${esc(teamName(ids[1]))}</b></span>
         </div>
         <div class="fan-mc-meta">${esc(dayLabel(d))}${d.teamSize ? ` · pick ${d.teamSize}` : ""}${d.maxPerTeam ? ` · max ${d.maxPerTeam}/team` : ""}</div>
-        ${d.isPlayoff ? `<span class="fan-playoff-tag">🏆 PLAYOFF · +${ENG.PLAYOFF_BONUS} for the winner call</span>` : ""}
+        ${d.isPlayoff ? `<span class="fan-playoff-tag">${ic("trophy", "sm")}Playoff · +${ENG.PLAYOFF_BONUS} for the winner call</span>` : ""}
         ${stateChip(d)}
         ${myStatusHtml(d)}
         <div class="fan-mc-actions">${ctaHtml(d)}</div>
@@ -726,12 +728,12 @@
     const n = (entDayId === day.id && entLoaded) ? entries.length
       : (day.standings ? day.standings.length : null);
     return `<div class="fan-admin-row">
-      ${n != null ? `<span class="fan-admin-count">👥 ${n}</span>` : ""}
-      <button class="btn btn-dark btn-mini" data-fan-edit-match="${day.id}">✎ Match</button>
-      <button class="btn btn-dark btn-mini" data-fan-open="${day.id}" data-fan-goto="scores">📝 Scores</button>
-      ${st === ENG.OPEN ? `<button class="btn btn-dark btn-mini" data-fan-guest="${day.id}">➕ Guest</button>
-      <button class="btn btn-dark btn-mini" data-fan-lock-now="${day.id}">🔒 Lock now</button>` : ""}
-      <button class="btn btn-danger btn-mini" data-fan-del-day="${day.id}">🗑</button>
+      ${n != null ? `<span class="fan-admin-count">${ic("users", "sm")} ${n}</span>` : ""}
+      <button class="btn btn-dark btn-mini" data-fan-edit-match="${day.id}">${ic("pencil", "sm")}<span>Match</span></button>
+      <button class="btn btn-dark btn-mini" data-fan-open="${day.id}" data-fan-goto="scores">${ic("notebook-pen", "sm")}<span>Scores</span></button>
+      ${st === ENG.OPEN ? `<button class="btn btn-dark btn-mini" data-fan-guest="${day.id}">${ic("user-plus", "sm")}<span>Guest</span></button>
+      <button class="btn btn-dark btn-mini" data-fan-lock-now="${day.id}">${ic("lock", "sm")}<span>Lock now</span></button>` : ""}
+      <button class="btn btn-danger btn-mini" data-fan-del-day="${day.id}" aria-label="Delete match" title="Delete match">${ic("trash-2", "sm")}</button>
     </div>`;
   }
 
@@ -844,7 +846,7 @@
       const tag = pid === d.captainId ? `<span class="cap">C</span>`
         : pid === d.viceCaptainId ? `<span class="vc">VC</span>` : "";
       return `<button class="fan-picked-chip" data-fan-unpick="${pid}" title="Remove">
-        <span class="fen-pname">${esc(pname(pid))}</span>${tag}<span class="fan-x">✕</span></button>`;
+        <span class="fen-pname">${esc(pname(pid))}</span>${tag}<span class="fan-x">${ic("x", "sm")}</span></button>`;
     }).join("");
     for (let i = d.playerIds.length; i < size; i++) chips += `<span class="fan-picked-chip is-empty">+</span>`;
 
@@ -871,7 +873,7 @@
     if (!ENG.isPlayoff(day)) return "";
     const picked = UI.draft.winnerPick || "";
     return `<div class="card fan-winner-pick">
-      <div class="fan-winner-k">🏆 Who wins this playoff? <span class="hint">+${ENG.PLAYOFF_BONUS} if you call it</span></div>
+      <div class="fan-winner-k">${ic("trophy", "sm")} Who wins this playoff? <span class="hint">+${ENG.PLAYOFF_BONUS} if you call it</span></div>
       <div class="fan-winner-opts">
         ${(day.teamIds || []).map(tid => `<button class="fan-winner-opt ${picked === tid ? "is-on" : ""}" data-fan-winner="${tid}">
           ${teamIcon(teamName(tid))}<span>${esc(teamName(tid))}</span></button>`).join("")}
@@ -900,12 +902,12 @@
 
     let html = bare ? "" : `<div class="fan-builder-head">
       <button class="btn btn-dark btn-mini fan-back" data-fan-back>‹ Matches</button>
-      <div class="fan-builder-title">${esc(matchTitle(day))}${day.isPlayoff ? ` <span class="fan-playoff-tag">🏆 PLAYOFF</span>` : ""}</div>
+      <div class="fan-builder-title">${esc(matchTitle(day))}${day.isPlayoff ? ` <span class="fan-playoff-tag">${ic("trophy", "sm")}Playoff</span>` : ""}</div>
       ${stateChip(day)}
     </div>`;
 
     if (hidden) {
-      html += `<div class="card fan-hidden-note"><p class="hint">🔒 Everyone's teams appear here the moment entries close, so nobody can copy a squad at the last minute. Until then you can only see your own.</p></div>`;
+      html += `<div class="card fan-hidden-note"><p class="hint">${ic("lock", "sm")} Everyone's teams appear here the moment entries close, so nobody can copy a squad at the last minute. Until then you can only see your own.</p></div>`;
     }
     if (!list.length) {
       // The entries listener is armed AFTER this markup goes in, so on the first
@@ -925,7 +927,7 @@
           ${avatar(e.name, e.photo)}
           <span class="fan-tc-name">${esc(e.name)}${e.teamName ? `<span class="frr-sub">${esc(e.teamName)}</span>` : ""}</span>
           ${st === ENG.PUBLISHED || (day.hasResults) ? `<span class="fan-pts">${fmtPts(entryPoints(day, e))} pts</span>` : ""}
-          ${canEditApp() && ENG.isOpen(day, nowMs()) ? `<button class="icon-btn del" data-fan-del-entry="${e.id}" title="Remove this team">✕</button>` : ""}
+          ${canEditApp() && ENG.isOpen(day, nowMs()) ? `<button class="icon-btn del" data-fan-del-entry="${e.id}" title="Remove this team" aria-label="Remove this team">${ic("trash-2")}</button>` : ""}
         </div>
         <div class="fan-entry-players">${e.playerIds.map(pid => playerChip(pid, e, day)).join("")}</div>
         ${winnerCallHtml(day, e)}
@@ -946,7 +948,7 @@
     const hit = ENG.winnerBonus(day, e) > 0;
     const verdict = !decided ? "" : hit ? `<b class="is-hit">+${ENG.PLAYOFF_BONUS}</b>` : `<b class="is-miss">missed</b>`;
     return `<div class="fan-call ${decided ? (hit ? "is-hit" : "is-miss") : ""}">
-      🏆 Called <b>${esc(teamName(pick))}</b> ${verdict}</div>`;
+      ${ic("trophy", "sm")} Called <b>${esc(teamName(pick))}</b> ${verdict}</div>`;
   }
 
   function playerChip(pid, e, day) {
@@ -955,7 +957,7 @@
     let pts = "";
     if (day && day.hasResults) pts = `<span class="pchip-pts">${fmtPts(ENG.playerEntryPoints(day, e, pid))}</span>`;
     return `<div class="fan-pchip ${gone ? "is-gone" : ""}">
-      <span class="fen-ico" aria-hidden="true">👤</span>
+      <span class="fen-ico" aria-hidden="true">${ic("user", "sm")}</span>
       <span class="fen-pname">${esc(pname(pid))}</span>${tag}${pts}
     </div>`;
   }
@@ -978,7 +980,7 @@
     const opts = (sel) => F.teams.map(t => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("");
     return `<div class="card fan-form">
       <h3>${editing ? "Edit match" : "New match"}</h3>
-      ${frozen ? `<div class="fan-form-warn">⚠ ${f.entryCount} team${f.entryCount === 1 ? " has" : "s have"} already been submitted, so the two squads, the team size and the playoff setting are fixed - changing them would invalidate every entry. The date, label, per-team cap and closing time are still yours to change.
+      ${frozen ? `<div class="fan-form-warn">${ic("circle-alert")} ${f.entryCount} team${f.entryCount === 1 ? " has" : "s have"} already been submitted, so the two squads, the team size and the playoff setting are fixed - changing them would invalidate every entry. The date, label, per-team cap and closing time are still yours to change.
         <button class="btn btn-danger btn-mini" data-fan-clear-entries="${f.id}">Clear all entries</button></div>` : ""}
       <div class="form-row">
         <label style="flex:1 1 180px">Team A<select id="fanFormA" ${frozen ? "disabled" : ""}>${opts(f.teamA)}</select></label>
@@ -1017,7 +1019,7 @@
     if (day.isPlayoff) {
       const ids = day.teamIds || [];
       html += `<div class="fan-winner-box">
-        <div class="fan-winner-k">🏆 Playoff result <span class="hint">- who won? Everyone who called it gets +${ENG.PLAYOFF_BONUS}.</span></div>
+        <div class="fan-winner-k">${ic("trophy", "sm")} Playoff result <span class="hint">- who won? Everyone who called it gets +${ENG.PLAYOFF_BONUS}.</span></div>
         <div class="fan-winner-opts">
           ${ids.map(tid => `<button class="fan-winner-opt ${day.winnerTeamId === tid ? "is-on" : ""}" data-fan-set-winner="${tid}">
             ${teamIcon(teamName(tid))}<span>${esc(teamName(tid))}</span></button>`).join("")}
@@ -1058,7 +1060,7 @@
   function renderDayStandings(day) {
     const rows = dayStandings(day);
     if (!day.hasResults || !rows.length) return "";
-    let html = `<div class="card"><div class="fan-card-head"><h3>Standings - ${esc(matchTitle(day))}</h3><button class="btn btn-dark fan-share-btn" data-share-day title="Download as image">📷 Share</button></div>`;
+    let html = `<div class="card"><div class="fan-card-head"><h3>Standings - ${esc(matchTitle(day))}</h3><button class="btn btn-dark fan-share-btn" data-share-day title="Download as image">${ic("share-2", "sm")}<span>Share</span></button></div>`;
     html += `<table class="fan-table"><thead><tr><th>#</th><th>Contestant</th><th class="num">Points</th></tr></thead><tbody>`;
     rows.forEach((row, i) => {
       html += `<tr><td>${medal(i)}</td><td>${esc(row.n)}</td><td class="num strong">${fmtPts(row.pts)}</td></tr>`;
@@ -1070,9 +1072,9 @@
   function renderLeaderboards() {
     const cs = contestantStats(), ps = playerStats();
     return `<div class="fan-board-grid">
-      <div class="card"><div class="fan-card-head"><h3>🏆 Contestants</h3><button class="btn btn-dark fan-share-btn" data-share-board="contestant" title="Download as image">📷 Share</button></div>
+      <div class="card"><div class="fan-card-head"><h3>Contestants</h3><button class="btn btn-dark fan-share-btn" data-share-board="contestant" title="Download as image">${ic("share-2", "sm")}<span>Share</span></button></div>
         ${boardTable(cs.map(s => ({ name: s.name, photo: s.photo, avg: s.avg, days: s.days, total: s.total })), "Contestant", "contestant")}</div>
-      <div class="card"><div class="fan-card-head"><h3>⭐ Fantasy Player of the Season</h3><button class="btn btn-dark fan-share-btn" data-share-board="player" title="Download as image">📷 Share</button></div>
+      <div class="card"><div class="fan-card-head"><h3>Fantasy Player of the Season</h3><button class="btn btn-dark fan-share-btn" data-share-board="player" title="Download as image">${ic("share-2", "sm")}<span>Share</span></button></div>
         ${boardTable(ps.map(s => ({ name: s.player.name, team: teamName(s.player.teamId), avg: s.avg, days: s.days, total: s.total })), "Player", "player")}</div>
     </div>`;
   }
@@ -1094,13 +1096,11 @@
 
   /* ---------- share leaderboard as image ---------- */
   function shareRankBadge(i) {
-    const base = "width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Russo One',sans-serif;font-weight:700;font-size:24px;flex:none;";
-    const grad = i === 0 ? "linear-gradient(135deg,#ffe066,#f5b301)"
-      : i === 1 ? "linear-gradient(135deg,#dcdce4,#9a9aa4)"
-      : i === 2 ? "linear-gradient(135deg,#e0975a,#a05a1e)" : "";
-    return grad
-      ? `<div style="${base}color:#1a1300;background:${grad};">${i + 1}</div>`
-      : `<div style="${base}color:#9b9ba3;background:#2a2a2e;">${i + 1}</div>`;
+    const base = "width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;flex:none;";
+    const fill = i === 0 ? "#F5BD4F" : i === 1 ? "#CBD5E1" : i === 2 ? "#D69E6B" : "";
+    return fill
+      ? `<div style="${base}color:#1A1405;background:${fill};">${i + 1}</div>`
+      : `<div style="${base}color:#94A3B8;background:#111C2E;border:1px solid #26364D;">${i + 1}</div>`;
   }
   function shareDateStr() {
     return new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
@@ -1124,35 +1124,35 @@
     // - those get cloned too and would blank the capture.
     card.style.cssText = "position:absolute;left:0;top:0;z-index:-1;pointer-events:none;" +
       "width:1080px;box-sizing:border-box;padding:52px 48px;" +
-      "background:#0a0a0b;color:#f6f6f7;font-family:'Inter',system-ui,sans-serif;";
+      "background:#0B1220;color:#F8FAFC;font-family:'Inter',system-ui,sans-serif;";
     card.innerHTML = `
       <div style="text-align:center;">
-        <div style="font-family:'Russo One',sans-serif;font-weight:700;font-size:56px;letter-spacing:1px;line-height:1;color:#ffcc00;">${esc(seasonTitle)} - Fantasy</div>
-        <div style="font-size:23px;letter-spacing:4px;text-transform:uppercase;color:#f6f6f7;margin-top:14px;">${esc(subTitle)}</div>
-        <div style="font-size:16px;color:#9b9ba3;margin-top:10px;">${esc(dateStr)}</div>
+        <div style="font-size:16px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:#60A5FA;">${esc(subTitle)}</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:56px;letter-spacing:-1px;line-height:1.05;color:#F8FAFC;margin-top:12px;">${esc(seasonTitle)} - Fantasy</div>
+        <div style="font-size:16px;color:#94A3B8;margin-top:12px;">${esc(dateStr)}</div>
       </div>
-      <div style="height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#e10600,#f5b301,transparent);margin:26px 0 30px;"></div>
+      <div style="height:1px;background:#26364D;margin:30px 0;"></div>
       <div style="max-width:840px;margin:0 auto;">${innerHtml}</div>
-      <div style="margin-top:30px;text-align:center;color:#5a5a62;font-size:15px;letter-spacing:3px;text-transform:uppercase;">
+      <div style="margin-top:30px;text-align:center;color:#94A3B8;font-size:15px;letter-spacing:3px;text-transform:uppercase;">
         HC Champions League
       </div>`;
     return card;
   }
   function shareRows(rows, isPlayer) {
     const statCell = (val, hi) =>
-      `<div style="width:120px;text-align:right;font-size:${hi ? 30 : 24}px;font-weight:${hi ? 800 : 600};color:${hi ? "#ffcc00" : "#f6f6f7"};">${val}</div>`;
+      `<div style="width:120px;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:${hi ? 30 : 24}px;font-weight:700;color:#F8FAFC;">${val}</div>`;
     return `
-        <div style="display:flex;align-items:center;padding:0 24px 14px;color:#9b9ba3;font-size:14px;letter-spacing:2px;text-transform:uppercase;">
+        <div style="display:flex;align-items:center;padding:0 24px 14px;color:#94A3B8;font-size:14px;letter-spacing:2px;text-transform:uppercase;">
           <div style="width:56px;">#</div>
           <div style="flex:1;">${isPlayer ? "Player" : "Contestant"}</div>
           <div style="width:120px;text-align:right;">Total</div>
         </div>
         ${rows.map(r => `
-          <div style="display:flex;align-items:center;background:#161618;border:1px solid #34343a;border-radius:16px;padding:16px 24px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;background:#17243A;border:1px solid #26364D;border-radius:16px;padding:16px 24px;margin-bottom:10px;">
             <div style="width:56px;">${shareRankBadge(r.i)}</div>
             <div style="flex:1;min-width:0;padding-right:16px;">
               <div style="font-size:27px;font-weight:700;line-height:1.15;">${esc(r.name)}</div>
-              ${r.sub ? `<div style="font-size:16px;color:#9b9ba3;margin-top:3px;">${esc(r.sub)}</div>` : ""}
+              ${r.sub ? `<div style="font-size:16px;color:#94A3B8;margin-top:3px;">${esc(r.sub)}</div>` : ""}
             </div>
             ${statCell(fmtPts(r.total), true)}
           </div>`).join("")}`;
@@ -1175,7 +1175,7 @@
     document.body.appendChild(node);
     try {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      const opts = { pixelRatio: 2, backgroundColor: "#0a0a0b", cacheBust: true, width: 1080, height: node.scrollHeight };
+      const opts = { pixelRatio: 2, backgroundColor: "#0B1220", cacheBust: true, width: 1080, height: node.scrollHeight };
       // First render is unreliable (fonts/styles not embedded yet) and often
       // comes back blank - run it as a throwaway, then capture for real.
       await window.htmlToImage.toPng(node, opts);
@@ -1190,9 +1190,16 @@
       node.remove();
     }
   }
+  // html-to-image is loaded the first time someone shares (not on page load).
+  async function imageLib() {
+    if (window.htmlToImage && typeof window.htmlToImage.toPng === "function") return window.htmlToImage;
+    if (!window.HCCLUI) return null;
+    ftoast("Preparing image tools...", "");
+    try { return await window.HCCLUI.loadLib("htmlToImage"); } catch (e) { return null; }
+  }
   async function shareBoard(kind) {
-    const lib = window.htmlToImage;
-    if (!lib || typeof lib.toPng !== "function") { ftoast("Image library still loading - try again", "bad"); return; }
+    const lib = await imageLib();
+    if (!lib || typeof lib.toPng !== "function") { ftoast("Couldn't load the image tools - check your connection and try again", "bad"); return; }
     const stats = kind === "player" ? playerStats() : contestantStats();
     if (!stats.length) { ftoast("No results to share yet", "bad"); return; }
     ftoast("Building image...", "");
@@ -1201,8 +1208,8 @@
     await captureAndDownload(node, filename, "Leaderboard image downloaded");
   }
   async function shareDay() {
-    const lib = window.htmlToImage;
-    if (!lib || typeof lib.toPng !== "function") { ftoast("Image library still loading - try again", "bad"); return; }
+    const lib = await imageLib();
+    if (!lib || typeof lib.toPng !== "function") { ftoast("Couldn't load the image tools - check your connection and try again", "bad"); return; }
     const day = currentDay();
     if (!day || !day.hasResults || !dayStandings(day).length) { ftoast("No results to share yet", "bad"); return; }
     ftoast("Building image...", "");
@@ -1238,13 +1245,13 @@
         <p class="hint">${fanHasAuction()
           ? "Pull tournament teams &amp; players straight from your auction squads (sold + retained)."
           : "Pull tournament teams &amp; players straight from this tournament's squads."}</p>
-        <div class="form-row"><button class="btn btn-yellow" data-import-auction>⬇ ${fanHasAuction() ? "Import from auction" : "Import squads"}</button></div>
+        <div class="form-row"><button class="btn btn-yellow" data-import-auction>${ic("download")}<span>${fanHasAuction() ? "Import from auction" : "Import squads"}</span></button></div>
         <hr/>
         <div class="form-row"><button class="btn btn-dark" data-export>Export fantasy backup</button>
           <label class="btn btn-dark file-btn">Import backup<input type="file" id="fanImportFile" accept="application/json" hidden/></label></div>
         <hr/>
         ${usingFirestore ? `<p class="hint">Live cloud sync is on - everyone sees the same data. Copy this device's saved data into the shared cloud (one-time).</p>
-        <div class="form-row"><button class="btn btn-yellow" data-cloud-upload>☁ Upload local data to cloud</button></div>
+        <div class="form-row"><button class="btn btn-yellow" data-cloud-upload>${ic("cloud-upload")}<span>Upload local data to cloud</span></button></div>
         <hr/>` : ""}
         <div class="form-row"><button class="btn btn-danger" data-reset>Erase fantasy data</button></div>
       </div>
@@ -1799,7 +1806,7 @@
     root.querySelectorAll("[data-fan-countdown]").forEach(el => {
       const at = Number(el.getAttribute("data-fan-countdown")) || 0;
       const left = at - now;
-      el.textContent = left > 0 ? "⏳ closes in " + ENG.fmtCountdown(left) : "🔒 entries closed";
+      el.textContent = left > 0 ? "closes in " + ENG.fmtCountdown(left) : "entries closed";
       el.classList.toggle("is-closing", left > 0 && left < 600000);
       el.classList.toggle("is-locked", left <= 0);
     });

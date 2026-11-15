@@ -1,379 +1,345 @@
-/* ===================== FANTASY ===================== */
-.fan-subnav { display: flex; gap: 8px; flex-wrap: wrap; }
-.fan-tab {
-  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
-  padding: 9px 14px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 700;
-  font-family: inherit; transition: all 0.15s ease;
-}
-.fan-tab:hover { color: var(--text); border-color: #4a4a52; }
-.fan-tab.active { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); border-color: transparent; }
+/* ===================== FANTASY ("Midnight Stadium") =====================
+   Everything renders inside #view-fantasy (the tournament page's Fantasy
+   tab). Tokens come from css/tokens.css; shared pieces (cards, buttons,
+   tables, underline tabs, segmented control) from styles.css. */
 
-#view-fantasy .card { margin-bottom: 16px; }
-#view-fantasy .card h3 { font-size: 17px; }
+/* Sub-nav = the underline "section tabs" style, full width under the title. */
+#view-fantasy .view-head { align-items: flex-start; flex-direction: column; gap: var(--s-3); margin-bottom: var(--s-4); }
+.fan-subnav {
+  display: flex; gap: var(--s-5); width: 100%;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.fan-subnav::-webkit-scrollbar { display: none; }
+.fan-tab {
+  position: relative; flex: none; display: inline-flex; align-items: center; gap: var(--s-2);
+  min-height: var(--tap); padding: 0 2px; background: none; border: 0; cursor: pointer;
+  color: var(--text-2); font-size: var(--fs-md); font-weight: 600; white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease);
+}
+.fan-tab::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: transparent; }
+.fan-tab:hover { color: var(--text); }
+.fan-tab.active { color: var(--text); }
+.fan-tab.active::after { background: var(--accent); }
+.fan-tab.active .ico { color: var(--accent-2); }
+
+#view-fantasy .card { margin-bottom: var(--s-4); }
+#view-fantasy .card h3 { font-size: var(--fs-lg); }
 
 /* teams playing toggles */
-.fan-team-toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+.fan-team-toggles { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .fan-chip {
-  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-  padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: var(--s-2); cursor: pointer;
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--text);
+  min-height: 40px; padding: 0 var(--s-4); border-radius: var(--r-pill); font-size: var(--fs-md); font-weight: 500;
 }
-.fan-chip.on { border-color: var(--gold); background: rgba(255, 204, 0, 0.12); color: var(--yellow); }
-.fan-chip input { accent-color: var(--gold); }
+.fan-chip.on { border-color: rgba(59, 130, 246, 0.6); background: var(--accent-soft); color: var(--text); }
 
 /* player pool picker */
-.fan-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(215px, 100%), 1fr)); gap: 14px; margin: 6px 0; }
-.fan-pool-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px 8px; }
-.fan-pool-team-name { font-weight: 800; font-size: 14px; color: var(--yellow); text-transform: uppercase; letter-spacing: 1px; margin: 2px 4px 8px; }
-.fan-pick { display: flex; align-items: center; gap: 10px; padding: 8px 8px; font-size: 14px; cursor: pointer; border-radius: 9px; transition: background 0.12s ease; }
-.fan-pick:hover { background: rgba(255, 255, 255, 0.04); }
-.fan-pick input { accent-color: var(--red); width: 17px; height: 17px; flex: none; }
+.fan-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: var(--s-3); margin: 6px 0; }
+.fan-pool-team { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px var(--s-2) var(--s-2); }
+.fan-pool-team-name { font-weight: 700; font-size: var(--fs-sm); color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.08em; margin: 2px var(--s-1) var(--s-2); }
+.fan-pick { display: flex; align-items: center; gap: 10px; padding: var(--s-2); font-size: var(--fs-md); cursor: pointer; border-radius: var(--r-sm); transition: background var(--dur-fast) var(--ease); }
+.fan-pick:hover { background: var(--card-2); }
+.fan-pick input { width: 17px; height: 17px; flex: none; }
 .fan-pick input:disabled { opacity: 0.4; }
-.fan-pick span { flex: 1; min-width: 0; line-height: 1.25; }
-.fan-pick input:checked + span { color: var(--yellow); font-weight: 700; }
-.fan-count { font-weight: 700; color: var(--muted); margin: 8px 0; }
-.fan-count.full { color: var(--green); }
+.fan-pick span { flex: 1; min-width: 0; line-height: 1.3; }
+.fan-pick input:checked + span { color: var(--text); font-weight: 700; }
+.fan-count { font-weight: 600; color: var(--text-2); margin: var(--s-2) 0; }
+.fan-count.full { color: var(--live); }
 
-/* entries list - each contestant is a collapsible team dropdown */
-.fan-entries { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-.fan-entry { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-.fan-entry-head { /* <summary> */
-  list-style: none; cursor: pointer;
-  display: flex; align-items: center; gap: 10px; padding: 12px;
-}
+/* entries list - each contestant is a collapsible team */
+.fan-entries { display: flex; flex-direction: column; gap: 10px; margin-top: var(--s-3); }
+.fan-entry { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.fan-entry-head { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: var(--s-3); }
 .fan-entry-head::-webkit-details-marker { display: none; }
-.fan-entry-head:hover { background: rgba(255, 255, 255, 0.03); }
-.fen-caret { flex: none; color: var(--muted); font-size: 12px; transition: transform 0.15s ease; }
+.fan-entry-head:hover { background: var(--card-2); }
+.fen-caret { flex: none; color: var(--text-2); font-size: var(--fs-sm); transition: transform var(--dur-fast) var(--ease); }
 .fan-entry[open] .fen-caret { transform: rotate(90deg); }
-.fen-cname { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fan-pts { color: var(--yellow); font-weight: 800; flex: none; }
-.fan-entry-head .hint { flex: none; font-size: 12px; }
-.fan-entry-actions { flex: none; display: flex; gap: 4px; }
-/* the picked team, revealed when the dropdown is open */
-.fan-entry-players { display: flex; flex-direction: column; gap: 5px; padding: 2px 12px 12px; }
-.fan-pchip { display: flex; align-items: center; gap: 9px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px; font-size: 13.5px; }
-.fen-ico { flex: none; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--panel); border: 1px solid var(--border); font-size: 12px; }
+.fen-cname { font-size: var(--fs-base); font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-pts { color: var(--text); font-family: var(--font-display); font-weight: 700; flex: none; font-variant-numeric: tabular-nums; }
+.fan-entry-head .hint { flex: none; }
+.fan-entry-actions { flex: none; display: flex; gap: var(--s-1); }
+.fan-entry-players { display: flex; flex-direction: column; gap: 6px; padding: 2px var(--s-3) var(--s-3); }
+.fan-pchip { display: flex; align-items: center; gap: var(--s-2); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: var(--s-2) 10px; font-size: var(--fs-md); }
+.fen-ico { flex: none; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-2); border: 1px solid var(--line); font-size: var(--fs-sm); }
 .fen-pname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fan-pchip .cap, .fan-pchip .vc { flex: none; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 5px; }
-.fan-pchip .cap { background: var(--red); color: #fff; }
-.fan-pchip .vc { background: var(--gold); color: #1a1300; }
-.pchip-pts { flex: none; color: var(--yellow); font-weight: 800; min-width: 46px; text-align: right; }
+.fan-pchip .cap, .fan-pchip .vc { flex: none; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 5px; }
+.fan-pchip .cap { background: var(--gold); color: var(--on-gold); }
+.fan-pchip .vc { background: transparent; color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-2); }
+.pchip-pts { flex: none; color: var(--text); font-weight: 700; min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
 
-/* results entry - full name on its own line, inputs below (no truncation) */
-.fan-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 14px; margin: 6px 0 14px; }
-.fan-results-team { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
-.fan-res-row { display: flex; flex-direction: column; gap: 6px; padding: 9px 0; border-bottom: 1px solid var(--panel-3); }
-.fan-res-row:last-child { border-bottom: none; }
-.frr-name { font-size: 14px; font-weight: 600; line-height: 1.25; }
-.frr-inputs { display: flex; align-items: center; gap: 8px; }
-.fan-res-row input { flex: 1 1 0; min-width: 0; padding: 7px 8px; text-align: center; }
-.frr-pts { flex: none; width: 48px; text-align: right; color: var(--yellow); font-weight: 800; font-size: 15px; }
-.frr-sub { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
+/* results entry - full name on its own line, inputs below */
+.fan-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: var(--s-3); margin: 6px 0 var(--s-3); }
+.fan-results-team { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px var(--s-3); }
+.fan-res-row { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.fan-res-row:last-child { border-bottom: 0; }
+.frr-name { font-size: var(--fs-md); font-weight: 600; line-height: 1.3; }
+.frr-inputs { display: flex; align-items: center; gap: var(--s-2); }
+.fan-res-row input { flex: 1 1 0; min-width: 0; padding: 0 var(--s-2); text-align: center; }
+.frr-pts { flex: none; width: 48px; text-align: right; color: var(--text); font-weight: 700; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
+.frr-sub { display: block; font-size: var(--fs-xs); color: var(--text-2); font-weight: 500; }
 
 /* leaderboards */
-.fan-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.fan-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-2); }
 .fan-card-head h3 { margin: 0; }
-.fan-share-btn { flex: none; padding: 7px 12px; font-size: 13px; }
-.fan-board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; align-items: start; }
-.fan-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.fan-table th { text-align: left; color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-.fan-table td { padding: 9px 8px; border-bottom: 1px solid var(--panel-2); vertical-align: middle; }
+.fan-share-btn { flex: none; min-height: 34px; padding: 0 var(--s-3); font-size: var(--fs-sm); }
+.fan-board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: var(--s-4); align-items: start; }
+.fan-board-grid > .card { overflow-x: auto; }
+.fan-table th { text-align: left; color: var(--text-2); font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: var(--s-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.fan-table td { padding: 10px var(--s-2); border-bottom: 1px solid var(--line); vertical-align: middle; }
+.fan-table tbody tr:last-child td { border-bottom: 0; }
 .fan-table td.num, .fan-table th.num { text-align: right; }
-.fan-table td.strong { color: var(--yellow); font-weight: 800; font-size: 15px; }
-.fan-table tr:first-child td { font-weight: 700; }
+.fan-table td.strong { color: var(--text); font-family: var(--font-display); font-weight: 700; font-size: var(--fs-base); }
+.fan-table tr:first-child td { font-weight: 600; }
+.fan-table tr.is-me td { background: var(--accent-soft); }
+/* Rank cell: podium badges (gold / silver / bronze), then plain numbers. */
+.rank { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: var(--r-pill); font-family: var(--font-display); font-size: var(--fs-sm); font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.rank.r1 { background: var(--gold); color: var(--on-gold); }
+.rank.r2 { background: var(--silver); color: #0B1220; }
+.rank.r3 { background: var(--bronze); color: #1A1405; }
 
 /* ===================== SELF-SERVE FANTASY ===================== */
-/* Match list -> team builder -> everyone's teams. All of it lives inside the
-   #view-fantasy panel; nothing is position:fixed, because .app-header has a
-   backdrop-filter and would become the containing block for it. */
-
-.fan-list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.fan-list-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-4); }
 .fan-list-head .hint { margin: 0; flex: 1 1 240px; }
 
-.fan-matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr)); gap: 16px; align-items: start; }
+.fan-matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: var(--s-4); align-items: start; }
 .fan-match-card {
-  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 16px; display: flex; flex-direction: column; gap: 10px;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3);
+  transition: border-color var(--dur) var(--ease);
 }
-.fan-match-card:hover { border-color: #4a4a52; transform: translateY(-2px); box-shadow: var(--shadow); }
-.fan-match-card.is-open { border-color: rgba(34, 197, 94, 0.45); }
-.fan-match-card.is-published { border-color: rgba(245, 179, 1, 0.4); }
+.fan-match-card:hover { border-color: var(--line-strong); }
+.fan-match-card.is-open { border-color: rgba(45, 212, 191, 0.45); }
+.fan-match-card.is-published { border-color: rgba(245, 189, 79, 0.4); }
 .fan-match-card.is-legacy { opacity: 0.85; }
 
-.fan-mc-teams { display: flex; align-items: center; gap: 10px; }
-.fan-mc-team { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 15px; }
-.fan-mc-team b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-mc-teams { display: flex; align-items: center; gap: var(--s-3); }
+.fan-mc-team { display: flex; align-items: center; gap: var(--s-2); flex: 1; min-width: 0; font-size: var(--fs-base); }
+.fan-mc-team b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-display); }
 .fan-mc-team:last-child { justify-content: flex-end; text-align: right; }
-.fan-mc-vs { flex: none; font-size: 11px; font-weight: 800; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
-.fan-mc-meta { font-size: 12.5px; color: var(--muted); }
+.fan-mc-vs { flex: none; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; color: var(--text-2); text-transform: uppercase; }
+.fan-mc-meta { font-size: var(--fs-sm); color: var(--text-2); }
 
 .fan-clock {
-  align-self: flex-start; font-size: 12px; font-weight: 800; letter-spacing: 0.5px;
-  padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border);
-  background: var(--panel-2); color: var(--muted); white-space: nowrap;
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums;
+  padding: 4px 10px; border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--bg-2); color: var(--text-2); white-space: nowrap;
 }
-.fan-clock[data-fan-countdown] { color: var(--green); border-color: rgba(34, 197, 94, 0.4); }
-.fan-clock.is-closing { color: var(--yellow); border-color: var(--gold); background: rgba(255, 204, 0, 0.1); }
-.fan-clock.is-locked { color: var(--muted); border-color: var(--border); background: var(--panel-2); }
-.fan-clock.is-done { color: var(--gold); border-color: rgba(245, 179, 1, 0.45); }
+/* Countdown chips are re-written as plain text every second by the ticker,
+   so their marker is a CSS dot rather than an icon in the markup. */
+.fan-clock[data-fan-countdown]::before, .fan-clock[data-fs-countdown]::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none;
+}
+.fan-clock[data-fan-countdown] { color: var(--live); border-color: rgba(45, 212, 191, 0.4); background: var(--live-soft); }
+.fan-clock.is-closing { color: var(--gold); border-color: rgba(245, 189, 79, 0.5); background: var(--gold-soft); }
+.fan-clock.is-locked { color: var(--text-2); border-color: var(--line); background: var(--bg-2); }
+.fan-clock.is-done { color: var(--gold); border-color: rgba(245, 189, 79, 0.45); background: transparent; }
 
-.fan-mc-you { font-size: 13.5px; color: var(--muted); padding-top: 2px; border-top: 1px solid var(--panel-3); }
-.fan-mc-you.is-in { color: var(--green); font-weight: 700; }
+.fan-mc-you { font-size: var(--fs-md); color: var(--text-2); padding-top: var(--s-2); border-top: 1px solid var(--line); }
+.fan-mc-you.is-in { color: var(--live); font-weight: 600; }
 .fan-mc-you.is-scored { color: var(--text); }
-.fan-mc-you.is-scored b { color: var(--yellow); }
+.fan-mc-you.is-scored b { color: var(--text); font-family: var(--font-display); }
 .fan-mc-cta { width: 100%; justify-content: center; }
 .fan-mc-actions { display: flex; }
 
-.fan-admin-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-top: 10px; border-top: 1px dashed var(--panel-3); }
-.fan-admin-count { font-size: 12px; font-weight: 700; color: var(--muted); margin-right: auto; }
+.fan-admin-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-top: 10px; border-top: 1px dashed var(--line); }
+.fan-admin-count { font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); margin-right: auto; }
 
 /* ---- builder ---- */
-.fan-builder-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-.fan-builder-title { font-family: "Russo One", sans-serif; font-size: 18px; flex: 1; min-width: 0; }
+.fan-builder-head { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-4); }
+.fan-builder-title { font-family: var(--font-display); font-weight: 700; font-size: var(--fs-lg); flex: 1; min-width: 0; }
 .fan-back { flex: none; }
-.fan-builder-intro .hint { margin: 0 0 4px; }
+.fan-builder-intro .hint { margin: 0 0 var(--s-1); }
 
-/* Your squad stays in view while you scroll the player lists. .app-header is
-   sticky at z-index 30, so this has to park BELOW it (81px at full width, 71px
-   from 900px down) rather than slide underneath. */
-.fan-picked-card { position: sticky; top: 89px; z-index: 3; }
-/* ===================== PLAYOFF: winner call ===================== */
-/* Shown on a playoff match only - the contestant's extra pick, the editor's
-   result recorder, and the verdict on each team card. The picker deliberately
-   borrows the C/VC slot's dashed-until-chosen language so it reads as one more
-   decision in the same builder, not a different kind of control. */
+/* Your squad stays in view under the sticky header while you scroll the lists. */
+.fan-picked-card { position: sticky; top: calc(var(--header-h) + var(--s-2)); z-index: 3; box-shadow: 0 8px 20px rgba(5, 9, 18, 0.45); }
+/* Desktop: the tournament tab bar is sticky too (styles.css) - park below it. */
+@media (min-width: 1024px) {
+  #view-fantasy .fan-picked-card { top: calc(var(--header-h) + var(--hubtabs-h) + var(--s-2)); }
+}
+
+/* ---- playoff: winner call ---- */
 .fan-playoff-tag {
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 10.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
-  color: var(--gold); background: rgba(255, 204, 0, 0.12);
-  border: 1px solid rgba(255, 204, 0, 0.35); border-radius: 999px; padding: 3px 9px;
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--gold); background: var(--gold-soft); border: 1px solid rgba(245, 189, 79, 0.35); border-radius: var(--r-pill); padding: 3px 9px;
 }
-/* Its own card under the sticky picked strip - never inside it, or the sticky
-   header grows and the options end up behind the sticky save bar. */
-.fan-winner-pick { margin-top: 12px; border: 1px solid rgba(255, 204, 0, 0.3); }
-.fan-winner-box { margin-bottom: 14px; padding: 12px; border: 1px solid rgba(255, 204, 0, 0.3); border-radius: 12px; }
-.fan-winner-k {
-  font-size: 10.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 8px;
-}
+.fan-winner-pick { margin-top: var(--s-3); border: 1px solid rgba(245, 189, 79, 0.3); }
+.fan-winner-box { margin-bottom: var(--s-3); padding: var(--s-3); border: 1px solid rgba(245, 189, 79, 0.3); border-radius: var(--r-md); }
+.fan-winner-k { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); margin-bottom: var(--s-2); }
 .fan-winner-k .hint { text-transform: none; letter-spacing: 0; font-weight: 500; }
 .fan-winner-opts { display: flex; flex-wrap: wrap; gap: 10px; }
 .fan-winner-opt {
-  flex: 1 1 140px; display: flex; align-items: center; justify-content: center; gap: 8px;
-  cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 700;
-  background: var(--panel-2); border: 1px dashed var(--border); color: var(--text);
-  padding: 10px 12px; border-radius: 12px; min-height: 44px;   /* comfortable tap target */
+  flex: 1 1 140px; display: flex; align-items: center; justify-content: center; gap: var(--s-2);
+  cursor: pointer; font-size: var(--fs-md); font-weight: 600;
+  background: var(--bg-2); border: 1px dashed var(--line-strong); color: var(--text);
+  padding: 10px var(--s-3); border-radius: var(--r-md); min-height: var(--tap);
 }
-.fan-winner-opt:hover { border-color: #4a4a52; }
-.fan-winner-opt.is-on {
-  border-style: solid; border-color: var(--gold);
-  background: rgba(255, 204, 0, 0.12); color: var(--yellow);
-}
-.fan-winner-opt.is-none { flex: 0 1 auto; font-weight: 600; color: var(--muted); }
+.fan-winner-opt:hover { border-color: var(--text-2); }
+.fan-winner-opt.is-on { border-style: solid; border-color: var(--gold); background: var(--gold-soft); color: var(--text); }
+.fan-winner-opt.is-none { flex: 0 1 auto; font-weight: 500; color: var(--text-2); }
 .fan-winner-opt.is-none.is-on { color: var(--text); }
-
-/* Verdict line on a team card once the result is in. */
-.fan-call {
-  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--panel-3);
-  font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-}
+.fan-call { margin-top: 10px; padding-top: var(--s-2); border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--text-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .fan-call b { color: var(--text); }
-.fan-call .is-hit { color: var(--green); }
-.fan-call .is-miss { color: var(--muted); font-weight: 600; }
+.fan-call .is-hit { color: var(--live); }
+.fan-call .is-miss { color: var(--text-2); font-weight: 600; }
 .fan-call.is-none { font-style: italic; }
 
-/* The checkbox on the match form. */
-.fan-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; line-height: 1.45; }
-.fan-check input { margin-top: 3px; flex: none; width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; }
-.fan-check span { font-size: 13px; color: var(--muted); }
+.fan-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; line-height: 1.5; }
+/* Inside a .card, the generic "label = stacked field" rule would put the box
+   ABOVE its text - a checkbox row stays a row. */
+.card label.fan-check { flex-direction: row; gap: 10px; }
+
+/* Team badge on match cards (fantasy.js teamIcon): logo image, or a coloured
+   initial when the team has no logo. */
+.team-ico {
+  width: 28px; height: 28px; border-radius: var(--r-sm); flex: none; vertical-align: middle;
+  display: inline-grid; place-items: center;
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+  border: 1px solid var(--line);
+  font-size: var(--fs-sm); font-weight: 700; color: #0B1220;
+}
+.fan-check input { margin-top: 3px; flex: none; width: 17px; height: 17px; cursor: pointer; }
+.fan-check span { font-size: var(--fs-md); color: var(--text-2); }
 .fan-check b { color: var(--text); }
 
-/* ===================== MODES: Daily / Weekly / Overall =====================
-   js/fantasy-season.js. A segmented control under the header; it only exists
-   when more than one mode is visible, so a Daily-only league looks unchanged. */
+/* ===================== MODES: Daily / Weekly / Overall ===================== */
 .fan-modebar {
-  display: flex; gap: 4px; padding: 4px; margin: 0 0 16px;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
-  width: fit-content; max-width: 100%;
+  display: flex; gap: 2px; padding: 3px; margin: 0 0 var(--s-4);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-md);
+  width: fit-content; max-width: 100%; overflow-x: auto; scrollbar-width: none;
 }
 .fan-mode {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
-  color: var(--muted); background: transparent; border: 0; border-radius: 10px;
-  padding: 9px 16px; min-height: 40px; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  font-size: var(--fs-md); font-weight: 600; cursor: pointer;
+  color: var(--text-2); background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
+  padding: 0 var(--s-4); min-height: 38px; white-space: nowrap;
 }
-.fan-mode:hover { color: var(--text); background: var(--panel-2); }
-.fan-mode.active { color: #1a1300; background: linear-gradient(135deg, var(--yellow), var(--gold)); }
-.fan-mode-off {
-  font-size: 9.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
-  padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted);
-}
-.fan-mode.active .fan-mode-off { background: rgba(0,0,0,.18); color: #1a1300; }
-.fs-off-note { border-color: rgba(255, 204, 0, 0.35); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.fan-mode:hover { color: var(--text); }
+.fan-mode.active { color: var(--text); background: var(--card-2); border-color: var(--line-strong); }
+.fan-mode-off { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--r-pill); background: var(--card-2); color: var(--text-2); }
+.fs-off-note { border-color: rgba(245, 189, 79, 0.35); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
 .fs-off-note .hint { margin: 0; }
-.fs-modes-card { margin-bottom: 16px; }
-.fs-mode-row { padding: 8px 0; border-top: 1px solid var(--panel-3); }
+.fs-modes-card { margin-bottom: var(--s-4); }
+.fs-mode-row { padding: var(--s-2) 0; border-top: 1px solid var(--line); }
 .fs-mode-row:first-of-type { border-top: 0; }
 .fan-intro .hint { margin-top: 6px; }
 .fs-row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 
-/* Pool tiles can carry a photo from the player library. */
 .fan-ptile-av.has-photo { background-size: cover; background-position: center; color: transparent; }
 
-/* Swap builder: what's coming in, what's going out, what it costs. */
-.fan-picked-chip.fs-new { border-color: var(--green); }
-.fs-new-tag {
-  font-size: 9.5px; font-weight: 800; letter-spacing: .5px; padding: 1px 5px; border-radius: 6px;
-  background: rgba(34,197,94,.16); color: var(--green);
-}
-.fs-out-line { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
-.fs-out-line b { color: var(--red); font-weight: 700; }
-.fs-swap-cost { font-size: 12.5px; font-weight: 700; color: var(--yellow); }
-.fs-swap-cost.is-bad { color: var(--red); }
+.fan-picked-chip.fs-new { border-color: var(--live); }
+.fs-new-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; padding: 1px 5px; border-radius: 6px; background: var(--live-soft); color: var(--live); }
+.fs-out-line { margin-top: 10px; font-size: var(--fs-sm); color: var(--text-2); }
+.fs-out-line b { color: var(--danger); font-weight: 700; }
+.fs-swap-cost { font-size: var(--fs-sm); font-weight: 700; color: var(--accent-2); }
+.fs-swap-cost.is-bad { color: var(--danger); }
 
-/* Season team card footer + swap budget. */
-.fs-team-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--panel-3);
-}
-.fs-swaps-pill {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700;
-  padding: 5px 11px; border-radius: 999px;
-  background: rgba(255, 204, 0, 0.12); color: var(--yellow); border: 1px solid rgba(255, 204, 0, 0.3);
-}
-.fs-swaps-pill.is-out { background: var(--panel-2); color: var(--muted); border-color: var(--border); }
-.fs-note { margin: -4px 2px 14px; }
+.fs-team-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.fs-swaps-pill { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; padding: 4px 10px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent-2); border: 1px solid rgba(96, 165, 250, 0.35); }
+.fs-swaps-pill.is-out { background: var(--bg-2); color: var(--text-2); border-color: var(--line); }
+.fs-note { margin: calc(var(--s-1) * -1) 2px var(--s-3); }
 .fs-hist { list-style: none; margin: 0; padding: 0; }
-.fs-hist li { padding: 9px 0; border-top: 1px solid var(--panel-3); font-size: 13px; line-height: 1.5; }
+.fs-hist li { padding: var(--s-2) 0; border-top: 1px solid var(--line); font-size: var(--fs-md); line-height: 1.5; }
 .fs-hist li:first-child { border-top: 0; }
-.fs-hist-when { color: var(--muted); font-size: 12px; margin-right: 6px; white-space: nowrap; }
-/* Overall scores sheet */
+.fs-hist-when { color: var(--text-2); font-size: var(--fs-sm); margin-right: 6px; white-space: nowrap; }
 .frr-pts.fo-pts { width: 58px; line-height: 1.1; }
-.fo-gain { display: block; font-size: 11px; font-weight: 700; color: var(--green); }
-.fo-gain.is-neg { color: var(--red); }
-.fo-label { flex: 1 1 200px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.fo-gain { display: block; font-size: var(--fs-xs); font-weight: 700; color: var(--live); }
+.fo-gain.is-neg { color: var(--danger); }
+.fo-label { flex: 1 1 200px; display: flex; flex-direction: column; gap: var(--s-1); font-size: var(--fs-sm); color: var(--text-2); }
 .fo-upd { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .fo-fill .hint { margin: 0 0 6px; }
-.fo-miss { margin-top: 6px; font-size: 13px; }
-.fo-miss summary { cursor: pointer; color: var(--yellow); font-weight: 600; }
-.fan-table tr.is-me td { background: rgba(255, 204, 0, 0.06); }
-.fan-mc-you.is-in { color: var(--green); }
+.fo-miss { margin-top: 6px; font-size: var(--fs-md); }
+.fo-miss summary { cursor: pointer; color: var(--accent-2); font-weight: 600; }
 
-@media (max-width: 900px) { .fan-picked-card { top: 79px; } }
-.fan-picked-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.fan-picked-strip { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .fan-picked-chip {
-  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font-family: inherit;
-  background: var(--panel-3); border: 1px solid var(--border); color: var(--text);
-  padding: 7px 11px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--text);
+  min-height: 36px; padding: 0 var(--s-3); border-radius: var(--r-pill); font-size: var(--fs-md); font-weight: 500;
 }
-.fan-picked-chip:hover { border-color: var(--red); }
-.fan-picked-chip .fan-x { color: var(--muted); font-size: 11px; }
-.fan-picked-chip.is-empty { cursor: default; border-style: dashed; color: var(--muted); background: transparent; min-width: 44px; justify-content: center; }
+.fan-picked-chip:hover { border-color: var(--danger); }
+.fan-picked-chip .fan-x { color: var(--text-2); font-size: var(--fs-xs); }
+.fan-picked-chip.is-empty { cursor: default; border-style: dashed; color: var(--text-2); background: transparent; min-width: 44px; justify-content: center; }
 
-.fan-cvc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.fan-cvc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: var(--s-3); }
 .fan-cvc-slot {
-  display: flex; flex-direction: column; gap: 3px; text-align: left; cursor: pointer; font-family: inherit;
-  background: var(--panel-2); border: 1px dashed var(--border); color: var(--text);
-  padding: 10px 12px; border-radius: 12px;
+  display: flex; flex-direction: column; gap: 3px; text-align: left; cursor: pointer;
+  background: var(--bg-2); border: 1px dashed var(--line-strong); color: var(--text);
+  padding: 10px var(--s-3); border-radius: var(--r-md); min-height: var(--tap);
 }
-.fan-cvc-slot:hover { border-color: #4a4a52; }
+.fan-cvc-slot:hover { border-color: var(--text-2); }
 .fan-cvc-slot.is-set { border-style: solid; }
-.fan-cvc-slot.is-armed { border-color: var(--gold); background: rgba(255, 204, 0, 0.1); border-style: solid; }
-.fan-cvc-k { font-size: 10.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
-.fan-cvc-slot.is-armed .fan-cvc-k { color: var(--yellow); }
-.fan-cvc-v { font-size: 14px; font-weight: 700; }
-.fan-cvc-slot:not(.is-set) .fan-cvc-v { color: var(--muted); font-weight: 500; }
+.fan-cvc-slot.is-armed { border-color: var(--accent); background: var(--accent-soft); border-style: solid; }
+.fan-cvc-k { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+.fan-cvc-slot.is-armed .fan-cvc-k { color: var(--accent-2); }
+.fan-cvc-v { font-size: var(--fs-md); font-weight: 600; }
+.fan-cvc-slot:not(.is-set) .fan-cvc-v { color: var(--text-2); font-weight: 500; }
 
-.fan-squad-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; margin: 16px 0; align-items: start; }
-.fan-squad-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
-.fan-squad-head { display: flex; align-items: center; gap: 9px; padding: 2px 4px 10px; border-bottom: 1px solid var(--panel-3); margin-bottom: 8px; }
-.fan-squad-head b { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fan-squad-count { flex: none; font-size: 12px; font-weight: 800; color: var(--muted); }
+.fan-squad-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--s-4); margin: var(--s-4) 0; align-items: start; }
+.fan-squad-col { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s-3); }
+.fan-squad-head { display: flex; align-items: center; gap: var(--s-2); padding: 2px var(--s-1) 10px; border-bottom: 1px solid var(--line); margin-bottom: var(--s-2); }
+.fan-squad-head b { flex: 1; min-width: 0; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-squad-count { flex: none; font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
 .fan-plist { display: flex; flex-direction: column; gap: 6px; }
 
 .fan-ptile {
-  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
-  font-family: inherit; color: var(--text);
-  background: var(--panel-2); border: 1px solid var(--border); border-radius: 11px; padding: 8px 10px;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer; color: var(--text);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-2) 10px; min-height: var(--tap);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
-.fan-ptile:hover:not(:disabled) { border-color: #4a4a52; }
-.fan-ptile.on { border-color: var(--gold); background: rgba(255, 204, 0, 0.12); }
+.fan-ptile:hover:not(:disabled) { border-color: var(--line-strong); }
+.fan-ptile.on { border-color: var(--accent); background: var(--accent-soft); }
 .fan-ptile.is-full { opacity: 0.35; cursor: not-allowed; }
-.fan-ptile-av {
-  flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background: var(--panel-3); border: 1px solid var(--border); font-size: 12px; font-weight: 800; color: var(--muted);
-}
-.fan-ptile.on .fan-ptile-av { background: var(--gold); color: #1a1300; border-color: transparent; }
+.fan-ptile-av { flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--card-2); border: 1px solid var(--line); font-size: var(--fs-sm); font-weight: 700; color: var(--text-2); }
+.fan-ptile.on .fan-ptile-av { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .fan-ptile-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.fan-ptile-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fan-ptile-stat { font-size: 11px; color: var(--muted); }
-.fan-ptile-badge { flex: none; font-size: 10px; font-weight: 800; min-width: 22px; text-align: right; color: var(--yellow); }
-.fan-ptile.is-c .fan-ptile-badge, .fan-ptile.is-vc .fan-ptile-badge {
-  min-width: 0; padding: 2px 6px; border-radius: 5px; color: #fff; background: var(--red);
-}
-.fan-ptile.is-vc .fan-ptile-badge { background: var(--gold); color: #1a1300; }
+.fan-ptile-name { font-size: var(--fs-md); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-ptile-stat { font-size: var(--fs-xs); color: var(--text-2); }
+.fan-ptile-badge { flex: none; font-size: 10px; font-weight: 700; min-width: 22px; text-align: right; color: var(--accent-2); }
+.fan-ptile.is-c .fan-ptile-badge, .fan-ptile.is-vc .fan-ptile-badge { min-width: 0; padding: 2px 6px; border-radius: 5px; }
+.fan-ptile.is-c .fan-ptile-badge { background: var(--gold); color: var(--on-gold); }
+.fan-ptile.is-vc .fan-ptile-badge { background: transparent; color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-2); }
 
+/* Save bar: sticks to the bottom of the viewport - and on phones/tablets it
+   rides ABOVE the fixed bottom tab bar instead of hiding under it. */
 .fan-savebar {
-  position: sticky; bottom: 0; z-index: 4;
+  position: sticky; z-index: 4;
+  bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom) + var(--s-2));
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  background: rgba(22, 22, 24, 0.94); backdrop-filter: blur(8px);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 12px 14px; margin-bottom: 8px;
+  background: var(--card-2); border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  padding: var(--s-3) var(--s-4); margin-bottom: var(--s-2);
+  box-shadow: 0 -6px 24px rgba(5, 9, 18, 0.5);
 }
-.fan-savebar-count { font-size: 13px; font-weight: 800; color: var(--muted); flex: none; }
-.fan-savebar-msg { flex: 1; min-width: 120px; font-size: 13px; }
-.fan-savebar-msg.is-bad { color: var(--yellow); }
-.fan-savebar-msg.is-ok { color: var(--green); }
+@media (min-width: 1024px) { .fan-savebar { bottom: var(--s-3); } }
+.fan-savebar-count { font-size: var(--fs-md); font-weight: 700; color: var(--text-2); flex: none; font-variant-numeric: tabular-nums; }
+.fan-savebar-msg { flex: 1; min-width: 120px; font-size: var(--fs-md); }
+.fan-savebar-msg.is-bad { color: var(--gold); }
+.fan-savebar-msg.is-ok { color: var(--live); }
 
 /* ---- everyone's teams ---- */
 .fan-hidden-note .hint { margin: 0; }
-.fan-teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; align-items: start; }
-.fan-team-card.is-me { border-color: var(--gold); }
+.fan-teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: var(--s-4); align-items: start; }
+.fan-team-card.is-me { border-color: rgba(59, 130, 246, 0.6); }
 .fan-tc-head { display: flex; align-items: center; gap: 10px; }
-.fan-tc-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fan-av {
-  flex: none; width: 32px; height: 32px; border-radius: 50%; background-size: cover; background-position: center;
-  display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #1a1300;
-}
+.fan-tc-name { flex: 1; min-width: 0; font-size: var(--fs-base); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fan-av { flex: none; width: 32px; height: 32px; border-radius: 50%; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: var(--fs-sm); font-weight: 700; color: #0B1220; }
 .fan-pchip.is-gone { opacity: 0.55; }
 .fan-pchip.is-gone .fen-pname { font-style: italic; }
 
 /* ---- editor forms ---- */
-.fan-form-warn {
-  background: rgba(255, 204, 0, 0.1); border: 1px solid var(--gold); border-radius: 12px;
-  padding: 11px 13px; font-size: 13px; line-height: 1.5;
-  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-}
-.fan-publish-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--panel-3); }
-.fan-publish-state { flex: 1; min-width: 160px; font-size: 13px; color: var(--muted); }
+.fan-form-warn { background: var(--gold-soft); border: 1px solid rgba(245, 189, 79, 0.5); border-radius: var(--r-md); padding: var(--s-3); font-size: var(--fs-md); line-height: 1.5; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.fan-publish-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.fan-publish-state { flex: 1; min-width: 160px; font-size: var(--fs-md); color: var(--text-2); }
 
-/* One-row swipe bar on small screens (same treatment as .subtabs /
-   .season-tabs at the end of styles.css). */
-@media (max-width: 760px) {
-  .fan-subnav {
-    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
-  }
-  .fan-subnav::-webkit-scrollbar { display: none; }
-  .fan-tab { flex: none; white-space: nowrap; }
-
-  /* The picked squad becomes a one-row scroller so the player lists stay in
-     view while you build, and the save bar clears the home indicator. */
-  .fan-picked-strip {
-    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);
-    padding-bottom: 2px;
-  }
+/* Phones: the picked squad becomes a one-row scroller so the player lists
+   stay in view; what to do next reads before the Save button. */
+@media (max-width: 767px) {
+  .fan-picked-strip { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; }
   .fan-picked-strip::-webkit-scrollbar { display: none; }
   .fan-picked-chip { flex: none; }
-  .fan-savebar { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-  /* Full-width and ABOVE the count/button row: what to do next should be read
-     before the button, not after it. */
   .fan-savebar-msg { order: -1; flex-basis: 100%; }
-  .fan-builder-title { font-size: 15px; }
+  .fan-builder-title { font-size: var(--fs-base); }
 }

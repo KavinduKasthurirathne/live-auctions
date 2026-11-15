@@ -31,6 +31,8 @@ Two ways to run, automatically chosen:
 - [Deployment](#-deployment)
 - [Firebase setup](#-firebase-setup)
 - [Branding a new season](#-branding-a-new-season)
+- [Design system](#-design-system)
+- [Images](#-images)
 - [Project structure](#-project-structure)
 - [Tech notes](#-tech-notes)
 
@@ -56,7 +58,14 @@ Two ways to run, automatically chosen:
 - 🖼️ **Player photos & team logos in the cloud**, stored so every viewer sees them.
 - 📷 **Share leaderboards as branded PNG images** (one-tap download).
 - 💾 **Export / import JSON backups** any time, and a graceful offline fallback.
-- 🎨 Dark **red / yellow / black** theme, custom league logo, favicon and tab title.
+- 🏛 **Hall of Fame** - every tournament's champion, runner-up and MVP, headline records,
+  and a profile for each player (photo, teams, career stats, honours), built only from data
+  the site already has.
+- 🎨 **"Midnight Stadium" design** - a dark navy, mobile-first interface (desktop top nav,
+  phone bottom tab bar), Space Grotesk + Inter, Lucide icons, skeleton loading, AA contrast,
+  reduced-motion support. See [Design system](#-design-system).
+- ⚡ **Light on data** - images are served as small WebP copies (≈2 MB for the whole set
+  instead of ≈117 MB), and Chart.js / html-to-image load only when first needed.
 
 ---
 
@@ -65,7 +74,7 @@ Two ways to run, automatically chosen:
 When Firebase is configured, a new visitor lands on a **split landing page** (branded
 **HC CHAMPIONS LEAGUE** hero on the left, Google sign-in on the right) - you must sign in
 before you can see anything. After signing in you land on the **🏠 Home** tab (league
-hero + a sliding carousel of past seasons). The season results are **cloud-backed** the
+hero, a "Live now" card for the current tournament, and the latest champions). The season results are **cloud-backed** the
 same way rankings are: they live in Firestore at `home/seasons` (seed once, read-only) so
 every device shows the same champions/MVPs, with the bundled `SEASONS` array in
 `js/home.js` as the seed source and offline fallback. Season/team/player **images** ship
@@ -431,6 +440,46 @@ Live mode needs a Firebase project with **Authentication** and **Firestore**:
 
 ---
 
+## 🎨 Design system
+
+"Midnight Stadium": dark-first, minimal, data-dense. Everything is plain CSS - no
+framework, no build step.
+
+- **Tokens** live in `css/tokens.css` (colours, 8px spacing scale, radii, type scale,
+  motion). `styles.css` and `fantasy.css` use only these variables - change a value there
+  and every page follows. Palette: navy `#0B1220` / `#111C2E` / cards `#17243A`, electric
+  blue `#3B82F6` (light blue `#60A5FA` for text), teal `#2DD4BF` for live/leading, gold
+  `#F5BD4F` for champions, `#F87171` for destructive actions. Primary buttons use
+  `#2563EB` so white text passes WCAG AA.
+- **Type:** Space Grotesk for headings and big numbers, Inter for everything else.
+- **Icons:** Lucide (v0.460.0, ISC) as an inline SVG sprite at the top of `index.html`;
+  `HCCLUI.icon("trophy")` (js/ui.js) returns the markup. To add one, paste its `<symbol>`
+  with id `i-<lucide-name>`.
+- **Layout:** mobile-first; breakpoints 640 / 768 / 1024 / 1280; content max 1440px; a
+  12-column grid (`.grid-12`) for page layouts. Below 1024px the nav becomes a bottom tab
+  bar (Home, Tournaments, Auctions, Fantasy, More) and "More" opens the side drawer.
+- **Three tab styles, used consistently:** top nav (`.tab`), underline section tabs
+  (`.subtab`, tournament tabs, fantasy sub-nav), segmented control (`.board-tabs`,
+  fantasy modes, Hall of Fame).
+- **Loading:** `HCCLUI.skeleton(kind, n)` placeholder blocks (with a screen-reader
+  "Loading…").
+- **Motion:** 150-250ms hover/fade transitions only; everything stops under
+  `prefers-reduced-motion`.
+
+## 🖼 Images
+
+Originals stay in `assets/`; the site serves lightweight WebP copies from `assets-web/`.
+After adding or renaming any image:
+
+```bash
+npm i --no-save sharp             # once, on your machine
+node tools/optimize-images.js     # writes assets-web/... copies (incremental; --force rebuilds)
+node tools/gen-assets.js          # points js/asset-manifest.js at the copies
+```
+
+Commit both `assets/` and `assets-web/`. If a copy is missing, the manifest falls back to the
+original, so nothing breaks - it's just heavier.
+
 ## 📁 Project structure
 
 Files are grouped into folders; `index.html`, `vercel.json`, `.gitignore`, and the
@@ -439,25 +488,26 @@ the HTML/JS are relative to it).
 
 | Path | Purpose |
 |------|---------|
-| `index.html` | Page structure (header, auction tabs, Insights view, fantasy mount, overlays) |
+| `index.html` | Page shell (header, nav, bottom bar, icon sprite, auction & setup markup, overlays) |
 | `vercel.json` | Static host config / optional auth rewrites |
-| `firebase-init.js` | Google auth, roles, members, split landing page, `window.HCCL` API |
+| `firebase-init.js` | Google auth, roles, members, sign-in screen, `window.HCCL` API |
 | `firebase-config.js` | Public Firebase web config + admin email list |
-| `firestore.rules` | Security rules (roles; `/auction` `/fantasy` `/ranking` `/home` `/mvp` read/write gating) |
-| `js/app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, season stats, Firestore sync |
+| `firestore.rules` | Security rules (roles and read/write gating) |
+| `js/ui.js` | Shared UI helpers: icons, skeletons, on-demand script loader (`window.HCCLUI`) |
+| `js/app.js` | Auction logic, Squad Tracker/Safe Bid, Insights, navigation, Firestore sync |
+| `js/series.js` | Tournaments registry + tournament pages (`window.HCCLSeries`) |
+| `js/season-archive.js` | HCCL season honours, playoffs, leaderboards, stats-sheet machinery |
+| `js/hall-of-fame.js` | Hall of Fame, records and player profiles (read-only) |
+| `js/home.js` | Home page: hero, live tournament card, recent champions |
 | `js/fantasy-engine.js` | Fantasy scoring, lock state, squad validation, standings (pure, Node-testable) |
-| `js/fantasy.js` | Fantasy league view + Firestore sync (Phase C) + self-serve entries |
-| `js/home.js` | Home page: hero + past-seasons carousel + Firestore read/seed of `home/seasons` |
-| `js/ranking.js` | Player Ranking boards UI + Firestore read/seed of `ranking/league` |
-| `js/ranking-engine.js` | Rating math (batting/bowling/all-rounder) from the stats CSV |
-| `js/ranking-data.js` | Bundled stats CSV + `HCCL_STATS_VERSION` (ranking source/fallback) |
-| `js/mvp.js` | MVP boards UI + STUMPS PDF upload (pdf.js) + realtime `mvp/{matchId}` sync |
-| `js/mvp-engine.js` | Hybrid MVP model: PDF-scorecard parser + scoring + season aggregation |
-| `css/styles.css` | Theme + auction UI + Squad Tracker / insights / role gating |
-| `css/fantasy.css` | Fantasy tab styling |
-| `assets/brand-logo.jpeg` | League logo for the sign-in wall and default favicon |
-| `docs/HCCL Player Stats/` | Raw stats exports (source for regenerating `js/ranking-data.js`) |
-| `docs/HCCL Batting Rankings Explanation.pdf` | Reference doc for the batting rating math |
+| `js/fantasy.js` / `js/fantasy-season.js` | Fantasy views (Daily / Weekly / Overall) + Firestore sync |
+| `js/members.js` / `js/photo-library.js` | Members & engagement board; cloud player-photo library |
+| `js/asset-manifest.js` | GENERATED image index (`node tools/gen-assets.js`) |
+| `css/tokens.css` | Design tokens (see Design system) |
+| `css/styles.css` | Base, layout, components and every page except fantasy |
+| `css/fantasy.css` | Fantasy styling |
+| `assets/` · `assets-web/` | Original images · lightweight WebP copies the site serves |
+| `tools/gen-assets.js` · `tools/optimize-images.js` | Manifest generator · WebP copy maker |
 
 ---
 
@@ -469,8 +519,8 @@ the HTML/JS are relative to it).
   local storage; Firestore takes over transparently in cloud mode.
 - **`window.HCCL`** is the bridge the auction/fantasy modules use for auth state, roles
   (`canEdit()`, `isAdmin()`), the `onChange` sign-in hook, and Firestore helpers.
-- **Image sharing** uses `html-to-image`, **charts** use `Chart.js`, and **MVP PDF parsing**
-  uses `pdf.js` - all from a CDN, no npm/build step.
+- **Image sharing** uses `html-to-image` and **charts** use `Chart.js`, both from a CDN and
+  loaded on first use (`HCCLUI.loadLib`), not on page load - no npm/build step.
 - **Resilient by design:** every cloud path has a local-storage fallback, so a blocked or
   offline Firestore never bricks the app.
 

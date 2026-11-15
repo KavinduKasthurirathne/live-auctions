@@ -194,13 +194,13 @@
     if (!el) return;
     if (!canEdit()) { el.innerHTML = ""; el.hidden = true; return; }
     el.hidden = false;
-    const head = `<h3>📸 Player Photo Library</h3>
+    const head = `<h3>Player Photo Library</h3>
       <p class="hint">One photo per player name, kept permanently in the cloud. Every tournament, the auction and the stats pages find it by name - no file to add, no redeploy. A photo uploaded for a player in the form above is copied here automatically if the library doesn't have one yet.</p>`;
     if (!cloudOn()) {
       el.innerHTML = head + `<p class="hint">The library lives in the shared cloud - sign in to manage it. Bundled photos still show offline.</p>`;
       return;
     }
-    if (!loaded) { el.innerHTML = head + `<p class="hint">Loading the library…</p>`; return; }
+    if (!loaded) { el.innerHTML = head + (window.HCCLUI ? window.HCCLUI.skeleton("tiles", 6, "Loading the library…") : `<p class="hint">Loading the library…</p>`); return; }
 
     const pending = pendingBundled().length;
     const f = ui.filter.trim().toLowerCase();
@@ -213,14 +213,14 @@
       </div>
       <div class="pl-bar">
         <span class="pl-count"><b>${lib.size}</b> photo${lib.size === 1 ? "" : "s"} in the library</span>
-        ${pending ? `<button class="btn btn-dark btn-mini" data-pl-seed ${seeding ? "disabled" : ""}>${seeding ? "Copying…" : `⬆ Copy ${pending} bundled photo${pending === 1 ? "" : "s"} to the library`}</button>` : `<span class="hint">All bundled photos are in the library.</span>`}
-        <input type="search" id="plFilter" placeholder="Search…" value="${esc(ui.filter)}" />
+        ${pending ? `<button class="btn btn-dark btn-mini" data-pl-seed ${seeding ? "disabled" : ""}>${seeding ? "Copying…" : `Copy ${pending} bundled photo${pending === 1 ? "" : "s"} to the library`}</button>` : `<span class="hint">All bundled photos are in the library.</span>`}
+        <input type="search" id="plFilter" placeholder="Search…" aria-label="Search the photo library" value="${esc(ui.filter)}" />
       </div>
       <div class="pl-grid">${rows.length ? rows.map(r => `
         <div class="pl-item" title="${esc(r.name)}">
           <span class="pl-thumb" style="background-image:url('${r.data}')"></span>
           <span class="pl-name">${esc(r.name)}</span>
-          <button class="icon-btn del" data-pl-del="${esc(r.key)}" title="Remove from the library">✕</button>
+          <button class="icon-btn del" data-pl-del="${esc(r.key)}" title="Remove from the library" aria-label="Remove ${esc(r.name)} from the library">${window.HCCLUI ? window.HCCLUI.icon("trash-2", "sm") : "✕"}</button>
         </div>`).join("") : `<p class="hint">${f ? "No player matches that search." : "The library is empty - copy the bundled photos above, or upload one."}</p>`}</div>`;
   }
 

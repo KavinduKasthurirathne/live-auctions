@@ -167,7 +167,7 @@
   let activeBoard = "overall";
 
   /* ---------- bubble helpers (team logos / player photos) ---------- */
-  const BUBBLE_COLORS = ["#e10600", "#f5b301", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
+  const BUBBLE_COLORS = ["#60A5FA", "#2DD4BF", "#F5BD4F", "#A78BFA", "#F472B6", "#38BDF8", "#34D399", "#FB923C"];
   function bubbleColor(s) {
     let h = 0; s = String(s || "");
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
@@ -263,10 +263,13 @@
   (function collect(o) {
     Object.values(o || {}).forEach(v => { if (typeof v === "string") KNOWN_ASSETS.add(v); else if (v && typeof v === "object") collect(v); });
   })({ a: AM.playerPhotoIndex, b: AM.teamLogoFolders, c: AM.teamLogoIndex, d: AM.seasonLogos, e: AM.tournamentLogoIndex });
+  // original "assets/..." path -> its lightweight assets-web copy (tools/optimize-images.js)
+  const WEB_MAP = AM.webMap || {};
   function logoFor(stored, name, seasonNo) {
     const s = String(stored || "");
     let p = s;
     try { p = decodeURI(s); } catch (e) { /* not URI-encoded */ }
+    if (WEB_MAP[p]) return assetUrl(WEB_MAP[p]);
     const stale = KNOWN_ASSETS.size > 0 && /^assets\//i.test(p) && !KNOWN_ASSETS.has(p);
     if (s && !stale) return s;
     return (seasonNo ? seasonLogo(seasonNo) : "") || tournamentLogo(name);
@@ -279,18 +282,30 @@
       : `<span class="bubble fallback" style="background:${bubbleColor(value)}">${esc(firstInitial(value))}</span>`;
   }
 
+  // A real player name (not a placeholder) opens that player's Hall of Fame
+  // profile when tapped (js/hall-of-fame.js listens for [data-player]).
+  const PLACEHOLDER = /^(|tbd|tba|-+|\?|n\/a)$/i;
+  const playerAttr = name => (PLACEHOLDER.test(String(name || "").trim()) ? ""
+    : ` data-player="${esc(String(name).trim())}" role="button" tabindex="0"`);
   function podiumItem(cls, role, kind, value) {
-    return `<div class="podium-item ${cls}">
+    return `<div class="podium-item ${cls}"${kind === "player" ? playerAttr(value) : ""}>
       ${bubble(kind, value)}
       <span class="podium-role">${role}</span>
       <span class="podium-name">${esc(value)}</span>
     </div>`;
   }
+  // `icon` may be a legacy emoji (🏏 / 🎯) or a Lucide name; both render as
+  // the matching Lucide icon so every caller gets the same look.
+  const EXTRA_ICONS = { "🏏": "zap", "🎯": "target" };
+  function extraIcon(icon) {
+    const name = EXTRA_ICONS[icon] || icon;
+    return window.HCCLUI && /^[a-z0-9-]+$/.test(name || "") ? window.HCCLUI.icon(name, "sm") : esc(icon || "");
+  }
   function extraItem(icon, label, name) {
-    return `<div class="extra-item">
+    return `<div class="extra-item"${playerAttr(name)}>
       ${bubble("player", name)}
       <div class="extra-meta">
-        <span class="extra-label">${icon} ${label}</span>
+        <span class="extra-label">${extraIcon(icon)} ${label}</span>
         <span class="extra-name">${esc(name)}</span>
       </div>
     </div>`;
@@ -528,7 +543,7 @@
   function overallBoard(rows) {
     const cols = [
       { label: "#", cell: r => esc(r[COL.no]) },
-      { label: "Player", cell: r => `<span class="lb-player">${esc(r[COL.name])}</span>` },
+      { label: "Player", cell: r => `<span class="lb-player player-link"${playerAttr(r[COL.name])}>${esc(r[COL.name])}</span>` },
       { label: "Team", cell: r => teamCell(r[COL.team]) },
       { label: "M", num: true, cell: r => esc(r[COL.matches]) },
       { label: "Runs", num: true, cell: r => esc(r[COL.runs]) },
@@ -577,7 +592,7 @@
     const sorted = rows.slice().sort(byRuns);
     const cols = [
       { label: "#", num: true, cell: (r, i) => String(i + 1) },
-      { label: "Player", cell: r => `<span class="lb-player">${esc(r[COL.name])}</span>` },
+      { label: "Player", cell: r => `<span class="lb-player player-link"${playerAttr(r[COL.name])}>${esc(r[COL.name])}</span>` },
       { label: "Team", cell: r => teamCell(r[COL.team]) },
       { label: "Runs", num: true, cell: r => esc(r[COL.runs]) },
       { label: "Bat Avg", num: true, cell: r => esc(r[COL.batAvg]) },
@@ -593,7 +608,7 @@
     const sorted = rows.slice().sort(byWickets);
     const cols = [
       { label: "#", num: true, cell: (r, i) => String(i + 1) },
-      { label: "Player", cell: r => `<span class="lb-player">${esc(r[COL.name])}</span>` },
+      { label: "Player", cell: r => `<span class="lb-player player-link"${playerAttr(r[COL.name])}>${esc(r[COL.name])}</span>` },
       { label: "Team", cell: r => teamCell(r[COL.team]) },
       { label: "Wkts", num: true, cell: r => esc(r[COL.wickets]) },
       { label: "Econ", num: true, cell: r => esc(r[COL.econ]) },
@@ -633,7 +648,7 @@
   function seasonTabsHtml(list) {
     return list.map(s =>
       `<button class="season-tab${s.no === activeSeason ? " active" : ""}" data-season="${s.no}">
-        Season ${pad2(s.no)}${s.ongoing ? `<span class="season-tab-live">● LIVE</span>` : ""}
+        Season ${pad2(s.no)}${s.ongoing ? `<span class="season-tab-live">LIVE</span>` : ""}
       </button>`).join("");
   }
 
@@ -662,7 +677,7 @@
           <div class="season-boards-head">
             <h3 class="season-boards-title">Season ${pad2(s.no)} · Player Stats</h3>
             <label class="btn btn-yellow file-btn season-stats-import" title="Upload the Season ${pad2(s.no)} stats CSV - updates the leaderboard for everyone (raw STUMPS exports are fine)">
-              <span>⬆ Import Season Stats</span>
+              ${window.HCCLUI ? window.HCCLUI.icon("upload") : ""}<span>Import Season Stats</span>
               <input type="file" class="season-stats-import-file" data-season="${s.no}" accept=".csv,text/csv" hidden />
             </label>
           </div>
@@ -1026,7 +1041,7 @@
         ${podiumItem("runner", "Runner-up", kind, h.runnerUp || "")}
       </div>`;
     },
-    extraItem, bubble, seasonLogo, tournamentLogo, logoFor,
+    extraItem, bubble, seasonLogo, tournamentLogo, logoFor, teamLogo, playerPhoto,
     /* ---- reusable stats-sheet machinery (per-tournament sheets in series.js) ---- */
     // Raw STUMPS exports carry a few preamble rows (app title, tournament
     // name, tour id) before the real header - drop everything above it so
@@ -1102,12 +1117,31 @@
       // bundled per-season sheets (+ any live override) …
       getSeasons().forEach(s => { const r = seasonRows(s.no); if (r && r.length) sheets.push({ name: `HCCL Season ${pad2(s.no)}`, rows: r }); });
       // … the bundled per-tournament sheets …
-      (window.HCCL_TOURNAMENT_STATS || []).forEach(t => {
-        if (t && t.csv) sheets.push({ name: t.name || t.id || "Tournament", rows: api.rowsFromCsv(t.csv) });
+      // A cloud import of the SAME tournament supersedes its bundled copy, so
+      // a player's runs are counted once, not twice. Matched by registry id,
+      // or by the loose name canon (so "Mini IPL 2026" == "HC Mini IPL 2026").
+      // Twin registry entries can each carry an import of the same event -
+      // keep one per tournament (same canon name or identical sheet text).
+      const seenExtra = new Set();
+      const extras = (extraSheets || []).filter(x => {
+        if (!x || !x.csv) return false;
+        const canon = logoCanon(x.name || "");
+        const k1 = canon ? "n:" + canon : "", k2 = "c:" + x.csv;
+        if ((k1 && seenExtra.has(k1)) || seenExtra.has(k2)) return false;
+        if (k1) seenExtra.add(k1);
+        seenExtra.add(k2);
+        return true;
       });
-      // … and anything the caller supplies ({ name, csv }).
-      (extraSheets || []).forEach(x => {
-        if (x && x.csv) sheets.push({ name: x.name || "Tournament", rows: api.rowsFromCsv(x.csv) });
+      const extraIds = new Set(extras.map(x => x.id).filter(Boolean));
+      const extraNames = new Set(extras.map(x => logoCanon(x.name)).filter(Boolean));
+      (window.HCCL_TOURNAMENT_STATS || []).forEach(t => {
+        if (!t || !t.csv) return;
+        if ((t.id && extraIds.has(t.id)) || (t.name && extraNames.has(logoCanon(t.name)))) return;
+        sheets.push({ name: t.name || t.id || "Tournament", rows: api.rowsFromCsv(t.csv) });
+      });
+      // … and anything the caller supplies ({ id?, name, csv }).
+      extras.forEach(x => {
+        sheets.push({ name: x.name || "Tournament", rows: api.rowsFromCsv(x.csv) });
       });
 
       const key = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -1155,6 +1189,48 @@
         average:    outs > 0 ? round1(a.runs / outs) : (a.runs > 0 ? round1(a.runs) : 0),
         strikeRate: a.ballsFaced > 0 ? round1((a.runs / a.ballsFaced) * 100) : 0,
         economy:    overs > 0 ? round1(a.runsConceded / overs) : 0,
+      };
+    },
+    /* ---------- Hall of Fame / player profiles ----------
+       statLines(sheets): sheets = [{ id, name, rows }] - ONE sheet per
+       tournament (the caller picks the effective one: cloud import, else the
+       bundled copy), so nothing is ever counted twice. Returns a Map
+       key -> { name, lines: [{ id, tournament, team, matches, runs, wickets,
+       batInn, ballsFaced, notOuts, runsConceded, ballsBowled }] }. */
+    statLines(sheets) {
+      const key = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
+      const idx = new Map();
+      (sheets || []).forEach(sheet => {
+        (sheet.rows || []).forEach(r => {
+          const nm = (r[COL.name] || "").trim();
+          if (!nm) return;
+          const k = key(nm);
+          if (!idx.has(k)) idx.set(k, { name: nm, lines: [] });
+          idx.get(k).lines.push({
+            id: sheet.id, tournament: sheet.name, team: (r[COL.team] || "").trim(),
+            matches: num(r[COL.matches]), runs: num(r[COL.runs]), wickets: num(r[COL.wickets]),
+            batInn: num(r[COL.batInn]), ballsFaced: num(r[COL.ballsFaced]), notOuts: num(r[COL.notOuts]),
+            runsConceded: num(r[COL.runsConceded]), ballsBowled: num(r[COL.ballsBowled]),
+          });
+        });
+      });
+      return idx;
+    },
+    // Career line from statLines() lines - the SAME formulas as
+    // careerStatsFor() above (guarded average, SR from balls faced, economy
+    // per 6-ball over), so a profile and the Setup preview agree.
+    careerTotals(lines) {
+      const t = { matches: 0, runs: 0, wickets: 0, batInn: 0, ballsFaced: 0, notOuts: 0, runsConceded: 0, ballsBowled: 0 };
+      (lines || []).forEach(l => Object.keys(t).forEach(k => { t[k] += l[k] || 0; }));
+      const round1 = v => Math.round(v * 10) / 10;
+      const outs = t.batInn - t.notOuts;
+      const overs = t.ballsBowled / 6;
+      return {
+        matches: t.matches, runs: t.runs, wickets: t.wickets,
+        average:    outs > 0 ? round1(t.runs / outs) : (t.runs > 0 ? round1(t.runs) : 0),
+        strikeRate: t.ballsFaced > 0 ? round1((t.runs / t.ballsFaced) * 100) : 0,
+        economy:    overs > 0 ? round1(t.runsConceded / overs) : 0,
+        bowled: t.ballsBowled > 0, batted: t.batInn > 0 || t.ballsFaced > 0,
       };
     },
     // Fired whenever the underlying data changes (cloud honors, live CSV).

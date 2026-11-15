@@ -41,7 +41,7 @@
   const ENG = window.HCCLFantasyEngine;
   const LEGACY_TID = "hccl-s6";
   const MODES = ["daily", "weekly", "overall"];
-  const MODE_LABEL = { daily: "🗓 Daily", weekly: "📅 Weekly", overall: "🏆 Overall" };
+  const MODE_LABEL = { daily: "Daily", weekly: "Weekly", overall: "Overall" };
   const MODE_KEY = "hccl_fantasy_mode";
 
   /* ---------------- tiny helpers ---------------- */
@@ -57,7 +57,10 @@
   const fs = () => H().fs;
   const db = () => H().db;
   const fmtPts = n => { const v = Math.round((Number(n) || 0) * 10) / 10; return String(v); };
-  const medal = i => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : String(i + 1));
+  // Rank cell: gold / silver / bronze badges for the podium, plain numbers after.
+  const medal = i => (i < 3 ? `<span class="rank r${i + 1}">${i + 1}</span>` : `<span class="rank">${i + 1}</span>`);
+  const ic = (n, c) => (window.HCCLUI ? window.HCCLUI.icon(n, c) : "");
+  const skel = (kind, n, label) => (window.HCCLUI ? window.HCCLUI.skeleton(kind, n, label) : `<div class="card"><p class="hint">${label}</p></div>`);
   const pad2 = n => String(n).padStart(2, "0");
   function ymd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
   function toLocalInput(ms) {
@@ -405,14 +408,14 @@
   function subnavHtml(mode) {
     const tab = (k, label, cur, attr) => `<button class="fan-tab ${cur === k ? "active" : ""}" ${attr}="${k}">${label}</button>`;
     if (mode === "weekly") {
-      return tab("weeks", "📅 Weeks", UI.wTab, "data-fs-wtab") + tab("board", "🏆 Leaderboard", UI.wTab, "data-fs-wtab");
+      return tab("weeks", `${ic("calendar-range")}<span>Weeks</span>`, UI.wTab, "data-fs-wtab") + tab("board", `${ic("trophy")}<span>Leaderboard</span>`, UI.wTab, "data-fs-wtab");
     }
     if (mode === "overall") {
       const st = seasonSt();
-      return tab("team", "🧢 My Team", UI.oTab, "data-fs-otab")
-        + tab("board", "🏆 Leaderboard", UI.oTab, "data-fs-otab")
-        + ((st === "swaps" || st === "closed" || canEdit()) ? tab("teams", "👥 All Teams", UI.oTab, "data-fs-otab") : "")
-        + (canEdit() ? tab("scores", "📝 Scores", UI.oTab, "data-fs-otab") + tab("season", "⚙️ Season", UI.oTab, "data-fs-otab") : "");
+      return tab("team", `${ic("shirt")}<span>My Team</span>`, UI.oTab, "data-fs-otab")
+        + tab("board", `${ic("trophy")}<span>Leaderboard</span>`, UI.oTab, "data-fs-otab")
+        + ((st === "swaps" || st === "closed" || canEdit()) ? tab("teams", `${ic("users")}<span>All Teams</span>`, UI.oTab, "data-fs-otab") : "")
+        + (canEdit() ? tab("scores", `${ic("notebook-pen")}<span>Scores</span>`, UI.oTab, "data-fs-otab") + tab("season", `${ic("settings")}<span>Season</span>`, UI.oTab, "data-fs-otab") : "");
     }
     return "";
   }
@@ -429,9 +432,9 @@
     return `<div class="card fs-modes-card">
       <h3>Fantasy modes</h3>
       <p class="hint">Choose what members can play. Teams &amp; players below are shared by every mode. Editors always see all three so a mode can be set up before it's switched on.</p>
-      ${row("daily", "🗓 Daily", "a team per match, as it works today")}
-      ${row("weekly", "📅 Weekly", "a team of 7 from the whole tournament, per week")}
-      ${row("overall", "🏆 Overall", "one team of 7 for the season, with " + (cfg.overall.maxSwaps) + " swaps")}
+      ${row("daily", "Daily", "a team per match, as it works today")}
+      ${row("weekly", "Weekly", "a team of 7 from the whole tournament, per week")}
+      ${row("overall", "Overall", "one team of 7 for the season, with " + (cfg.overall.maxSwaps) + " swaps")}
     </div>`;
   }
   /* Writes ONLY the key that changed (a merge deep-merges the modes map), and
@@ -463,13 +466,13 @@
       body.innerHTML = `<div class="card"><p class="hint">Weekly and Overall fantasy run in the shared cloud - sign in to play.</p></div>`;
       return;
     }
-    if (!cfgLoaded) { body.innerHTML = `<div class="card"><p class="hint">Loading…</p></div>`; return; }
+    if (!cfgLoaded) { body.innerHTML = skel("cards", 3, "Loading…"); return; }
     const offNote = (canEdit() && !cfg.modes[mode])
       ? `<div class="card fs-off-note"><p class="hint"><b>${MODE_LABEL[mode]} is hidden from members.</b> Set it up here, then switch it on.</p>
           <button class="btn btn-yellow btn-mini" data-fs-mode-on="${mode}">Switch on for members</button></div>` : "";
     if (!pool().teams.length) {
       body.innerHTML = offNote + `<div class="card"><h3>No teams yet</h3><p class="hint">${canEdit()
-        ? "Add the tournament teams &amp; players first - <b>🗓 Daily → ⚙️ Manage</b>. Every mode uses the same pool."
+        ? "Add the tournament teams &amp; players first - <b>Daily → Manage</b>. Every mode uses the same pool."
         : "The league hasn't been set up yet."}</p></div>`;
       return;
     }
@@ -492,19 +495,19 @@
      ============================================================ */
   function stateChipWeek(w) {
     const st = ENG.lockState(w, now());
-    if (st === ENG.PUBLISHED) return `<span class="fan-clock is-done">🏁 result in</span>`;
-    if (st === ENG.LOCKED) return `<span class="fan-clock is-locked">🔒 locked - scoring</span>`;
+    if (st === ENG.PUBLISHED) return `<span class="fan-clock is-done">${ic("flag", "sm")}result in</span>`;
+    if (st === ENG.LOCKED) return `<span class="fan-clock is-locked">${ic("lock", "sm")}locked - scoring</span>`;
     if (st === ENG.LEGACY) return `<span class="fan-clock is-locked">no lock time</span>`;
     const left = w.lockAt - now();
-    return `<span class="fan-clock ${left < 600000 ? "is-closing" : ""}" data-fs-countdown="${w.lockAt}">⏳ locks in ${esc(ENG.fmtCountdown(left))}</span>`;
+    return `<span class="fan-clock ${left < 600000 ? "is-closing" : ""}" data-fs-countdown="${w.lockAt}">locks in ${esc(ENG.fmtCountdown(left))}</span>`;
   }
   function seasonChip() {
     const st = seasonSt(), L = cfg.overall.lockAt;
     if (st === "setup") return `<span class="fan-clock is-locked">not set up</span>`;
-    if (st === "closed") return `<span class="fan-clock is-done">🏁 season over</span>`;
-    if (st === "swaps") return `<span class="fan-clock is-locked">🔁 swaps only</span>`;
+    if (st === "closed") return `<span class="fan-clock is-done">${ic("flag", "sm")}season over</span>`;
+    if (st === "swaps") return `<span class="fan-clock is-locked">${ic("repeat", "sm")}swaps only</span>`;
     const left = L - now();
-    return `<span class="fan-clock ${left < 600000 ? "is-closing" : ""}" data-fs-countdown="${L}">⏳ teams lock in ${esc(ENG.fmtCountdown(left))}</span>`;
+    return `<span class="fan-clock ${left < 600000 ? "is-closing" : ""}" data-fs-countdown="${L}">teams lock in ${esc(ENG.fmtCountdown(left))}</span>`;
   }
 
   /* Season points per player across PUBLISHED weeks - the "form guide" on
@@ -591,7 +594,7 @@
       const tag = pid === draft.captainId ? `<span class="cap">C</span>` : pid === draft.viceCaptainId ? `<span class="vc">VC</span>` : "";
       const isNew = baseIds && !baseIds.has(pid);
       return `<button class="fan-picked-chip ${isNew ? "fs-new" : ""}" data-fs-unpick="${pid}" title="Remove">
-        <span class="fen-pname">${esc(pname(pid))}</span>${isNew ? `<span class="fs-new-tag">IN</span>` : ""}${tag}<span class="fan-x">✕</span></button>`;
+        <span class="fen-pname">${esc(pname(pid))}</span>${isNew ? `<span class="fs-new-tag">IN</span>` : ""}${tag}<span class="fan-x">${ic("x", "sm")}</span></button>`;
     }).join("");
     for (let i = draft.playerIds.length; i < size; i++) chips += `<span class="fan-picked-chip is-empty">+</span>`;
     const out = baseIds ? oMine.playerIds.filter(pid => draft.playerIds.indexOf(pid) < 0) : [];
@@ -619,7 +622,7 @@
     if (B.kind === "swap") {
       const left = ENG.swapsLeft(cfg.overall, oMine);
       const n = v.swaps || 0;
-      extra = `<span class="fs-swap-cost ${n > left ? "is-bad" : ""}">🔁 ${n ? `uses ${n} swap${n === 1 ? "" : "s"} · ${Math.max(0, left - n)} left after` : `${left} swap${left === 1 ? "" : "s"} left`}</span>`;
+      extra = `<span class="fs-swap-cost ${n > left ? "is-bad" : ""}">${ic("repeat", "sm")} ${n ? `uses ${n} swap${n === 1 ? "" : "s"} · ${Math.max(0, left - n)} left after` : `${left} swap${left === 1 ? "" : "s"} left`}</span>`;
       label = "Confirm swap";
     } else if (B.kind === "weekly") {
       const mine = myWeekCache.get(B.weekId);
@@ -671,7 +674,7 @@
     return `<div class="fan-entry-players">${(e.playerIds || []).map(pid => {
       const tag = pid === e.captainId ? `<span class="cap">C</span>` : pid === e.viceCaptainId ? `<span class="vc">VC</span>` : "";
       const pts = week ? `<span class="pchip-pts">${fmtPts(ENG.playerEntryPoints(week, e, pid))}</span>` : "";
-      return `<div class="fan-pchip ${playerById(pid) ? "" : "is-gone"}"><span class="fen-ico" aria-hidden="true">👤</span>
+      return `<div class="fan-pchip ${playerById(pid) ? "" : "is-gone"}"><span class="fen-ico" aria-hidden="true">${ic("user", "sm")}</span>
         <span class="fen-pname">${esc(pname(pid))}</span>${tag}${pts}</div>`;
     }).join("")}</div>`;
   }
@@ -699,8 +702,8 @@
     let html = `<div class="card fan-intro"><p class="hint">${list.length
       ? `Pick your best ${ENG.DEFAULT_TEAM_SIZE} from <b>every team in the tournament</b> for the week, plus a captain (2×) and vice-captain (1.5×). Points come from the runs &amp; wickets scored through the week.`
       : (canEdit() ? "No weeks yet - open the first one." : "No weekly contest has been opened yet.")}</p>
-      ${canEdit() ? `<div class="form-row"><button class="btn btn-yellow" data-fs-new-week>＋ New week</button></div>` : ""}</div>`;
-    if (!weeksLoaded) return html + `<div class="card"><p class="hint">Loading weeks…</p></div>`;
+      ${canEdit() ? `<div class="form-row"><button class="btn btn-yellow" data-fs-new-week>${ic("plus")}<span>New week</span></button></div>` : ""}</div>`;
+    if (!weeksLoaded) return html + skel("cards", 3, "Loading weeks…");
     if (!list.length) return html;
     html += `<div class="fan-matches">`;
     list.forEach(w => {
@@ -708,10 +711,10 @@
       const mine = myWeekCache.get(w.id);
       const known = myWeekCache.has(w.id);
       const status = st === ENG.OPEN
-        ? (mine ? `<div class="fan-mc-you is-in">✓ Your team is in</div>` : (known ? `<div class="fan-mc-you">You haven't picked yet</div>` : ""))
-        : (mine ? `<div class="fan-mc-you is-in">✓ You're in${w.hasResults && w.standings ? ` · ${fmtPts((w.standings.find(r => r.k === myUid()) || {}).pts || 0)} pts` : ""}</div>` : (known ? `<div class="fan-mc-you">You didn't enter</div>` : ""));
+        ? (mine ? `<div class="fan-mc-you is-in">${ic("circle-check", "sm")} Your team is in</div>` : (known ? `<div class="fan-mc-you">You haven't picked yet</div>` : ""))
+        : (mine ? `<div class="fan-mc-you is-in">${ic("circle-check", "sm")} You're in${w.hasResults && w.standings ? ` · ${fmtPts((w.standings.find(r => r.k === myUid()) || {}).pts || 0)} pts` : ""}</div>` : (known ? `<div class="fan-mc-you">You didn't enter</div>` : ""));
       const cta = st === ENG.OPEN
-        ? `<button class="btn btn-red" data-fs-open-week="${w.id}" data-fs-goto="build">${mine ? "✎ Edit team" : "Pick team"}</button>`
+        ? `<button class="btn btn-red" data-fs-open-week="${w.id}" data-fs-goto="build">${mine ? "Edit team" : "Pick team"}</button>`
         : `<button class="btn btn-dark" data-fs-open-week="${w.id}" data-fs-goto="teams">View teams</button>`;
       html += `<div class="fan-match-card is-${st}">
         <div class="fan-mc-teams"><span class="fan-mc-team"><b>${esc(w.label || "Week")}</b></span></div>
@@ -719,10 +722,10 @@
         ${stateChipWeek(w)}${status}
         <div class="fan-mc-actions">${cta}</div>
         ${canEdit() ? `<div class="fan-admin-row">
-          <button class="btn btn-dark btn-mini" data-fs-edit-week="${w.id}">✎ Week</button>
-          <button class="btn btn-dark btn-mini" data-fs-open-week="${w.id}" data-fs-goto="scores">📝 Scores</button>
-          ${st === ENG.OPEN ? `<button class="btn btn-dark btn-mini" data-fs-lock-week="${w.id}">🔒 Lock now</button>` : ""}
-          <button class="btn btn-danger btn-mini" data-fs-del-week="${w.id}">🗑</button></div>` : ""}
+          <button class="btn btn-dark btn-mini" data-fs-edit-week="${w.id}">${ic("pencil", "sm")}<span>Week</span></button>
+          <button class="btn btn-dark btn-mini" data-fs-open-week="${w.id}" data-fs-goto="scores">${ic("notebook-pen", "sm")}<span>Scores</span></button>
+          ${st === ENG.OPEN ? `<button class="btn btn-dark btn-mini" data-fs-lock-week="${w.id}">${ic("lock", "sm")}<span>Lock now</span></button>` : ""}
+          <button class="btn btn-danger btn-mini" data-fs-del-week="${w.id}" aria-label="Delete week" title="Delete week">${ic("trash-2", "sm")}</button></div>` : ""}
       </div>`;
     });
     return html + `</div>`;
@@ -743,8 +746,8 @@
     const hidden = !canEdit() && weekOpen(w);
     let html = `<div class="fan-builder-head"><button class="btn btn-dark btn-mini fan-back" data-fs-back>‹ Weeks</button>
       <div class="fan-builder-title">${esc(w.label || "Week")}</div>${stateChipWeek(w)}</div>`;
-    if (hidden) html += `<div class="card fan-hidden-note"><p class="hint">🔒 Everyone's teams appear when the week locks.</p></div>`;
-    if (!wEnt.loaded || wEnt.weekId !== w.id) return html + `<div class="card"><p class="hint">Loading teams…</p></div>`;
+    if (hidden) html += `<div class="card fan-hidden-note"><p class="hint">${ic("lock", "sm")} Everyone's teams appear when the week locks.</p></div>`;
+    if (!wEnt.loaded || wEnt.weekId !== w.id) return html + skel("cards", 3, "Loading teams…");
     if (!all.length) return html + `<div class="card"><p class="hint">No teams were picked for this week.</p></div>`;
     const scored = st !== ENG.OPEN;
     html += `<div class="fan-teams-grid">`;
@@ -753,7 +756,7 @@
         <div class="fan-tc-head">${avatar(e.name, e.photo)}
           <span class="fan-tc-name">${esc(e.name)}${e.teamName ? `<span class="frr-sub">${esc(e.teamName)}</span>` : ""}</span>
           ${scored ? `<span class="fan-pts">${fmtPts(ENG.entryPoints(w, e))} pts${w.hasResults ? "" : " · live"}</span>` : ""}
-          ${canEdit() && weekOpen(w) ? `<button class="icon-btn del" data-fs-del-wentry="${e.id}" title="Remove this team">✕</button>` : ""}
+          ${canEdit() && weekOpen(w) ? `<button class="icon-btn del" data-fs-del-wentry="${e.id}" title="Remove this team" aria-label="Remove this team">${ic("trash-2")}</button>` : ""}
         </div>${teamChipsHtml(e, scored ? w : null)}</div>`;
     });
     return html + `</div>`;
@@ -785,7 +788,7 @@
     const frozen = f.entryCount > 0;
     return `<div class="card fan-form">
       <h3>${f.id ? "Edit week" : "New week"}</h3>
-      ${frozen ? `<div class="fan-form-warn">⚠ ${f.entryCount} team${f.entryCount === 1 ? " has" : "s have"} been picked, so the team size is fixed.</div>` : ""}
+      ${frozen ? `<div class="fan-form-warn">${ic("circle-alert")} ${f.entryCount} team${f.entryCount === 1 ? " has" : "s have"} been picked, so the team size is fixed.</div>` : ""}
       <div class="form-row">
         <label style="flex:1 1 180px">Label<input id="fsWLabel" value="${esc(f.label)}" placeholder="e.g. Week 3"/></label>
         <label style="flex:1 1 150px">From<input type="date" id="fsWStart" value="${esc(f.startDate)}"/></label>
@@ -906,10 +909,10 @@
       html += `<div class="fan-results-team"><div class="fan-pool-team-name">No longer in the pool</div>${orphans.map(pid => scoreRowHtml(w, pid, pname(pid))).join("")}</div>`;
     }
     html += `</div><div class="fan-publish-bar">
-        <button class="btn btn-dark" data-fs-save-scores>💾 Save scores</button>
+        <button class="btn btn-dark" data-fs-save-scores>${ic("save")}<span>Save scores</span></button>
         ${w.hasResults
-          ? `<button class="btn btn-yellow" data-fs-publish>📣 Re-publish</button><button class="btn btn-danger btn-mini" data-fs-unpublish>Unpublish</button>`
-          : `<button class="btn btn-red" data-fs-publish>📣 Publish points</button>`}
+          ? `<button class="btn btn-yellow" data-fs-publish>${ic("megaphone")}<span>Re-publish</span></button><button class="btn btn-danger btn-mini" data-fs-unpublish>Unpublish</button>`
+          : `<button class="btn btn-red" data-fs-publish>${ic("megaphone")}<span>Publish points</span></button>`}
       </div></div>`;
     return html;
   }
@@ -998,7 +1001,7 @@
     const last = weeks.filter(w => w.hasResults && Array.isArray(w.standings))
       .sort((a, b) => (b.lockAt || 0) - (a.lockAt || 0))[0];
     return `<div class="fan-board-grid">
-      <div class="card"><div class="fan-card-head"><h3>📅 Weekly - season total</h3></div>
+      <div class="card"><div class="fan-card-head"><h3>Weekly - season total</h3></div>
         ${boardTableHtml(rows, [{ h: "Wks", v: r => r.days }, { h: "Total", v: r => fmtPts(r.total), strong: true }])}</div>
       ${last ? `<div class="card"><div class="fan-card-head"><h3>${esc(last.label || "Latest week")}</h3></div>
         ${boardTableHtml(last.standings.map(r => ({ ...r, name: r.n })), [{ h: "Points", v: r => fmtPts(r.pts), strong: true }])}</div>` : ""}
@@ -1038,12 +1041,12 @@
 
   function overallTeamHtml() {
     const st = seasonSt();
-    if (!oMineLoaded) return `<div class="card"><p class="hint">Loading your team…</p></div>`;
+    if (!oMineLoaded) return skel("rows", 4, "Loading your team…");
     let html = `<div class="card fan-intro"><div class="fs-row-between"><h3 style="margin:0">Season team</h3>${seasonChip()}</div>
       <p class="hint">${rulesBlurb()}</p></div>`;
     if (st === "setup") {
       return html + `<div class="card"><p class="hint">${canEdit()
-        ? "Set the lock time in <b>⚙️ Season</b> to open team building."
+        ? "Set the lock time in <b>Season</b> to open team building."
         : "The season hasn't been opened yet - check back soon."}</p></div>`;
     }
     if (!oMine) {
@@ -1061,8 +1064,8 @@
       </div>
       ${teamChipsHtml(oMine, null)}
       <div class="fs-team-foot">
-        ${st === "open" ? `<span class="hint">Editable until teams lock.</span><button class="btn btn-dark" data-fs-build-overall>✎ Edit team</button>` : ""}
-        ${st === "swaps" ? `<span class="fs-swaps-pill ${left ? "" : "is-out"}">🔁 ${left} of ${cfg.overall.maxSwaps} swaps left</span>
+        ${st === "open" ? `<span class="hint">Editable until teams lock.</span><button class="btn btn-dark" data-fs-build-overall>${ic("pencil")}<span>Edit team</span></button>` : ""}
+        ${st === "swaps" ? `<span class="fs-swaps-pill ${left ? "" : "is-out"}">${ic("repeat", "sm")} ${left} of ${cfg.overall.maxSwaps} swaps left</span>
           ${left ? `<button class="btn btn-red" data-fs-start-swap>Make a swap</button>` : `<span class="hint">Your team is final.</span>`}` : ""}
         ${st === "closed" ? `<span class="hint">The season is over - this is your final team.</span>` : ""}
       </div></div>`;
@@ -1175,13 +1178,13 @@
   }
 
   function overallBoardHtml() {
-    const head = `<div class="card"><div class="fan-card-head"><h3>🏆 Overall standings</h3></div>`;
+    const head = `<div class="card"><div class="fan-card-head"><h3>Overall standings</h3></div>`;
     const last = oScores[oScores.length - 1];
-    if (!oScoresLoaded) return head + `<p class="hint">Loading…</p></div>`;
+    if (!oScoresLoaded) return head + skel("table", 6, "Loading…") + `</div>`;
     if (!last) return head + `<p class="hint">No points yet - they appear when the first score update is published.</p></div>`;
     const st = seasonSt();
-    if (!canEdit() && st !== "swaps" && st !== "closed") return head + `<p class="hint">🔒 Standings appear when teams lock.</p></div>`;
-    if (!oAllLoaded) return head + `<p class="hint">Loading teams…</p></div>`;
+    if (!canEdit() && st !== "swaps" && st !== "closed") return head + `<p class="hint">${ic("lock", "sm")} Standings appear when teams lock.</p></div>`;
+    if (!oAllLoaded) return head + skel("table", 6, "Loading teams…") + `</div>`;
     const rows = ENG.overallStandings(oScores, oAll);
     return head + `<p class="hint">Last update: <b>${esc(last.label || "Update")}</b> · ${esc(whenLabel(last.at))}</p>
       ${boardTableHtml(rows, [{ h: "Last update", v: r => (r.last < 0 ? "" : "+") + fmtPts(r.last) }, { h: "Total", v: r => fmtPts(r.total), strong: true }])}</div>`;
@@ -1189,8 +1192,8 @@
 
   function overallTeamsHtml() {
     const st = seasonSt();
-    if (!canEdit() && st !== "swaps" && st !== "closed") return `<div class="card"><p class="hint">🔒 Everyone's teams appear when teams lock.</p></div>`;
-    if (!oAllLoaded) return `<div class="card"><p class="hint">Loading teams…</p></div>`;
+    if (!canEdit() && st !== "swaps" && st !== "closed") return `<div class="card"><p class="hint">${ic("lock", "sm")} Everyone's teams appear when teams lock.</p></div>`;
+    if (!oAllLoaded) return skel("cards", 3, "Loading teams…");
     if (!oAll.length) return `<div class="card"><p class="hint">Nobody has built a season team yet.</p></div>`;
     const totals = new Map(ENG.overallStandings(oScores, oAll).map(r => [r.key, r.total]));
     return `<div class="fan-teams-grid">${oAll.slice().sort((a, b) => (totals.get(b.id) || 0) - (totals.get(a.id) || 0)).map(e => `
@@ -1199,8 +1202,8 @@
           <span class="fan-tc-name">${esc(e.name)}${e.teamName ? `<span class="frr-sub">${esc(e.teamName)}</span>` : ""}</span>
           <span class="fan-pts">${fmtPts(totals.get(e.id) || 0)} pts</span>
         </div>${teamChipsHtml(e, null)}
-        <div class="fs-team-foot"><span class="fs-swaps-pill ${ENG.swapsLeft(cfg.overall, e) ? "" : "is-out"}">🔁 ${e.swapsUsed || 0}/${cfg.overall.maxSwaps} swaps used</span>
-          ${canEdit() ? `<button class="icon-btn del" data-fs-del-oentry="${e.id}" title="Remove this team">✕</button>` : ""}</div>
+        <div class="fs-team-foot"><span class="fs-swaps-pill ${ENG.swapsLeft(cfg.overall, e) ? "" : "is-out"}">${ic("repeat", "sm")} ${e.swapsUsed || 0}/${cfg.overall.maxSwaps} swaps used</span>
+          ${canEdit() ? `<button class="icon-btn del" data-fs-del-oentry="${e.id}" title="Remove this team" aria-label="Remove this team">${ic("trash-2")}</button>` : ""}</div>
       </div>`).join("")}</div>`;
   }
 
@@ -1224,15 +1227,15 @@
   }
 
   function scoresSheetHtml() {
-    if (!oScoresLoaded) return `<div class="card"><p class="hint">Loading scores…</p></div>`;
+    if (!oScoresLoaded) return skel("table", 6, "Loading scores…");
     const base = latestTotals();
     const inPool = new Set(pool().players.map(p => p.id));
     const orphans = Object.keys(base).filter(pid => !inPool.has(pid));
     const d = oDraft || blankDraft();
     let html = `<div class="card fan-intro"><h3>Season scores</h3>
       <p class="hint">Enter every player's <b>season totals so far</b> - runs and wickets exactly as the stats sheet shows them - then publish. Each update scores what changed since the previous one: 1 per run, 10 per wicket, captain 2×, vice-captain 1.5×. Only Overall uses this sheet - Daily and Weekly keep their own.</p>
-      <div class="form-row"><button class="btn btn-dark btn-mini" data-fo-fill>⬇ Fill from stats sheet</button>
-        ${oDraft ? `<button class="btn btn-dark btn-mini" data-fo-discard>↺ Discard changes</button>` : ""}</div></div>`;
+      <div class="form-row"><button class="btn btn-dark btn-mini" data-fo-fill>${ic("download", "sm")}<span>Fill from stats sheet</span></button>
+        ${oDraft ? `<button class="btn btn-dark btn-mini" data-fo-discard>${ic("rotate-ccw", "sm")}<span>Discard changes</span></button>` : ""}</div></div>`;
     html += fillReportHtml();
     html += `<div class="card"><h3>Runs &amp; wickets - season totals</h3><div class="fan-results">`;
     pool().teams.forEach(t => {
@@ -1249,7 +1252,7 @@
       <div class="fan-publish-bar">
         <label class="fo-label">Update name<input id="foLabel" value="${esc(d.label != null ? d.label : `Update ${oScores.length + 1}`)}" placeholder="e.g. After match 12"/></label>
         <label class="fo-label">Teams as they stood at<input type="datetime-local" id="foTeamsAt" value="${esc(d.teamsAt != null ? d.teamsAt : toLocalInput(defaultTeamsAt()))}"/></label>
-        <button class="btn btn-red" data-fo-publish>📣 Publish update</button>
+        <button class="btn btn-red" data-fo-publish>${ic("megaphone")}<span>Publish update</span></button>
       </div>
       <p class="hint">Set <b>Teams as they stood at</b> to when the first match in this update started: swaps made before then count for these runs &amp; wickets, swaps made after don't. Left as it is, it's when the last update went out.</p></div>`;
     return html + updatesListHtml();
@@ -1276,7 +1279,7 @@
     if (!oFill) return "";
     const list = (title, names) => names.length
       ? `<details class="fo-miss"><summary>${title} (${names.length})</summary><p class="hint">${names.map(esc).join(", ")}</p></details>` : "";
-    return `<div class="card fo-fill"><p class="hint">⬇ Filled <b>${oFill.matched}</b> player${oFill.matched === 1 ? "" : "s"} from the stats sheet. Check the numbers, then publish.</p>
+    return `<div class="card fo-fill"><p class="hint">Filled <b>${oFill.matched}</b> player${oFill.matched === 1 ? "" : "s"} from the stats sheet. Check the numbers, then publish.</p>
       ${list("In the pool but not on the sheet - type these in", oFill.missing)}
       ${list("On the sheet but not in the pool", oFill.extra)}</div>`;
   }
@@ -1286,7 +1289,7 @@
     return `<div class="card"><h3>Published updates</h3><ul class="fs-hist">${oScores.slice().reverse().map(u => `
       <li class="fo-upd"><span><span class="fs-hist-when">${esc(whenLabel(u.at))}</span> <b>${esc(u.label || "Update")}</b>
         <span class="hint">· ${u.baseline ? "starting point" : u.source === "sheet" ? "from stats sheet" : "typed in"}${u.changed ? ` · ${u.changed} player${u.changed === 1 ? "" : "s"} changed` : ""}${u.teamsAt && !u.baseline ? ` · teams as at ${esc(whenLabel(u.teamsAt))}` : ""}</span></span>
-        ${u.id === lastId ? `<button class="icon-btn del" data-fo-del="${u.id}" title="Remove this update">✕</button>` : ""}</li>`).join("")}</ul></div>`;
+        ${u.id === lastId ? `<button class="icon-btn del" data-fo-del="${u.id}" title="Remove this update" aria-label="Remove this update">${ic("trash-2")}</button>` : ""}</li>`).join("")}</ul></div>`;
   }
 
   /* The viewed tournament's stats sheet, as series.js resolves it: HCCL
@@ -1405,21 +1408,21 @@
     const frozen = oAllLoaded && oAll.length > 0;
     return `<div class="card fan-form">
       <div class="fs-row-between"><h3 style="margin:0">Season settings</h3>${seasonChip()}</div>
-      ${frozen ? `<div class="fan-form-warn">⚠ ${oAll.length} season team${oAll.length === 1 ? " exists" : "s exist"}, so the team size is fixed.</div>` : ""}
+      ${frozen ? `<div class="fan-form-warn">${ic("circle-alert")} ${oAll.length} season team${oAll.length === 1 ? " exists" : "s exist"}, so the team size is fixed.</div>` : ""}
       <div class="form-row">
         <label style="flex:1 1 150px">Players per team<input type="number" min="1" max="15" id="fsOSize" value="${o.teamSize}" ${frozen ? "disabled" : ""}/></label>
         <label style="flex:1 1 150px">Swaps per season<input type="number" min="0" max="20" id="fsOSwaps" value="${o.maxSwaps}"/></label>
         <label style="flex:1 1 190px">Max from one team <span class="hint">(blank = no limit)</span><input type="number" min="1" max="15" id="fsOCap" value="${o.maxPerTeam || ""}" placeholder="no limit"/></label>
       </div>
       <label>Teams lock at<input type="datetime-local" id="fsOLock" value="${toLocalInput(o.lockAt)}"/></label>
-      <p class="hint">Until then members build and rebuild freely. From then on, swaps only. Points come from <b>📝 Scores</b> - publish the first update once teams have locked.</p>
+      <p class="hint">Until then members build and rebuild freely. From then on, swaps only. Points come from <b>Scores</b> - publish the first update once teams have locked.</p>
       <label class="fan-check"><input type="checkbox" id="fsOFreeCap" ${o.freeCaptaincy ? "checked" : ""}/>
         <span><b>Free captaincy changes</b> - let members move captain / vice-captain without spending a swap (until their swaps run out). Off: the armbands can only move in the same submission as a swap.</span></label>
       <div class="form-row">
         <button class="btn btn-red" data-fs-save-season>Save settings</button>
-        ${st === "open" ? `<button class="btn btn-dark" data-fs-lock-season>🔒 Lock teams now</button>` : ""}
-        ${st === "swaps" ? `<button class="btn btn-dark" data-fs-close-season>🏁 End season</button>` : ""}
-        ${st === "closed" ? `<button class="btn btn-dark" data-fs-reopen-season>↩ Reopen swaps</button>` : ""}
+        ${st === "open" ? `<button class="btn btn-dark" data-fs-lock-season>${ic("lock")}<span>Lock teams now</span></button>` : ""}
+        ${st === "swaps" ? `<button class="btn btn-dark" data-fs-close-season>${ic("flag")}<span>End season</span></button>` : ""}
+        ${st === "closed" ? `<button class="btn btn-dark" data-fs-reopen-season>${ic("undo-2")}<span>Reopen swaps</span></button>` : ""}
       </div>
     </div>`;
   }
@@ -1469,7 +1472,7 @@
     document.querySelectorAll("[data-fs-countdown]").forEach(el => {
       const at = Number(el.getAttribute("data-fs-countdown")) || 0;
       const left = at - now();
-      el.textContent = (el.textContent.indexOf("teams lock") >= 0 ? "⏳ teams lock in " : "⏳ locks in ") + ENG.fmtCountdown(left);
+      el.textContent = (el.textContent.indexOf("teams lock") >= 0 ? "teams lock in " : "locks in ") + ENG.fmtCountdown(left);
       el.classList.toggle("is-closing", left > 0 && left < 600000);
     });
     const s = sig();

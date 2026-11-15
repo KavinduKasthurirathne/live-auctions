@@ -123,7 +123,8 @@
   // form: null | { mode:"create" } | { mode:"edit", id }
   // detail: null | tournament id whose hub page is open (list ⇄ detail)
   // hubTab: which inner tab of the tournament page is showing
-  const UI = { form: null, detail: null, hubTab: "overview" };
+  const UI = { form: null, detail: null, hubTab: "overview", filter: "all" };
+  const ic = (n, c) => (window.HCCLUI ? window.HCCLUI.icon(n, c) : "");
 
   /* ---------------- registry helpers ---------------- */
   const metaOf = id => tournaments.find(t => t.id === id) || null;
@@ -309,6 +310,22 @@
     onChange(cb) {
       listeners.push(cb);
       if (ready) { try { cb(api); } catch (e) { console.error(e); } }
+    },
+    // Does this tournament have live data roots (auction / fantasy)? Home uses
+    // it to decide which shortcuts a featured card offers.
+    hasDataRoots(id) { const m = metaOf(id); return !!m && !isArchiveOnly(m); },
+    // Open a specific tournament's page on a given inner tab - exactly what
+    // tapping its card does (incl. pointing the app at it when it has data
+    // roots). Used by Home's featured-card shortcuts.
+    open(id, hubKey) {
+      const m = metaOf(id);
+      if (!m) return;
+      UI.detail = id; UI.form = null;
+      const keys = hubTabsFor(m).map(t => t.key);
+      UI.hubTab = keys.includes(hubKey) ? hubKey : "overview";
+      if (!isArchiveOnly(m)) api.setViewing(id);
+      render();
+      window.scrollTo(0, 0);
     },
     // Open the viewed tournament's page on a given inner tab. Used by the
     // Fantasy nav pill and any legacy switchTab("fantasy") (js/app.js
@@ -700,7 +717,8 @@
   }
 
   /* ---------------- Series page ---------------- */
-  const STATUS_LABEL = { live: "● LIVE", completed: "COMPLETED", upcoming: "UPCOMING" };
+  const STATUS_LABEL = { live: "Live", completed: "Completed", upcoming: "Upcoming" };
+  const statusChip = m => `<span class="series-chip st-${esc(m.status)}">${m.status === "live" ? `<span class="live-dot"></span>` : ""}${STATUS_LABEL[m.status] || esc(m.status)}</span>`;
 
   function logoHtml(m) {
     const A = window.HCCLSeasonArchive;
@@ -723,18 +741,18 @@
     // an editor can delete the spare with 🗑.
     const twins = twinsOf(m);
     const chips = [
-      `<span class="series-chip st-${esc(m.status)}">${STATUS_LABEL[m.status] || esc(m.status)}</span>`,
-      m.id === activeId ? `<span class="series-chip st-default">DEFAULT</span>` : "",
-      isViewing ? `<span class="series-chip st-viewing">VIEWING</span>` : "",
+      statusChip(m),
+      m.id === activeId ? `<span class="series-chip st-default">Default</span>` : "",
+      isViewing ? `<span class="series-chip st-viewing">Viewing</span>` : "",
       twins.length
-        ? `<span class="series-chip st-dup" title="Also listed as &quot;${esc(twins.map(t => t.name).join('", "'))}&quot; - the same tournament twice. Delete the spare entry (🗑) to tidy the list.">DUPLICATE</span>`
+        ? `<span class="series-chip st-dup" title="Also listed as &quot;${esc(twins.map(t => t.name).join('", "'))}&quot; - the same tournament twice. Delete the spare entry (bin icon) to tidy the list.">Duplicate</span>`
         : "",
     ].join("");
     const admin = (editorOn() && cloudOn()) ? `
       <div class="series-admin-row">
-        <button class="icon-btn" data-series-edit="${esc(m.id)}" title="Edit tournament">✎</button>
-        ${(!archiveOnly && m.id !== activeId) ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament">★</button>` : ""}
-        ${(!m.legacy && m.id !== activeId) ? `<button class="icon-btn del" data-series-del="${esc(m.id)}" title="Delete (only while empty)">🗑</button>` : ""}
+        <button class="icon-btn" data-series-edit="${esc(m.id)}" title="Edit tournament" aria-label="Edit tournament">${ic("pencil")}</button>
+        ${(!archiveOnly && m.id !== activeId) ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament" aria-label="Make default">${ic("pin")}</button>` : ""}
+        ${(!m.legacy && m.id !== activeId) ? `<button class="icon-btn del" data-series-del="${esc(m.id)}" title="Delete (only while empty)" aria-label="Delete tournament">${ic("trash-2")}</button>` : ""}
       </div>` : "";
     // No "View" button: tapping the card (or Details) opens the hub AND - for a
     // tournament that has live data roots - points the rest of the app at it.
@@ -745,10 +763,11 @@
           <h3>${esc(m.name)}</h3>
           ${m.duration ? `<div class="series-dur">${esc(m.duration)}</div>` : ""}
           <div class="series-chips">${chips}</div>
+          ${m.honors && m.honors.champion ? `<div class="series-champ">${ic("crown", "sm")}<span>Champion</span><b>${esc(m.honors.champion)}</b></div>` : ""}
         </div>
         <div class="series-actions">
-          <button class="btn btn-dark" data-series-open="${esc(m.id)}">Details ›</button>
           ${admin}
+          <button class="icon-btn series-go" data-series-open="${esc(m.id)}" aria-label="Open ${esc(m.name)}">${ic("chevron-right")}</button>
         </div>
       </div>`;
   }
@@ -783,7 +802,7 @@
           <input type="file" id="serLogoFile" accept="image/*" />
         </label>
         <details class="stats-fieldset"${editing ? " open" : ""}>
-          <summary>🏆 Honors / Podium - shown on this tournament's Hall of Champions card</summary>
+          <summary>Honours / podium - shown on this tournament's Hall of Fame card</summary>
           ${editing && editing.status === "live" ? `<p class="hint">Finished? Set <b>Status: Completed</b> above and fill in the champion, runner-up and MVP. The LIVE badges come off everywhere and this tournament's podium joins the Hall of Champions - for everyone, straight away.</p>` : ""}
           <label>Champion (team, or player for solo events)
             <input type="text" id="serChampion" placeholder="e.g. Super Fire Dragons" value="${editing && editing.honors ? esc(editing.honors.champion || "") : ""}" />
@@ -874,11 +893,11 @@
     if (!hasPodium && !hasLead) return "";
     return `
       <div class="card series-honors">
-        <div class="hub-honors">
+        <div class="hub-honors${hasPodium && hasLead ? "" : " solo"}">
           ${hasPodium ? A.podiumHtml(h, m.solo ? "player" : "team") : ""}
           ${hasLead ? `<div class="hub-leads">
-            ${A.extraItem("🏏", "Most Runs", lead.mostRuns || "TBD")}
-            ${A.extraItem("🎯", "Most Wickets", lead.mostWickets || "TBD")}
+            ${A.extraItem("zap", "Most Runs", lead.mostRuns || "TBD")}
+            ${A.extraItem("target", "Most Wickets", lead.mostWickets || "TBD")}
           </div>` : ""}
         </div>
       </div>`;
@@ -889,14 +908,14 @@
     const admin = editorOn();
     const importBtn = admin ? `
       <label class="btn btn-yellow file-btn tstats-import" title="Upload this tournament's stats CSV (36-column Season Stats format; raw STUMPS exports are fine)">
-        <span>⬆ Import Stats Sheet</span>
+        ${ic("upload")}<span>Import Stats Sheet</span>
         <input type="file" class="tstats-import-file" accept=".csv,text/csv" hidden />
       </label>` : "";
     const csv = effectiveCsv(m);
     let body;
     if (!csv) {
       body = !statsLoaded && cloudOn()
-        ? `<p class="hint">Loading stats…</p>`
+        ? (window.HCCLUI ? window.HCCLUI.skeleton("table", 6, "Loading stats…") : `<p class="hint">Loading stats…</p>`)
         : `<p class="hint">${admin
             ? "No stats sheet imported yet - upload this tournament's Season-Stats CSV to publish its leaderboards for everyone."
             : "Stats for this tournament haven't been published yet - check back soon."}</p>`;
@@ -1031,13 +1050,13 @@
     const honors = hubHonorsHtml(m); // podium + Most Runs/Wickets (may be "")
     const c = counts(m);
     const facts = `
-      <div class="card hub-facts">
+      <div class="hub-facts">
         <div class="hub-fact"><span class="hub-fact-k">Status</span><span class="hub-fact-v">${STATUS_LABEL[m.status] || esc(m.status)}</span></div>
         ${m.duration ? `<div class="hub-fact"><span class="hub-fact-k">Duration</span><span class="hub-fact-v">${esc(m.duration)}</span></div>` : ""}
         <div class="hub-fact"><span class="hub-fact-k">Teams</span><span class="hub-fact-v">${c.teams || "-"}</span></div>
         <div class="hub-fact"><span class="hub-fact-k">Players</span><span class="hub-fact-v">${c.players || "-"}</span></div>
       </div>`;
-    return `${honors || ""}${facts}`;
+    return `<div class="hub-overview">${facts}${honors || ""}</div>`;
   }
 
   /* ---- Squads ---- */
@@ -1073,7 +1092,7 @@
   }
   function squadsHtml(m) {
     const manage = (editorOn() && (cloudOn() || api.isLegacy(m.id)) && hasDataRoots(m))
-      ? `<div class="hub-manage-row"><button class="btn btn-yellow" data-goto="setup">⚙️ Manage teams &amp; players</button>
+      ? `<div class="hub-manage-row"><button class="btn btn-yellow" data-goto="setup">${ic("settings")}<span>Manage teams &amp; players</span></button>
          <span class="hint"></span></div>` : "";
     if (isLiveViewed(m) && window.HCCLAuction.teams().length) return manage + auctionSquadsHtml(m);
     const rows = tournamentRows(m);
@@ -1091,7 +1110,7 @@
     return `<div class="hub-table-wrap"><table class="hub-ptable">
       <thead><tr><th>Player</th><th>Team</th><th class="num">M</th><th class="num">Runs</th><th class="num">Wkts</th></tr></thead>
       <tbody>${rows.map(p => `<tr>
-        <td>${esc(p.name)}</td><td>${esc(p.team || "-")}</td>
+        <td><span class="player-link" data-player="${esc(p.name)}" role="button" tabindex="0">${esc(p.name)}</span></td><td>${esc(p.team || "-")}</td>
         <td class="num">${esc(p.matches || "-")}</td><td class="num">${esc(p.runs || "-")}</td><td class="num">${esc(p.wickets || "-")}</td>
       </tr>`).join("")}</tbody></table></div>`;
   }
@@ -1146,30 +1165,26 @@
     const admin = editorOn() && cloudOn();
     const isViewing = m.id === (viewingId || LEGACY_ID);
     const chips = [
-      `<span class="series-chip st-${esc(m.status)}">${STATUS_LABEL[m.status] || esc(m.status)}</span>`,
-      m.id === activeId ? `<span class="series-chip st-default">DEFAULT</span>` : "",
-      isViewing && hasDataRoots(m) ? `<span class="series-chip st-viewing">VIEWING</span>` : "",
+      statusChip(m),
+      m.id === activeId ? `<span class="series-chip st-default">Default</span>` : "",
+      isViewing && hasDataRoots(m) ? `<span class="series-chip st-viewing">Viewing</span>` : "",
     ].join("");
     return `
-      <div class="view-head series-detail-head">
-        <button class="btn btn-dark series-back" data-series-back>‹ All Tournaments</button>
-        <h2>${esc(m.short || m.name).toUpperCase()}</h2>
-      </div>
-      <div class="series-card series-detail-card${isViewing ? " viewing" : ""}">
+      <button class="btn btn-ghost series-back" data-series-back>${ic("chevron-left")}<span>All tournaments</span></button>
+      <header class="t-hero${isViewing && hasDataRoots(m) ? " viewing" : ""}">
         ${logoHtml(m)}
-        <div class="series-meta">
-          <h3>${esc(m.name)}</h3>
+        <div class="t-hero-meta">
+          ${isHcclFamily(m) ? `<p class="eyebrow">HC Champions League</p>` : ""}
+          <h2>${esc(m.name)}</h2>
           ${m.duration ? `<div class="series-dur">${esc(m.duration)}</div>` : ""}
           <div class="series-chips">${chips}</div>
         </div>
-        <div class="series-actions">
-          ${admin ? `
-          <div class="series-admin-row">
-            <button class="icon-btn" data-series-edit="${esc(m.id)}" title="Edit tournament">✎</button>
-            ${(!isArchiveOnly(m) && m.id !== activeId) ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament">★</button>` : ""}
-          </div>` : ""}
-        </div>
-      </div>
+        ${admin ? `
+        <div class="t-hero-actions series-admin-row">
+          <button class="icon-btn" data-series-edit="${esc(m.id)}" title="Edit tournament" aria-label="Edit tournament">${ic("pencil")}</button>
+          ${(!isArchiveOnly(m) && m.id !== activeId) ? `<button class="icon-btn" data-series-default="${esc(m.id)}" title="Make this the default tournament" aria-label="Make default">${ic("pin")}</button>` : ""}
+        </div>` : ""}
+      </header>
       ${UI.form ? formHtml() : ""}`;
   }
 
@@ -1182,7 +1197,13 @@
     const head = $("#tournamentHead"); if (head) head.innerHTML = headHtml(m);
     const bar = $("#tournamentTabs");
     if (bar) bar.innerHTML = tabs.map(t =>
-      `<button class="subtab hub-tab${t.key === UI.hubTab ? " active" : ""}" data-hub-tab="${esc(t.key)}">${esc(t.label)}</button>`).join("");
+      `<button class="subtab hub-tab${t.key === UI.hubTab ? " active" : ""}" data-hub-tab="${esc(t.key)}"${t.key === UI.hubTab ? ` aria-current="true"` : ""}>${esc(t.label)}</button>`).join("");
+    // On narrow screens the tab row scrolls sideways - bring the active tab
+    // into view (horizontally only; the page itself must not jump).
+    const activeTab = bar && bar.querySelector(".hub-tab.active");
+    if (activeTab && bar.scrollWidth > bar.clientWidth) {
+      bar.scrollLeft = Math.max(0, activeTab.offsetLeft - (bar.clientWidth - activeTab.offsetWidth) / 2);
+    }
     applyHubPanel(UI.hubTab);
     // Light inline panels are filled eagerly so switching is instant; the active
     // tab (incl. heavy archive / hosted modules) is (re)rendered last.
@@ -1221,14 +1242,25 @@
     const admin = editorOn() && cloudOn();
     const offlineHint = !cloudOn()
       ? `<p class="hint series-hint">Multi-tournament browsing works through the shared cloud - sign in to see and switch tournaments.</p>` : "";
+    // Status filter chips (All / Live / Upcoming / Completed) - list order is
+    // unchanged; the filter only hides cards.
+    const FILTERS = [["all", "All"], ["live", "Live"], ["upcoming", "Upcoming"], ["completed", "Completed"]];
+    const countOf = k => (k === "all" ? tournaments.length : tournaments.filter(t => t.status === k).length);
+    if (UI.filter !== "all" && !countOf(UI.filter)) UI.filter = "all";
+    const shown = UI.filter === "all" ? tournaments : tournaments.filter(t => t.status === UI.filter);
+    const filters = tournaments.length > 3 ? `<div class="filter-row" role="group" aria-label="Filter by status">
+        ${FILTERS.filter(([k]) => k === "all" || countOf(k)).map(([k, label]) =>
+          `<button class="filter-chip${UI.filter === k ? " active" : ""}" data-series-filter="${k}" aria-pressed="${UI.filter === k}">${label} <span class="count">${countOf(k)}</span></button>`).join("")}
+      </div>` : "";
     listEl.innerHTML = `
       <div class="view-head">
-        <h2>TOURNAMENTS</h2>
-        ${admin ? `<div class="view-head-tools"><button class="btn btn-yellow" data-series-new>＋ New Tournament</button></div>` : ""}
+        <div><p class="eyebrow">Every HC event</p><h2>Tournaments</h2></div>
+        ${admin ? `<div class="view-head-tools"><button class="btn btn-yellow" data-series-new>${ic("plus")}<span>New tournament</span></button></div>` : ""}
       </div>
       ${offlineHint}
+      ${filters}
       <div class="series-grid">
-        ${tournaments.map(cardHtml).join("")}
+        ${shown.map(cardHtml).join("")}
       </div>
       ${UI.form ? formHtml() : ""}`;
   }
@@ -1249,8 +1281,8 @@
       else document.body.prepend(bar);
     }
     bar.innerHTML = `
-      <span>👁 Viewing <b>${esc(v.name)}</b>${act ? ` - the current tournament is <b>${esc(act.name)}</b>` : ""}</span>
-      ${act ? `<button class="btn btn-yellow" data-series-view="${esc(act.id)}">↩ Back to ${esc(act.short || act.name)}</button>` : ""}`;
+      <span>${ic("eye", "sm")} Viewing <b>${esc(v.name)}</b>${act ? ` - the current tournament is <b>${esc(act.name)}</b>` : ""}</span>
+      ${act ? `<button class="btn btn-dark" data-series-view="${esc(act.id)}">${ic("undo-2", "sm")}<span>Back to ${esc(act.short || act.name)}</span></button>` : ""}`;
   }
 
   /* ---------------- events ---------------- */
@@ -1259,6 +1291,8 @@
     const view = t.closest("[data-series-view]");
     if (view) { api.setViewing(view.getAttribute("data-series-view")); return; }
     if (t.closest("[data-series-new]")) { UI.form = { mode: "create" }; render(); return; }
+    const flt = t.closest("[data-series-filter]");
+    if (flt) { UI.filter = flt.getAttribute("data-series-filter") || "all"; render(); return; }
     const edit = t.closest("[data-series-edit]");
     if (edit) { UI.form = { mode: "edit", id: edit.getAttribute("data-series-edit") }; render(); return; }
     const del = t.closest("[data-series-del]");
@@ -1275,8 +1309,11 @@
       const m = metaOf(UI.detail);
       if (key && m && key !== UI.hubTab) {
         UI.hubTab = key;
-        document.querySelectorAll("#tournamentTabs .hub-tab").forEach(b =>
-          b.classList.toggle("active", b.getAttribute("data-hub-tab") === key));
+        document.querySelectorAll("#tournamentTabs .hub-tab").forEach(b => {
+          const on = b.getAttribute("data-hub-tab") === key;
+          b.classList.toggle("active", on);
+          if (on) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+        });
         applyHubPanel(key);
         fillHubPanel(m, key);
         window.scrollTo(0, 0);

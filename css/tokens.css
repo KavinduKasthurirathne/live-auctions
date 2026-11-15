@@ -1,0 +1,97 @@
+/* ============================================================
+   DESIGN TOKENS - "Midnight Stadium"
+   One source of truth for colour, type, spacing, radii and motion.
+   styles.css and fantasy.css consume ONLY these variables; change a
+   value here and every page follows.
+   ============================================================ */
+:root {
+  color-scheme: dark;
+
+  /* ---- surfaces ---- */
+  --bg: #0B1220;          /* page - deep midnight navy */
+  --bg-2: #111C2E;        /* secondary background, insets, table heads */
+  --card: #17243A;        /* elevated card */
+  --card-2: #1D2C46;      /* hover / nested surface on a card */
+  --line: #26364D;        /* 1px borders */
+  --line-strong: #344862; /* hover borders, dividers that must read */
+
+  /* ---- brand + status ---- */
+  --accent: #3B82F6;      /* electric blue: borders, rings, indicators, charts */
+  --accent-2: #60A5FA;    /* light blue: accent TEXT on navy (AA) */
+  --accent-fill: #2563EB; /* button fill - white text on it passes WCAG AA (5.2:1) */
+  --accent-fill-hover: #1D4ED8; /* hover goes DARKER so white text stays AA (6.7:1) */
+  --placeholder: #8291A7; /* input placeholder (AA on --bg-2) */
+  --accent-soft: rgba(59, 130, 246, 0.14);
+  --live: #2DD4BF;        /* teal: live / open / leading / success */
+  --live-soft: rgba(45, 212, 191, 0.14);
+  --gold: #F5BD4F;        /* championship gold: champions, captains, winners */
+  --gold-soft: rgba(245, 189, 79, 0.14);
+  --danger: #F87171;      /* destructive actions, unsold, errors */
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --silver: #CBD5E1;
+  --bronze: #D69E6B;
+
+  /* ---- text ---- */
+  --text: #F8FAFC;        /* primary */
+  --text-2: #94A3B8;      /* secondary / labels (6:1 on --card) */
+  --on-accent: #FFFFFF;
+  --on-gold: #1A1405;
+
+  /* ---- type ---- */
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 14px;
+  --fs-base: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: clamp(24px, 3.2vw, 32px);
+  --fs-3xl: clamp(30px, 4.6vw, 44px);
+  --fs-stat: clamp(32px, 5vw, 56px);
+
+  /* ---- spacing (8px system; 4px is the half step) ---- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 40px;
+  --s-8: 48px;
+  --s-9: 64px;
+
+  /* ---- radii ---- */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* ---- motion ---- */
+  --dur-fast: 150ms;
+  --dur: 200ms;
+  --dur-slow: 250ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ---- layout ---- */
+  --container: 1440px;
+  --gutter: clamp(16px, 3vw, 32px);
+  --header-h: 64px;
+  --bottomnav-h: 64px;
+  --hubtabs-h: 45px;      /* tournament inner tab bar (44px tabs + 1px rule) */
+  --tap: 44px;            /* minimum touch target */
+
+  /* ---- legacy aliases ----
+     Older inline styles in JS still name these; keep them pointing at the
+     new palette so nothing renders in the retired red/yellow theme. */
+  --black: var(--bg);
+  --panel: var(--card);
+  --panel-2: var(--bg-2);
+  --panel-3: var(--card-2);
+  --border: var(--line);
+  --muted: var(--text-2);
+  --red: var(--danger);
+  --yellow: var(--accent-2);
+  --green: var(--live);
+  --radius: var(--r-lg);
+}

@@ -57,24 +57,32 @@ Keep the offline `firebase-config.js` as well `firebase-init.js` still sets
 
 1. Copy the repo (minus `.git`) to a scratch dir **including
    `firebase-init.js`**, which is easy to miss when copying only
-   `index.html css js assets docs` (without it there's no `body.can-edit`, so
+   `index.html css js assets assets-web` (without it there's no `body.can-edit`, so
    every editor-only control is silently hidden). Blank the firebase config
    as above.
 2. `npm i playwright-core` (no browser download) and launch the installed
    Chrome: `chromium.launch({ executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", headless: true })`.
 3. Serve the copy with a MIME-correct static server (see gotcha #1).
-4. Drive: tabs via `[data-tab="..."]` buttons; Series hub via
-   `.series-card [data-series-open]` / `[data-series-back]`; home carousel via
-   `[data-champs-prev/next/dot]`; season tabs `[data-season="N"]`; board tabs
-   `[data-board="overall|batting|bowling"]`.
+4. Drive: `window.switchTab(name)` / `window.switchSubTab(name)` are globals
+   (fastest), or click `#tabs [data-tab]` (desktop) / `#bottomNav [data-tab]`
+   (phones). Tournament page via `.series-card[data-series-open]`,
+   `[data-hub-tab]`, `[data-series-back]`, or `HCCLSeries.open(id, hubKey)`;
+   season tabs `[data-season="N"]`; board tabs `[data-board="..."]`; Hall of
+   Fame `[data-hof-tab]`, `[data-hof-group]`, `#hofSearch`, `.player-tile`,
+   `[data-hof-back]`; any `[data-player]` opens a profile. Home shortcuts are
+   `[data-home-open][data-home-hub]`. The buttons in the auction bid grid
+   re-render on every bid, so click by selector (`.team-bid-btn >> nth=0`),
+   never through a stored handle.
 5. Capture `console`/`pageerror` events the app logs loudly on failure. A
    clean run has zero console errors and zero 404s.
 
-Flows worth driving after a change: home (hero, the Hall of Champions carousel
-registry-driven, this-year-only, live card first auto-advance ~6.5s, dots;
-roll the clock with an `addInitScript` Date override to test the year rule),
-the news list (`.news-card` rows) + story popup (`[data-news-open]`, Escape /
-backdrop close), Series list → Details hubs (no View button: the card and
+Flows worth driving after a change: no horizontal overflow on every view at
+390 / 768 / 1280 / 1440 (`scrollWidth <= clientWidth`); home (hero, "Live now"
+card + its shortcuts, recent champions grid - static, no carousel); Hall of
+Fame (records, champions filter, players search + paging, profile; profile
+matches/runs/wickets must equal `HCCLSeasonArchive.careerStatsFor(name)` for a
+bundled-only player); Dashboard charts (Chart.js loads on demand -
+`window.Chart` is absent until the Dashboard opens); Series list → Details hubs (no View button: the card and
 `[data-series-open]` open the hub; S1-S5 archive-only, S6 live with quick links,
 S7 upcoming placeholder; bracket lines drawn, leaderboards, board switching),
 back-and-reopen a hub (re-mount must not stack listeners), other tabs still
@@ -83,15 +91,20 @@ render, 390px mobile viewport, `reducedMotion: "reduce"` context (no autoplay).
 More gotchas:
 - Don't pass multi-line JS to `node -e` from PowerShell - the quoting gets
   mangled. Write driver scripts to files and `node file.js`.
-- On mobile (≤900px) the nav is an off-canvas drawer: click `#navToggle` first,
-  then the `[data-tab]` buttons inside `#tabs`; a closed drawer is
+- Below 1024px there is a fixed bottom tab bar (`#bottomNav`: Home,
+  Tournaments, Auctions, Fantasy, More). "More" IS `#navToggle` and opens the
+  off-canvas drawer (`#tabs`, relocated to `<body>`); a closed drawer is
   `visibility: hidden` and off-canvas, so its tabs are unclickable. Close paths:
-  `#navClose`, `#navBackdrop`, Escape.
-- **`.app-header` has `backdrop-filter`, which makes it the containing block for
-  `position: fixed` DESCENDANTS** (same trap as `transform`/`filter`/
-  `will-change`), and `position: sticky` makes it a stacking context. Anything
-  meant to overlay the page must therefore NOT be a child of the header app.js
-  relocates `<nav id="tabs">` to `<body>` below 900px for exactly this reason.
+  `#navClose`, `#navBackdrop`, Escape (focus returns to More). Full-page
+  screenshots show the fixed bottom bar mid-page - that's the capture, not a bug.
+- The header nav lives in `.header-inner`, not directly in `.app-header`; the
+  drawer relocation remembers the nav's real parent (an `insertBefore` on the
+  header itself throws and silently kills the rest of `wireEvents`).
+- **`.app-header` is `position: sticky`, which makes it a stacking context**
+  (it used to have `backdrop-filter` too - that also makes it the containing
+  block for `position: fixed` descendants; keep it off). Anything meant to
+  overlay the page must therefore NOT be a child of the header: app.js
+  relocates `<nav id="tabs">` to `<body>` below 1024px for exactly this reason.
   Assert drawer/overlay **geometry** (`getBoundingClientRect().height ≈ innerHeight`),
   not just that clicks land: a fixed child trapped in the header still clicks
   fine, it's just the size of the navbar. That bug shipped once.

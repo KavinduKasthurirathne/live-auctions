@@ -131,6 +131,33 @@ fs.readdirSync(ASSETS, { withFileTypes: true })
   .filter(e => e.isFile() && IMG.test(e.name) && !ROOT_UI_ASSETS.test(e.name))
   .forEach(e => warnings.push(`loose file at assets/ root is NOT indexed: "${e.name}" - move it into a folder (e.g. Tournament Logos/)`));
 
+/* ---- lightweight copies (tools/optimize-images.js) ----
+   When assets-web/<dir>/<base>.webp exists, the manifest serves THAT instead
+   of the full-size original. Keys stay the same, so no consumer changes.
+   webMap (original -> copy) lets season-archive.js logoFor() swap a stored
+   original path (registry seeds keep "assets/..." logo paths) for its copy. */
+const WEB = path.join(ROOT, "assets-web");
+const webMap = {};
+let webHits = 0, webMissing = 0;
+function toWeb(p) {
+  if (typeof p !== "string" || !/^assets\//.test(p) || /\.svg$/i.test(p)) return p;
+  const w = p.replace(/^assets\//, "assets-web/").replace(/\.[^./]+$/, ".webp");
+  if (fs.existsSync(path.join(ROOT, w))) { webMap[p] = w; webHits++; return w; }
+  webMissing++;
+  return p;
+}
+const swapAll = o => Object.keys(o).forEach(k => { o[k] = toWeb(o[k]); });
+if (fs.existsSync(WEB)) {
+  swapAll(playerPhotoIndex);
+  swapAll(teamLogoIndex);
+  Object.values(teamLogoFolders).forEach(swapAll);
+  swapAll(seasonLogos);
+  swapAll(tournamentLogoIndex);
+  if (webMissing) warnings.push(`${webMissing} image(s) have no assets-web copy yet - run: node tools/optimize-images.js`);
+} else {
+  notes.push("no assets-web/ folder - serving full-size originals (run tools/optimize-images.js for small copies)");
+}
+
 const manifest = {
   generatedAt: new Date().toISOString().slice(0, 10),
   counts: {
@@ -144,6 +171,7 @@ const manifest = {
   teamLogoFolders,
   seasonLogos,
   tournamentLogoIndex,
+  webMap,
 };
 
 const json = JSON.stringify(manifest, null, 2).replace(/\n/g, "\n  ");
@@ -166,6 +194,7 @@ console.log(`  team logos:       ${manifest.counts.teamLogos}`);
 console.log(`  season logos:     ${manifest.counts.seasonLogos}`);
 console.log(`  tournament logos: ${manifest.counts.tournamentLogos}`);
 console.log(`  team-logo folders: ${TEAM_LOGO_DIRS.join(", ")}`);
+console.log(`  webp copies used: ${webHits}`);
 if (notes.length) {
   console.log("\nnotes:");
   notes.forEach(n => console.log("  - " + n));

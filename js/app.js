@@ -627,6 +627,9 @@ function setPhoto(el, img, fallback) {
   else { el.style.backgroundImage = ""; el.textContent = fallback; }
 }
 
+/* Lucide icon markup from js/ui.js (empty string if ui.js failed to load). */
+function uiIcon(name, cls) { return window.HCCLUI ? window.HCCLUI.icon(name, cls) : ""; }
+
 let toastTimer;
 function toast(msg, kind = "") {
   const t = $("#toast");
@@ -672,14 +675,21 @@ function switchTab(name) {
   // [data-goto], or a call naming a section that has since been retired
   // (rankings, fixtures, mvp) - so land on Home instead of nothing.
   if (!document.getElementById("view-" + name)) name = "home";
-  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  $$(".tab").forEach(t => {
+    const on = t.dataset.tab === name;
+    t.classList.toggle("active", on);
+    if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
+  });
+  // The phone/tablet bottom bar mirrors the same state.
+  $$(".bnav-item[data-tab]").forEach(b => {
+    const on = b.dataset.tab === name;
+    b.classList.toggle("active", on);
+    if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
   $$(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
   // Open the new view at the top - otherwise it keeps the old view's scroll
   // offset and its controls land hidden underneath the sticky header.
   window.scrollTo(0, 0);
-  // Keep the active pill in sight in the swipeable mobile nav bar.
-  const active = $(".tab.active");
-  if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
 }
 
 /* Sub-tabs: the Auctions section owns the only group (Room / Players /
@@ -781,14 +791,14 @@ function renderAuction() {
       // Editors get the Setup shortcut; viewers just get a friendly notice.
       empty.innerHTML = auCanEdit()
         ? `<h2>No players to auction yet</h2>
-          <p>Go to the <strong>⚙️ Setup</strong> tab to add teams and players, or load the sample data to try it out.</p>
+          <p>Go to the <strong>Setup</strong> tab to add teams and players, or load the sample data to try it out.</p>
           <button class="btn btn-yellow" data-goto="setup">Open Setup</button>`
         : `<h2>No players to auction yet</h2>
           <p>The auction for this tournament hasn't been set up - check back soon!</p>`;
     } else {
       const sold = state.players.filter(p => p.status === "sold").length;
       const unsold = state.players.filter(p => p.status === "unsold").length;
-      empty.innerHTML = `<h2>🏆 Auction Complete</h2>
+      empty.innerHTML = `<h2>Auction complete</h2>
         <p>${sold} sold · ${unsold} unsold.</p>
         <div class="form-row" style="justify-content:center">
           ${(unsold && auCanEdit()) ? `<button class="btn btn-yellow" id="btnReauction2">Re-open ${unsold} unsold</button>` : ""}
@@ -835,7 +845,7 @@ function renderAuction() {
   const leader = a.currentBidderId ? getTeam(a.currentBidderId) : null;
   $("#currentBidAmount").textContent = leader ? money(a.currentBid) : money(player.basePrice);
   $("#currentLeader").textContent = leader ? leader.name : "No bids yet";
-  $("#currentLeader").style.color = leader ? "var(--yellow)" : "var(--muted)";
+  $("#currentLeader").style.color = leader ? "var(--live)" : "var(--text-2)";
 
   renderTeamButtons();
   renderRtmPanel();
@@ -878,7 +888,7 @@ function renderTeamButtons() {
   const next = nextBidAmount();
 
   if (!state.teams.length) {
-    grid.innerHTML = `<p class="hint">No teams yet. Add teams in the ⚙️ Setup tab.</p>`;
+    grid.innerHTML = `<p class="hint">No teams yet. Add teams in the Setup tab.</p>`;
     return;
   }
 
@@ -899,7 +909,7 @@ function renderTeamButtons() {
       <span class="tb-meta">
         <span class="tb-name">${esc(t.name)}</span>
         <span class="tb-purse">
-          <span class="tb-purse-txt">${leading ? "★ Leading" : money(info.remaining) + " left"}</span>
+          <span class="tb-purse-txt">${leading ? "Leading" : money(info.remaining) + " left"}</span>
           ${rtmOn(state) && rtmLeft(state, t.id) > 0
             ? `<i class="rtm-badge" title="Right to Match card still in hand">RTM</i>` : ""}
         </span>
@@ -916,7 +926,7 @@ function renderSquadTracker() {
   if (!box) return;
   if (!state.teams.length) { box.innerHTML = ""; return; }
   const a = state.auction;
-  box.innerHTML = `<h3 class="tracker-title">📋 Squad Tracker</h3>
+  box.innerHTML = `<h3 class="tracker-title">Squad Tracker</h3>
     <div class="tracker-grid">${state.teams.map(t => {
       const info = squadInfo(state, t.id);
       const bought = state.players.filter(p => p.status === "sold" && !p.retained && p.soldTo === t.id);
@@ -1250,7 +1260,7 @@ function showResultView(r) {
     logo.classList.add("hidden");
     text.innerHTML = `<b>${esc(r.playerName)}</b> went unsold`;
   }
-  actions.innerHTML = `<button class="btn btn-yellow" id="btnNextPlayer">Next Player ▶</button>`;
+  actions.innerHTML = `<button class="btn btn-yellow" id="btnNextPlayer"><span>Next Player</span>${uiIcon("chevron-right")}</button>`;
   const nb = $("#btnNextPlayer"); if (nb) nb.onclick = nextPlayer;
 }
 function hideOverlay() { $("#overlay").classList.add("hidden"); }
@@ -1288,7 +1298,7 @@ function renderInsights() {
     `<div class="ins-card"><div class="ins-k">${label}</div><div class="ins-v${accent ? " accent" : ""}">${value}</div></div>`;
 
   view.innerHTML = `
-    <div class="view-head"><h2>📊 AUCTION INSIGHTS</h2></div>
+    <div class="view-head"><div><p class="eyebrow">Auction</p><h2>Insights</h2></div></div>
     <div class="ins-complete">
       <div class="ins-complete-top"><span>Auction Completion</span><span><b>${completion}%</b> · ${done} / ${auctionable.length} done</span></div>
       <div class="ins-bar"><span style="width:${completion}%"></span></div>
@@ -1325,17 +1335,35 @@ function renderInsights() {
         </tbody></table></div>
     </div>`;
 
-  // Charts: only when the tab is visible and Chart.js actually loaded (offline-safe).
-  if (view.classList.contains("active") && window.Chart) buildInsightCharts({ sold, unsold, available, byPrice, teamSpends });
+  // Charts: only when the tab is visible. Chart.js is fetched on first use
+  // (HCCLUI.loadLib) instead of on every page load; if it's blocked or
+  // offline, each chart box says so and the cards/tables above still work.
+  if (!view.classList.contains("active")) return;
+  const chartData = { sold, unsold, available, byPrice, teamSpends };
+  if (window.Chart) { buildInsightCharts(chartData); return; }
+  if (!window.HCCLUI) return;
+  window.HCCLUI.loadLib("chart")
+    .then(() => { if (view.classList.contains("active")) buildInsightCharts(chartData); })
+    .catch(() => {
+      view.querySelectorAll(".ins-chart canvas").forEach(c => {
+        c.insertAdjacentHTML("afterend", `<div class="ins-chart-note">Charts need an internet connection - the numbers above are complete.</div>`);
+        c.remove();
+      });
+    });
 }
 
 function buildInsightCharts(d) {
   Object.values(insCharts).forEach(c => { try { c.destroy(); } catch (e) {} });
   insCharts = {};
-  const gridC = "rgba(255,255,255,0.08)", tickC = "#9b9ba3";
-  const axis = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickC } } },
-    scales: { x: { ticks: { color: tickC }, grid: { color: gridC } }, y: { ticks: { color: tickC }, grid: { color: gridC } } } };
-  const pie = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickC } } } };
+  // Midnight Stadium chart palette (css/tokens.css): blue = money moving,
+  // teal = good/remaining, red = unsold, slate = not yet decided.
+  const C = { accent: "#3B82F6", live: "#2DD4BF", danger: "#F87171", rest: "#334155" };
+  const gridC = "rgba(148,163,184,0.12)", tickC = "#94A3B8";
+  const font = { family: "Inter, system-ui, sans-serif", size: 12 };
+  const bar = { borderRadius: 6, maxBarThickness: 36 };
+  const axis = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickC, font } } },
+    scales: { x: { ticks: { color: tickC, font }, grid: { color: gridC } }, y: { ticks: { color: tickC, font }, grid: { color: gridC }, beginAtZero: true } } };
+  const pie = { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "bottom", labels: { color: tickC, font } } } };
   const mk = (id, cfg) => { const el = document.getElementById(id); if (el) insCharts[id] = new window.Chart(el, cfg); };
 
   const prices = d.sold.map(p => p.soldPrice || 0);
@@ -1343,13 +1371,13 @@ function buildInsightCharts(d) {
   const bins = Array.from({ length: binCount }, () => 0);
   prices.forEach(v => { bins[Math.min(binCount - 1, Math.floor(v / binSize))]++; });
   mk("chartPrices", { type: "bar", data: { labels: bins.map((_, i) => `${i * binSize}-${(i + 1) * binSize}`),
-    datasets: [{ label: "Players", data: bins, backgroundColor: "#ffcc00" }] }, options: axis });
+    datasets: [{ label: "Players", data: bins, backgroundColor: C.accent, ...bar }] }, options: axis });
   mk("chartSold", { type: "doughnut", data: { labels: ["Sold", "Unsold", "Remaining"],
-    datasets: [{ data: [d.sold.length, d.unsold.length, d.available.length], backgroundColor: ["#22c55e", "#e10600", "#34343a"] }] }, options: pie });
+    datasets: [{ data: [d.sold.length, d.unsold.length, d.available.length], backgroundColor: [C.live, C.danger, C.rest], borderColor: "#17243A", borderWidth: 2 }] }, options: pie });
   mk("chartTeamSpend", { type: "bar", data: { labels: d.teamSpends.map(x => x.t.name),
-    datasets: [{ label: "Spent", data: d.teamSpends.map(x => x.spent), backgroundColor: "#e10600" }] }, options: axis });
+    datasets: [{ label: "Spent", data: d.teamSpends.map(x => x.spent), backgroundColor: C.accent, ...bar }] }, options: axis });
   mk("chartTeamPurse", { type: "bar", data: { labels: d.teamSpends.map(x => x.t.name),
-    datasets: [{ label: "Remaining", data: d.teamSpends.map(x => x.info.remaining), backgroundColor: "#22c55e" }] }, options: axis });
+    datasets: [{ label: "Remaining", data: d.teamSpends.map(x => x.info.remaining), backgroundColor: C.live, ...bar }] }, options: axis });
 }
 
 /* ---------- PLAYERS ---------- */
@@ -1398,7 +1426,7 @@ function renderPlayers() {
 function renderPurse() {
   const grid = $("#purseGrid");
   grid.innerHTML = "";
-  if (!state.teams.length) { grid.innerHTML = `<p class="hint">No teams yet. Add teams in the ⚙️ Setup tab.</p>`; return; }
+  if (!state.teams.length) { grid.innerHTML = `<p class="hint">No teams yet. Add teams in the Setup tab.</p>`; return; }
 
   state.teams.forEach(t => {
     const total = teamPurse(t), spent = teamSpent(t.id), remaining = total - spent;
@@ -1519,8 +1547,8 @@ function renderSetup() {
       ${logoHTML("ml-logo", t.logo, t.name)}
       <span class="ml-name">${esc(t.name)}</span>
       <span class="ml-sub">${sub}</span>
-      <button class="icon-btn" data-edit-team="${t.id}" title="Edit">✎</button>
-      <button class="icon-btn del" data-del-team="${t.id}" title="Delete">✕</button>`;
+      <button class="icon-btn" data-edit-team="${t.id}" title="Edit" aria-label="Edit team">${uiIcon("pencil")}</button>
+      <button class="icon-btn del" data-del-team="${t.id}" title="Delete" aria-label="Delete team">${uiIcon("trash-2")}</button>`;
     tl.appendChild(row);
   });
 
@@ -1542,15 +1570,15 @@ function renderSetup() {
     } else {
       sub = `${money(p.basePrice)} · ${p.status}`;
       reorder = `
-      <button class="icon-btn" data-up="${p.id}" title="Move up">▲</button>
-      <button class="icon-btn" data-down="${p.id}" title="Move down">▼</button>`;
+      <button class="icon-btn" data-up="${p.id}" title="Move up" aria-label="Move up">${uiIcon("chevron-up")}</button>
+      <button class="icon-btn" data-down="${p.id}" title="Move down" aria-label="Move down">${uiIcon("chevron-down")}</button>`;
     }
     row.innerHTML = `
       ${logoHTML("ml-logo", photoOf(p), p.name)}
       <span class="ml-name">${esc(p.name)}</span>
       <span class="ml-sub">${sub}</span>${reorder}
-      <button class="icon-btn" data-edit-player="${p.id}" title="Edit">✎</button>
-      <button class="icon-btn del" data-del-player="${p.id}" title="Delete">✕</button>`;
+      <button class="icon-btn" data-edit-player="${p.id}" title="Edit" aria-label="Edit player">${uiIcon("pencil")}</button>
+      <button class="icon-btn del" data-del-player="${p.id}" title="Delete" aria-label="Delete player">${uiIcon("trash-2")}</button>`;
     pl.appendChild(row);
   });
 
@@ -1580,8 +1608,8 @@ function renderSetup() {
       <span class="ml-name">${esc(p.name)}</span>
       <span class="ret-tag ${retainTagClass(p.role)}">${esc(retainTag(p.role))}</span>
       <span class="ml-sub">${team ? esc(team.name) : "-"}${p.soldPrice ? " · " + money(p.soldPrice) : ""}</span>
-      <button class="icon-btn" data-edit-retain="${p.id}" title="Edit">✎</button>
-      <button class="icon-btn del" data-del-retain="${p.id}" title="Remove">✕</button>`;
+      <button class="icon-btn" data-edit-retain="${p.id}" title="Edit" aria-label="Edit retained player">${uiIcon("pencil")}</button>
+      <button class="icon-btn del" data-del-retain="${p.id}" title="Remove" aria-label="Remove retained player">${uiIcon("trash-2")}</button>`;
     rl.appendChild(row);
   });
 }
@@ -1834,7 +1862,7 @@ async function loadCareerExtraSheets() {
     const list = S.list();
     const got = await Promise.all(list.map(t =>
       fs.getDoc(fs.doc(H.db, "tournaments", t.id, "stats", "sheet"))
-        .then(d => (d.exists() ? { name: t.name, csv: (d.data() || {}).csv || "" } : null))
+        .then(d => (d.exists() ? { id: t.id, name: t.name, csv: (d.data() || {}).csv || "" } : null))
         .catch(() => null)));
     careerExtraSheets = got.filter(x => x && x.csv);
   } catch (e) { /* bundled sheets alone still give a useful career line */ }
@@ -1875,7 +1903,7 @@ async function renderCareerPreview() {
   box.classList.remove("hidden");
   box.innerHTML = `
     <div class="cp-head">
-      <span class="cp-title">📊 Career stats found</span>
+      <span class="cp-title">${uiIcon("chart-column")} Career stats found</span>
       <span class="cp-src" title="${esc(c.tournaments.join(", "))}">${n} tournament${n === 1 ? "" : "s"}</span>
     </div>
     <div class="cp-grid">
@@ -2141,18 +2169,21 @@ function wireEvents() {
      descendants (a fixed child is then sized against the ~70px header, not the
      viewport - the "menu expands inside the navbar" bug), and `position: sticky`
      makes it a stacking context, which caps anything inside it at the header's
-     own z-index. So below 900px we relocate the very same <nav id="tabs"> node
+     own z-index. So below 1024px we relocate the very same <nav id="tabs"> node
      to <body> - same element, same id, same listeners (fantasy.js
      and series.js all hold references to it) - and hand it back to the header
      on desktop, where the layout is untouched. */
-  const mq = window.matchMedia("(max-width: 900px)");
+  const mq = window.matchMedia("(max-width: 1023.98px)");
   const header = document.querySelector(".app-header");
   const nav = $("#tabs");
   const navToggle = $("#navToggle");
   const navClose = $("#navClose");
   const navBackdrop = $("#navBackdrop");
   const navSlot = document.createComment("tabs"); // marks the desktop home of the nav
-  if (header && nav) header.insertBefore(navSlot, nav);
+  // The nav's desktop home is wherever it sits in the markup (inside
+  // .header-inner today) - remember that parent, not the header itself.
+  const navHome = nav ? nav.parentNode : null;
+  if (header && nav && navHome) navHome.insertBefore(navSlot, nav);
 
   let navReturnFocus = null; // control to hand focus back to when we close
   const navIsOpen = () => document.body.classList.contains("nav-open");
@@ -2164,7 +2195,7 @@ function wireEvents() {
   const lockPage = on => document.documentElement.classList.toggle("nav-locked", on);
 
   function placeNav() {
-    if (!header || !nav) return;
+    if (!header || !nav || !navHome) return;
     if (mq.matches) {
       if (nav.parentElement !== document.body) document.body.appendChild(nav);
       // Only a drawer is a dialog; the desktop pill row is just a nav.
@@ -2173,7 +2204,7 @@ function wireEvents() {
       nav.setAttribute("aria-labelledby", "navTitle");
     } else {
       closeNav({ restoreFocus: false }); // never leave a drawer open across the breakpoint
-      if (nav.parentElement !== header) header.insertBefore(nav, navSlot);
+      if (nav.parentNode !== navHome) navHome.insertBefore(nav, navSlot);
       nav.removeAttribute("role");
       nav.removeAttribute("aria-modal");
       nav.removeAttribute("aria-labelledby");
@@ -2230,6 +2261,18 @@ function wireEvents() {
   });
   mq.addEventListener("change", placeNav);
   placeNav();
+
+  // Bottom tab bar (phones/tablets): each item forwards to the real #tabs
+  // button so every listener on it (switchTab, series.js re-render,
+  // analytics) runs exactly as for a top-nav click. "More" is #navToggle,
+  // wired above.
+  const bottomNav = $("#bottomNav");
+  if (bottomNav) bottomNav.addEventListener("click", e => {
+    const item = e.target.closest(".bnav-item[data-tab]");
+    if (!item) return;
+    const real = $(`#tabs .tab[data-tab="${item.dataset.tab}"]`);
+    if (real) real.click();
+  });
   // Sub-tab bars - the Auctions section owns the only .subtab group today;
   // switchSubTab scopes the toggle to the right section regardless.
   document.addEventListener("click", e => {

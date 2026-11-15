@@ -63,18 +63,23 @@ function renderAuthBox() {
   if (!box) return;
   const H = window.HCCL;
   if (!H.configured) { box.innerHTML = ""; return; }
-  if (!H.ready) { box.innerHTML = `<span class="auth-connecting">Connecting…</span>`; return; }
+  if (!H.ready) { box.innerHTML = `<span class="auth-connecting" role="status"><span class="skel skel-avatar" aria-hidden="true"></span><span class="sr-only">Connecting…</span></span>`; return; }
   if (!H.user) {
-    box.innerHTML = `<button class="auth-btn" id="authSignIn">Sign in with Google</button>`;
+    box.innerHTML = `<button class="auth-btn" id="authSignIn">Sign in</button>`;
     const b = document.getElementById("authSignIn"); if (b) b.onclick = () => H.signIn();
   } else {
+    const who = H.user.displayName || H.user.email || "";
+    const initial = esc((who.trim()[0] || "?").toUpperCase());
     box.innerHTML = `<div class="auth-user">
-        ${H.user.photoURL ? `<img src="${esc(H.user.photoURL)}" alt="" referrerpolicy="no-referrer"/>` : ""}
+        ${H.user.photoURL ? `<img src="${esc(H.user.photoURL)}" alt="" referrerpolicy="no-referrer"/>`
+          : `<span class="auth-avatar" style="display:grid;place-items:center;font-weight:700;font-size:13px">${initial}</span>`}
         <div class="auth-meta">
-          <span class="auth-name">${esc(H.user.displayName || H.user.email || "")}</span>
+          <span class="auth-name">${esc(who)}</span>
           <span class="auth-role role-${esc(H.role)}">${esc(H.role)}</span>
         </div>
-        <button class="auth-btn ghost" id="authSignOut">Sign out</button>
+        <button class="auth-btn ghost" id="authSignOut" aria-label="Sign out" title="Sign out">
+          <svg class="ico" aria-hidden="true"><use href="#i-log-out"></use></svg><span class="auth-btn-label">Sign out</span>
+        </button>
       </div>`;
     // Role management moved to the 📈 Members tab (js/members.js), which admins
     // and moderators share - no header popup any more.
@@ -96,7 +101,7 @@ function gateLogoHtml() {
   // only logo guaranteed to be available before sign-in (the cloud logo isn't
   // readable yet, and a stale/broken #brandLogo background must not pre-empt it).
   // Swap assets/brand-logo.jpeg in the repo to rebrand for a new league.
-  return `<div class="auth-gate-logo" style="background-image:url('assets/brand-logo.jpeg');background-size:cover;background-position:center"></div>`;
+  return `<div class="auth-gate-logo" style="background-image:url('assets-web/brand-logo.webp');background-size:cover;background-position:center"></div>`;
 }
 function renderAuthGate() {
   const H = window.HCCL;
@@ -120,12 +125,12 @@ function renderAuthGate() {
   authGateEl.innerHTML = `
     <div class="gate-hero">
       ${gateLogoHtml()}
-      <h1 class="gate-title">HC COMMUNITY</h1>
-      <p class="gate-flagline">
+      <p class="gate-flagline eyebrow">
         <span class="sl-flag" role="img" aria-label="Sri Lanka"></span>
-        <span class="gate-country">SRI LANKA</span>
+        <span class="gate-country">Sri Lanka</span>
       </p>
-      <p class="gate-tagline">HAND CRICKET CHAMPIONS LEAGUE</p>
+      <h1 class="gate-title">HC Community</h1>
+      <p class="gate-tagline">Hand Cricket Champions League</p>
       <p class="gate-tags">Live Auctions · Fantasy League · Season Stats</p>
     </div>
     <div class="gate-panel"><div class="gate-panel-card">${panel}</div></div>`;
